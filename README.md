@@ -61,11 +61,12 @@ It is the reverse of `openspec-apply-change`, and is distinct from `openspec-syn
 
 ## Cursor extras
 
-This repo also keeps Cursor-specific helpers:
+Canonical skill content lives under `skills/`. Cursor loads the same files via a symlink:
 
 | Type | Path |
 |------|------|
-| Cursor skill mirror | `.cursor/skills/openspec-update-change-from-code/SKILL.md` |
+| Skill (canonical) | `skills/openspec-update-change-from-code/SKILL.md` |
+| Cursor skill link | `.cursor/skills/openspec-update-change-from-code` → `../../skills/...` |
 | Cursor command | `.cursor/commands/opsx-update-change-from-code.md` |
 
 Clone into a project root if you want the Cursor command as well as the skill:
