@@ -30,6 +30,11 @@ It is the reverse of `openspec-apply-change`, and is distinct from `openspec-syn
 - An AI coding agent that supports [Agent Skills](https://agentskills.io)
 - [OpenSpec CLI](https://github.com/Fission-AI/OpenSpec) (`openspec` on your `PATH`)
 
+## Team workflow
+
+See [AI-SDD 团队工作流](docs/ai-sdd-workflow.md) for the evidence-driven schema,
+risk levels, frontend/backend spec boundaries, independent verification, and archive gates.
+
 ## Skill: `openspec-update-change-from-code`
 
 | | |
