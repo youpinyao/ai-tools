@@ -33,6 +33,11 @@ rules:
     - 除非属于方案约束，否则 proposal 中避免过早描述实现细节。
     - 前后端需求必须拆分为独立 capability spec，不得混写在同一份 spec 中。
     - 涉及前后端契约时，分别列出后端契约能力和前端消费能力，并声明关联方式。
+    - 后端 capability 必须命名为 <domain>-backend，前端 capability 必须命名为 <domain>-frontend；<domain> 使用 kebab-case 且双方保持一致。
+    - 仅一端发生需求变化时只创建该端 spec，不得为了形式完整创建空的配对 spec。
+    - Low 风险限于单模块、无公共契约或数据结构变化且容易回滚的变更。
+    - Medium 风险包括跨模块、兼容性契约变化、可回滚迁移或需要功能开关的变更。
+    - High 风险包括破坏性契约、不可逆迁移、认证授权、资金隐私、核心性能或跨系统高影响变更。
 
   specs:
     - 使用“必须”“应当”“可以”等明确词语表达要求。
@@ -48,7 +53,10 @@ rules:
     - 每个场景必须能够映射到自动化测试或明确的人工验证步骤。
     - 后端 spec 只描述服务端行为、接口契约、数据和错误语义。
     - 前端 spec 只描述用户行为、页面状态、交互和契约消费方式。
+    - 后端 spec 必须存放于 specs/<domain>-backend/spec.md，前端 spec 必须存放于 specs/<domain>-frontend/spec.md。
+    - 同一业务能力的前后端 spec 必须使用相同的 <domain>，不得使用无法建立对应关系的别名。
     - 前后端 spec 通过 API 路径、OpenAPI operationId、Schema 名称或明确版本关联，禁止复制两份易漂移的契约定义。
+    - 后端 spec 是接口契约事实来源；前端 spec 引用契约标识并描述消费行为，不重复定义完整请求和响应结构。
 
   design:
     - 首先简要描述当前状态和目标状态。
