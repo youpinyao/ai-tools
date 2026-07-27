@@ -8,10 +8,10 @@ description: Propose a new change - create it and generate all artifacts in one 
 Propose a new change - create the change and generate all artifacts in one step.
 
 I'll create every artifact required by the selected schema. For `evidence-driven` this includes:
-- proposal.md (what, why, and risk level)
-- separate backend/frontend specs when both sides change
+- proposal.md (what and why)
+- capability specs (what the system should do)
 - design.md (how)
-- tasks.md (independently reviewable behavior increments)
+- tasks.md (implementation checklist)
 - verification.md (verification plan; results remain pending until implementation)
 
 When ready to implement, run /opsx:apply

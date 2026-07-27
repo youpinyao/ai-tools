@@ -55,11 +55,6 @@ Implement tasks from an OpenSpec change.
    - **spec-driven**: proposal, specs, design, tasks
    - Other schemas: follow the contextFiles from CLI output
 
-   **Pre-implementation risk gate:**
-   - Read the risk level from proposal.md and approval fields from design.md when present.
-   - If risk is High, require a named approval owner and `Approval status: Approved` before editing code.
-   - If High-risk approval is missing or pending, stop and request the required human approval; do not offer an override.
-
 5. **Show current progress**
 
    Display:

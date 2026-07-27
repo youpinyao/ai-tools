@@ -51,13 +51,11 @@ Archive a completed change in the experimental workflow.
 
    For schemas that include a `verification` artifact:
    - Resolve and read the verification artifact from status/instruction context; do not assume its path.
-   - Resolve and read the proposal and design artifacts to determine the declared risk level and required approval.
    - Require the exact conclusion `验证结论：通过` in `## 独立验证结论`.
    - Require `验证者` to identify an independent Agent/new conversation.
    - Block archive if the conclusion is missing, `待执行`, or `阻塞`.
    - Block archive if any applicable check is `待执行` or `失败`.
    - Block archive if any CRITICAL issue is unresolved.
-   - For Medium/High risk changes, require a named approval owner, `Approval status: Approved` in design.md, and explicit residual-risk acceptance in verification.md.
 
    Verification failures are hard gates. Do not offer a confirmation override.
 

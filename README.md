@@ -33,7 +33,7 @@ It is the reverse of `openspec-apply-change`, and is distinct from `openspec-syn
 ## Team workflow
 
 See [AI-SDD 团队工作流](docs/ai-sdd-workflow.md) for the evidence-driven schema,
-risk levels, frontend/backend spec boundaries, independent verification, and archive gates.
+which keeps the original OpenSpec workflow and adds independent verification and archive gates.
 
 ## Skill: `openspec-update-change-from-code`
 
