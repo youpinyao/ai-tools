@@ -1,162 +1,161 @@
 name: evidence-driven
 version: 1
-description: Default OpenSpec workflow with verification - proposal → specs → design → tasks → verification
+description: 带验证环节的默认 OpenSpec 工作流——提案 → 规范 → 设计 → 任务 → 验证
 artifacts:
   - id: proposal
     generates: proposal.md
-    description: Initial proposal document outlining the change
+    description: 说明变更内容的初始提案文档
     template: proposal.md
     instruction: |
-      Create the proposal document that establishes WHY this change is needed.
+      创建提案文档，说明为什么需要此项变更。
 
-      Sections:
-      - **Why**: 1-2 sentences on the problem or opportunity. What problem does this solve? Why now?
-      - **What Changes**: Bullet list of changes. Be specific about new capabilities, modifications, or removals. Mark breaking changes with **BREAKING**.
-      - **Capabilities**: Identify which specs will be created or modified:
-        - **New Capabilities**: List capabilities being introduced. Each becomes a new `specs/<name>/spec.md`. Use kebab-case names (e.g., `user-auth`, `data-export`).
-        - **Modified Capabilities**: List existing capabilities whose REQUIREMENTS are changing. Only include if spec-level behavior changes (not just implementation details). Each needs a delta spec file. Check `openspec/specs/` for existing spec names. Leave empty if no requirement changes.
-      - **Impact**: Affected code, APIs, dependencies, or systems.
+      文档章节：
+      - **背景与动机**：用 1～2 句话说明问题或机会。本变更解决什么问题？为什么现在需要变更？
+      - **变更内容**：以项目符号列出变更。明确说明新增、修改或移除的能力。破坏性变更须标记为 **BREAKING**。
+      - **能力**：明确将创建或修改哪些规范：
+        - **新增能力**：列出本次引入的能力。每项能力对应一个新的 `specs/<名称>/spec.md`。名称使用 kebab-case（例如 `user-auth`、`data-export`）。
+        - **修改能力**：列出需求（REQUIREMENTS）发生变化的现有能力。仅在规范层行为变化时列出，不包括单纯的实现细节变化。每项能力都需要一个增量规范（delta spec）文件。检查 `openspec/specs/` 中已有的规范名称；没有需求变化时留空。
+      - **影响**：受影响的代码、API、依赖或系统。
 
-      IMPORTANT: The Capabilities section is critical. It creates the contract between
-      proposal and specs phases. Research existing specs before filling this in.
-      Each capability listed here will need a corresponding spec file.
+      重要：能力章节至关重要，它建立提案与规范阶段之间的约定。
+      填写前先调研已有规范。此处列出的每项能力都必须有对应的规范文件。
 
-      Keep it concise (1-2 pages). Focus on the "why" not the "how" -
-      implementation details belong in design.md.
+      内容保持简洁（1～2 页），重点说明“为什么”，而不是“如何实现”；
+      实现细节应写入 design.md。
 
-      This is the foundation - specs, design, and tasks all build on this.
+      提案是后续工作的基础，规范、设计和任务都建立在提案之上。
     requires: []
 
   - id: specs
     generates: "specs/**/*.md"
-    description: Detailed specifications for the change
+    description: 变更的详细规范
     template: spec.md
     instruction: |
-      Create specification files that define WHAT the system should do.
+      创建规范文件，定义系统应该做什么。
 
-      Create one spec file per capability listed in the proposal's Capabilities section.
-      - New capabilities: use the exact kebab-case name from the proposal (specs/<capability>/spec.md).
-      - Modified capabilities: use the existing spec folder name from openspec/specs/<capability>/ when creating the delta spec at specs/<capability>/spec.md.
+      为提案“能力”章节中列出的每项能力创建一个规范文件。
+      - 新增能力：使用提案中完全一致的 kebab-case 名称（`specs/<capability>/spec.md`）。
+      - 修改能力：在 `specs/<capability>/spec.md` 创建增量规范时，使用 `openspec/specs/<capability>/` 中已有的规范目录名称。
 
-      Delta operations (use ## headers):
-      - **ADDED Requirements**: New capabilities
-      - **MODIFIED Requirements**: Changed behavior - MUST include full updated content
-      - **REMOVED Requirements**: Deprecated features - MUST include **Reason** and **Migration**
-      - **RENAMED Requirements**: Name changes only - use FROM:/TO: format
+      增量操作（使用 ## 标题）：
+      - **ADDED Requirements**：新增能力
+      - **MODIFIED Requirements**：变更的行为，必须包含更新后的完整内容
+      - **REMOVED Requirements**：废弃的功能，必须包含 **Reason** 和 **Migration**
+      - **RENAMED Requirements**：仅用于名称变更，使用 FROM:/TO: 格式
 
-      Format requirements:
-      - Each requirement: `### Requirement: <name>` followed by description
-      - Use SHALL/MUST for normative requirements (avoid should/may)
-      - Each scenario: `#### Scenario: <name>` with WHEN/THEN format
-      - **CRITICAL**: Scenarios MUST use exactly 4 hashtags (`####`). Using 3 hashtags or bullets will fail silently.
-      - Every requirement MUST have at least one scenario.
+      格式要求：
+      - 每项需求使用 `### Requirement: <名称>`，后接需求说明
+      - 规范性需求使用 SHALL/MUST，避免使用 should/may
+      - 每个场景使用 `#### Scenario: <名称>`，并采用 WHEN/THEN 格式
+      - **关键要求**：场景标题必须恰好使用 4 个井号（`####`）。使用 3 个井号或项目符号会导致静默失败。
+      - 每项需求必须至少包含一个场景。
 
-      MODIFIED requirements workflow:
-      1. Locate the existing requirement in openspec/specs/<capability>/spec.md
-      2. Copy the ENTIRE requirement block (from `### Requirement:` through all scenarios)
-      3. Paste under `## MODIFIED Requirements` and edit to reflect new behavior
-      4. Ensure header text matches exactly (whitespace-insensitive)
+      MODIFIED 需求处理流程：
+      1. 在 `openspec/specs/<capability>/spec.md` 中找到现有需求
+      2. 复制完整的需求块（从 `### Requirement:` 开始，包含其全部场景）
+      3. 粘贴到 `## MODIFIED Requirements` 下，并根据新行为进行修改
+      4. 确保标题文本完全匹配（忽略空白差异）
 
-      Common pitfall: Using MODIFIED with partial content loses detail at archive time.
-      If adding new concerns without changing existing behavior, use ADDED instead.
+      常见问题：MODIFIED 只包含部分内容会在归档时丢失细节。
+      如果只是增加新关注点而未改变现有行为，应使用 ADDED。
 
-      Example:
+      示例：
       ```
       ## ADDED Requirements
 
-      ### Requirement: User can export data
-      The system SHALL allow users to export their data in CSV format.
+      ### Requirement: 用户可以导出数据
+      系统 SHALL 允许用户以 CSV 格式导出其数据。
 
-      #### Scenario: Successful export
-      - **WHEN** user clicks "Export" button
-      - **THEN** system downloads a CSV file with all user data
+      #### Scenario: 成功导出
+      - **WHEN** 用户点击“导出”按钮
+      - **THEN** 系统下载包含全部用户数据的 CSV 文件
 
       ## REMOVED Requirements
 
-      ### Requirement: Legacy export
-      **Reason**: Replaced by new export system
-      **Migration**: Use new export endpoint at /api/v2/export
+      ### Requirement: 旧版导出
+      **Reason**: 已由新版导出系统取代
+      **Migration**: 使用新的导出端点 `/api/v2/export`
       ```
 
-      Specs should be testable - each scenario is a potential test case.
+      规范应具备可测试性，每个场景都可能成为一个测试用例。
     requires:
       - proposal
 
   - id: design
     generates: design.md
-    description: Technical design document with implementation details
+    description: 包含实现细节的技术设计文档
     template: design.md
     instruction: |
-      Create the design document that explains HOW to implement the change.
+      创建设计文档，说明如何实现此项变更。
 
-      When to include design.md (create only if any apply):
-      - Cross-cutting change (multiple services/modules) or new architectural pattern
-      - New external dependency or significant data model changes
-      - Security, performance, or migration complexity
-      - Ambiguity that benefits from technical decisions before coding
+      何时需要 design.md（至少符合一项时才创建）：
+      - 跨多个服务或模块的横切变更，或者引入新的架构模式
+      - 引入新的外部依赖，或者数据模型发生重大变化
+      - 存在安全、性能或迁移方面的复杂性
+      - 存在适合在编码前通过技术决策消除的歧义
 
-      Sections:
-      - **Context**: Background, current state, constraints, stakeholders
-      - **Goals / Non-Goals**: What this design achieves and explicitly excludes
-      - **Decisions**: Key technical choices with rationale (why X over Y?). Include alternatives considered for each decision.
-      - **Risks / Trade-offs**: Known limitations, things that could go wrong. Format: [Risk] → Mitigation
-      - **Migration Plan**: Steps to deploy, rollback strategy (if applicable)
-      - **Open Questions**: Outstanding decisions or unknowns to resolve
+      文档章节：
+      - **背景**：相关背景、当前状态、约束和利益相关方
+      - **目标 / 非目标**：本设计要达成的目标，以及明确排除的内容
+      - **设计决策**：关键技术选择及其理由（为什么选择 X 而不是 Y？）。每项决策都应包含考虑过的替代方案。
+      - **风险 / 权衡**：已知限制和潜在问题。格式：[风险] → 缓解措施
+      - **迁移计划**：部署步骤和回滚策略（如适用）
+      - **待解决问题**：尚未作出的决策或需要解决的未知事项
 
-      Focus on architecture and approach, not line-by-line implementation.
-      Reference the proposal for motivation and specs for requirements.
+      重点描述架构和实现思路，不要逐行描述实现。
+      变更动机以提案为依据，需求以规范为依据。
 
-      Good design docs explain the "why" behind technical decisions.
+      优秀的设计文档会说明技术决策背后的“为什么”。
     requires:
       - proposal
 
   - id: tasks
     generates: tasks.md
-    description: Implementation checklist with trackable tasks
+    description: 包含可跟踪任务的实现清单
     template: tasks.md
     instruction: |
-      Create the task list that breaks down the implementation work.
+      创建任务清单，将实现工作拆分为可执行的任务。
 
-      **IMPORTANT: Follow the template below exactly.** The apply phase parses
-      checkbox format to track progress. Tasks not using `- [ ]` won't be tracked.
+      **重要：必须严格遵循下方模板。** apply 阶段通过解析复选框格式跟踪进度。
+      未使用 `- [ ]` 格式的任务不会被跟踪。
 
-      Guidelines:
-      - Group related tasks under ## numbered headings
-      - Each task MUST be a checkbox: `- [ ] X.Y Task description`
-      - Tasks should be small enough to complete in one session
-      - Order tasks by dependency (what must be done first?)
+      编写准则：
+      - 在带编号的 ## 标题下对相关任务分组
+      - 每项任务必须使用复选框：`- [ ] X.Y 任务说明`
+      - 任务粒度应足够小，能够在一次会话中完成
+      - 按依赖关系排列任务，优先列出必须先完成的任务
 
-      Example:
+      示例：
       ```
-      ## 1. Setup
+      ## 1. 准备工作
 
-      - [ ] 1.1 Create new module structure
-      - [ ] 1.2 Add dependencies to package.json
+      - [ ] 1.1 创建新的模块结构
+      - [ ] 1.2 向 package.json 添加依赖
 
-      ## 2. Core Implementation
+      ## 2. 核心实现
 
-      - [ ] 2.1 Implement data export function
-      - [ ] 2.2 Add CSV formatting utilities
+      - [ ] 2.1 实现数据导出函数
+      - [ ] 2.2 添加 CSV 格式化工具
       ```
 
-      Reference specs for what needs to be built, design for how to build it.
-      Each task should be verifiable - you know when it's done.
+      要构建什么以规范为依据，如何构建以设计为依据。
+      每项任务都应可验证，以便明确判断任务是否完成。
     requires:
       - specs
       - design
 
   - id: verification
     generates: verification.md
-    description: Verification plan and implementation evidence
+    description: 验证计划与实现证据
     template: verification.md
     instruction: |
-      Create the verification plan that defines how the implementation will be validated.
+      创建验证计划，定义如何验证实现。
 
-      Map requirements and scenarios to applicable automated or manual checks.
-      Use real commands confirmed from the repository; do not invent commands.
-      During planning, mark checks as pending and do not fabricate results.
-      After implementation, record actual commands, results, skipped checks, and remaining risks.
-      Leave the independent verification conclusion for an agent that did not implement the change.
+      将需求和场景映射到适用的自动化或人工检查。
+      使用已从仓库确认的真实命令，不要编造命令。
+      规划阶段将检查标记为待执行，不得捏造结果。
+      实现后记录实际执行的命令、结果、跳过的检查和剩余风险。
+      独立验证结论应留给未参与实现此项变更的 Agent 填写。
     requires:
       - tasks
 
@@ -164,7 +163,7 @@ apply:
   requires: [verification]
   tracks: tasks.md
   instruction: |
-    Read context files, work through pending tasks, mark complete as you go.
-    Execute the checks defined in verification.md and record actual evidence.
-    Do not fill the independent verification conclusion.
-    Pause if you hit blockers or need clarification.
+    阅读上下文文件，逐项处理待办任务，并随进度标记为完成。
+    执行 verification.md 中定义的检查，并记录实际证据。
+    不要填写独立验证结论。
+    遇到阻塞或需要澄清时暂停。
