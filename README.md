@@ -32,7 +32,7 @@ It is the reverse of `openspec-apply-change`, and is distinct from `openspec-syn
 
 ## Team workflow
 
-See [AI-SDD 团队工作流](docs/ai-sdd-workflow.md) for the evidence-driven schema,
+See [AI-SDD 团队工作流](ai-sdd-workflow.md) for the evidence-driven schema,
 which keeps the original OpenSpec workflow and adds independent verification and archive gates.
 
 ## Skill: `openspec-update-change-from-code`
