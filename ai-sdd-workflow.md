@@ -31,7 +31,8 @@
   └─ /opsx-sync
 
 实现与实现侧检查已完成，需要独立复验？
-  └─ 在全新 Agent 会话中运行 /opsx-verify
+  └─ 优先：/opsx-apply 证据门禁后自动 Task 派发独立子 Agent 跑 /opsx-verify
+  └─ 备选：在全新 Agent 会话中手动运行 /opsx-verify
 
 独立验证已通过，需要结束 change？
   └─ /opsx-archive
@@ -46,7 +47,7 @@ propose
     ↓
 apply（实现 tasks，并记录实现侧验证证据）
     ↓
-verify（未参与实现的 Agent，在新会话中独立复验）
+verify（未参与实现的 Agent 独立复验；优先由 apply 自动派发子 Agent）
     ↓
 archive（可在归档时同步 delta specs）
 ```
@@ -148,8 +149,10 @@ change 尚未生成完整规划产物，应先补齐规划，而不是直接实�
 4. 对“不适用”项写明具体原因。
 5. 记录跳过项、失败项和剩余风险。
 
-实现 Agent 不得填写或修改“独立验证结论”。只要必需检查仍为“待执行”或
-“失败”，就应暂停并处理阻塞，不能进入归档。
+实现 Agent 不得填写或修改“独立验证结论”。证据门禁完成后，应**优先**用 Task
+派发独立子 Agent 执行 `/opsx-verify`（隔离上下文，不继承实现会话历史）；若无法
+派发，再提示用户新开会话手动 verify。只要必需检查仍为“待执行”或“失败”，就应
+暂停并处理阻塞，不能进入归档。
 
 ## 场景五：实现过程中发现规划有问题
 
@@ -218,7 +221,10 @@ apply → explore → update → apply
 
 前提：`apply` 已完成 tasks 和实现侧检查。
 
-必须打开一个未参与实现的全新 Agent 会话，然后运行：
+独立验证可以由以下方式启动（优先 1）：
+
+1. `/opsx-apply` 在实现证据门禁完成后，用 Task 自动派发独立子 Agent 跑 verify。
+2. 用户打开未参与实现的全新 Agent 会话，手动运行：
 
 ```text
 /opsx-verify <change-name>
@@ -241,6 +247,8 @@ apply → explore → update → apply
 - 无 CRITICAL、无失败检查、无适用的待执行检查时，写
   `验证结论：通过`。
 - 其他情况写 `验证结论：阻塞`。
+- `验证者` 填写 `独立 Agent（子 Agent）`（Task 派发）或
+  `独立 Agent（新会话）`（用户手开）。
 
 聊天中的“验证通过”不算归档证据，结论必须持久化到 `verification.md`。
 
@@ -252,7 +260,7 @@ apply → explore → update → apply
 - 需求或设计已改变，代码还未跟上：先 `/opsx-update`，再 `/opsx-apply`。
 - 当前代码行为已被确认接受，但 change 落后：运行
   `/opsx-update-change-from-code`。
-- 验证环境或权限缺失：保留阻塞结论，补齐环境后在新的独立会话重新验证。
+- 验证环境或权限缺失：保留阻塞结论，补齐环境后重新独立验证（子 Agent 或新会话）。
 
 修复后必须重新运行 `/opsx-verify`。不能通过接受 CRITICAL、忽略失败检查或手工
 改写结论来绕过门禁。
@@ -270,7 +278,7 @@ apply → explore → update → apply
 - 所有规划产物状态为完成。
 - `tasks.md` 中没有未完成任务。
 - 实现侧适用检查没有“待执行”或“失败”。
-- `verification.md` 包含独立 Agent 在新会话写入的
+- `verification.md` 包含独立 Agent（子 Agent 或新会话）写入的
   `验证结论：通过`。
 - 没有未解决的 CRITICAL 问题。
 

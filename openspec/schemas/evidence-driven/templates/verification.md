@@ -76,7 +76,13 @@
 ## 独立验证结论
 
 <!--
-必须由未参与实现的 Agent 在独立会话中执行 /opsx:verify 后填写。
+必须由未参与实现的 Agent 执行 /opsx:verify（或等价流程）后填写。实现 Agent 不得自填本区块。
+
+推荐启动方式（二选一，优先 1）：
+1. /opsx:apply 在实现证据门禁完成后，用 Task 派发独立子 Agent 跑 verify（隔离上下文，不继承实现会话历史）
+2. 用户新开 Agent 会话手动执行 /opsx:verify <change-name>
+
+验证者填写：`独立 Agent（子 Agent）` 或 `独立 Agent（新会话）`。
 归档门禁只接受“验证结论：通过”。存在 CRITICAL、失败或未处置的待执行项时必须填写“阻塞”。
 -->
 

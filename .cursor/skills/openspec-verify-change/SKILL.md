@@ -12,7 +12,11 @@ metadata:
 
 Verify that an implementation matches the change artifacts (specs, tasks, design).
 
-**Independence gate:** This skill must run in a fresh Agent conversation that did not implement the change. If the current conversation participated in implementation, stop and ask the user to open a fresh Agent conversation. The implementer cannot approve its own work.
+**Independence gate:** The verifier must **not** have implemented the change. Allowed runners:
+1. **Preferred:** A Task-dispatched subagent started by `/opsx:apply` after the implementation evidence gate (isolated context; no implementer history).
+2. A user-opened fresh Agent conversation that runs `/opsx-verify`.
+
+If **this** conversation participated in implementation (wrote application code / marked implementation tasks done for this change), **stop**: do not fill `独立验证结论` yourself—dispatch a Task subagent for verify, or ask the user to open a fresh conversation. The implementer cannot approve its own work.
 
 **Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`). Other commands do not take the flag. Hints printed by commands already carry the flag; keep it on follow-ups. Without a store, commands act on the nearest local `openspec/` root.
 
@@ -126,7 +130,7 @@ Verify that an implementation matches the change artifacts (specs, tasks, design
    If a `verification` artifact exists, update its `## 独立验证结论` section:
    - Set `验证结论` to `通过` only when there are no CRITICAL issues, no failed required checks, and no applicable pending checks.
    - Otherwise set `验证结论` to `阻塞`.
-   - Set `验证者` to `独立 Agent（新会话）`.
+   - Set `验证者` to `独立 Agent（子 Agent）` when Task-dispatched, or `独立 Agent（新会话）` when user-opened.
    - Record the verification scope, CRITICAL issues, WARNING issues, and whether residual risks were explicitly accepted.
    - Add concise fresh command evidence to the relevant result rows.
 

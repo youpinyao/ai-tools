@@ -88,7 +88,11 @@ Implement tasks from an OpenSpec change.
    - List skipped checks, failures, and residual risks.
    - Do **not** fill or change `独立验证结论`; the implementer cannot verify itself.
    - If any required check fails or remains `待执行`, pause and report the blocker.
-   - If evidence is complete, require the user to open a fresh Agent conversation and run `/opsx:verify <change-name>`.
+   - If evidence is complete, **automatically dispatch** an independent verify Agent (preferred), then report its conclusion:
+     1. Use the **Task** tool with a **fresh/isolated** subagent (do not `resume` the implementer; do not pass implementation chat history).
+     2. Instruct it to follow `.cursor/skills/openspec-verify-change/SKILL.md` / `/opsx-verify` for this change (pass `--store` when applicable), re-run applicable checks, and write `## 独立验证结论` only.
+     3. After it returns, summarize 通过/阻塞 for the user. Do **not** rewrite the conclusion yourself.
+     4. **Fallback only** if Task/dispatch is unavailable: ask the user to open a fresh Agent conversation and run `/opsx:verify <change-name>`.
 
    A completed task list is not archive-ready until independent verification records `验证结论：通过`.
 
@@ -97,7 +101,7 @@ Implement tasks from an OpenSpec change.
    Display:
    - Tasks completed this session
    - Overall progress: "N/M tasks complete"
-   - If all tasks and implementation checks are done: request independent `/opsx:verify` in a fresh Agent conversation
+   - If all tasks and implementation checks are done: state that independent `/opsx:verify` was auto-dispatched (or fallback: user must open a fresh session)
    - If paused: explain why and wait for guidance
 
 **Output During Implementation**
@@ -129,7 +133,7 @@ Working on task 4/7: <task description>
 ...
 
 Implementation checks are recorded in verification.md.
-Open a fresh Agent conversation and run `/opsx:verify <change-name>`.
+Independent `/opsx:verify` was auto-dispatched via Task (or fallback: open a fresh Agent conversation and run `/opsx:verify <change-name>`).
 Do not archive until it records `验证结论：通过`.
 ```
 
@@ -164,6 +168,7 @@ What would you like to do?
 - Use contextFiles from CLI output, don't assume specific file names
 - Never treat completed task checkboxes as sufficient evidence for archive
 - Never fill the independent verification conclusion from the implementation session
+- Prefer Task-dispatch of an independent `/opsx:verify` subagent after the evidence gate; only fall back to asking the user to open a fresh session
 - Never suggest archive before independent verification passes
 
 **Fluid Workflow Integration**

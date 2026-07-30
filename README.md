@@ -45,7 +45,7 @@ propose
     ↓
 apply（实现 tasks，并记录实现侧验证证据）
     ↓
-verify（未参与实现的 Agent，在新会话中独立复验）
+verify（未参与实现的 Agent 独立复验；优先由 apply 自动派发子 Agent）
     ↓
 archive（可在归档时同步 delta specs）
 ```
