@@ -20,6 +20,12 @@ artifacts:
       重要：能力章节至关重要，它建立提案与规范阶段之间的约定。
       填写前先调研已有规范。此处列出的每项能力都必须有对应的规范文件。
 
+      每项变更必须声明至少一项能力（新增或修改），或明确选择跳过规范：
+      若没有任何规范增量，`openspec validate` 会拒绝，除非该 change 的
+      `.openspec.yaml` 设置了 `skip_specs: true`。仅在无规范层行为变化时
+      使用（纯重构、工具链、文档等）——规范描述行为，行为不变则规范也不应变。
+      不要为了通过校验而捏造需求。
+
       内容保持简洁（1～2 页），重点说明“为什么”，而不是“如何实现”；
       实现细节应写入 design.md。
 
@@ -37,6 +43,10 @@ artifacts:
       - 新增能力：使用提案中完全一致的 kebab-case 名称（`specs/<capability>/spec.md`）。
       - 修改能力：在 `specs/<capability>/spec.md` 创建增量规范时，使用 `openspec/specs/<capability>/` 中已有的规范目录名称。
 
+      除非 change 的 `.openspec.yaml` 设置了 `skip_specs: true`（无规范层行为变化），
+      否则必须至少有一个规范文件——`openspec validate` 会拒绝零增量变更。
+      若提案未列出任何能力且未设置 `skip_specs`，先回到提案修订。
+
       增量操作（使用 ## 标题）：
       - **ADDED Requirements**：新增能力
       - **MODIFIED Requirements**：变更的行为，必须包含更新后的完整内容
@@ -50,6 +60,14 @@ artifacts:
       - **关键要求**：场景标题必须恰好使用 4 个井号（`####`）。使用 3 个井号或项目符号会导致静默失败。
       - 每项需求必须至少包含一个场景。
 
+      仅新增能力：增量规范开头须有 `## Purpose` 小节——一两句话说明该能力用途
+      （建议 50 字以上，否则 `openspec validate --strict` 可能判定过短）。
+      归档时会写入新建的 main spec；缺失时 main spec 会留下
+      `TBD ... Update Purpose after archive` 占位。不要给“修改已有能力”的
+      增量规范加 `## Purpose`——该能力已有 Purpose，增量中的会被忽略。
+      若要改已有能力的 Purpose（含残留 TBD），直接编辑
+      `openspec/specs/<capability>/spec.md`。
+
       MODIFIED 需求处理流程：
       1. 在 `openspec/specs/<capability>/spec.md` 中找到现有需求
       2. 复制完整的需求块（从 `### Requirement:` 开始，包含其全部场景）
@@ -59,8 +77,12 @@ artifacts:
       常见问题：MODIFIED 只包含部分内容会在归档时丢失细节。
       如果只是增加新关注点而未改变现有行为，应使用 ADDED。
 
-      示例：
+      示例（新增能力，故以 `## Purpose` 开头）：
       ```
+      ## Purpose
+
+      允许用户以可移植格式将产品中的数据导出。
+
       ## ADDED Requirements
 
       ### Requirement: 用户可以导出数据

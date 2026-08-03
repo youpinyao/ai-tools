@@ -17,6 +17,7 @@
 
 准备为一项新需求或修复建立完整规划？
   └─ /opsx-propose
+     （纯重构 / 工具链 / 文档、无规范层行为变化时：.openspec.yaml 加 skip_specs: true）
 
 已有 change，需要调整规划，但不改代码？
   └─ /opsx-update
@@ -108,6 +109,13 @@ proposal
 
 如果一项新诉求改变了原 change 的核心意图，而不是细化原方案，应使用新的
 change 名重新运行 `/opsx-propose`，不要把不相关的目标塞进旧 change。
+
+纯重构、工具链或文档类变更若没有任何 capability / delta specs，须在 change 的
+`.openspec.yaml` 中设置 `skip_specs: true`（保留 `schema:`）。OpenSpec 1.7+ 的
+`validate` 会拒绝「零增量且未声明 skip_specs」的 change；不要为了过校验而捏造
+需求。设置后 `specs` 产物状态为 `skipped`，propose / archive 不得再创建 specs。
+
+新增能力的 delta spec 建议以 `## Purpose` 开头，归档时会写入对应的 main spec。
 
 ## 场景三：已有 change，只调整规划
 
@@ -275,7 +283,7 @@ apply → explore → update → apply
 
 归档前必须同时满足：
 
-- 所有规划产物状态为完成。
+- 所有规划产物状态为 `done`，或因 `skip_specs` 而为 `skipped`。
 - `tasks.md` 中没有未完成任务。
 - 实现侧适用检查没有“待执行”或“失败”。
 - `verification.md` 包含独立 Agent（子 Agent 或新会话）写入的
@@ -283,7 +291,8 @@ apply → explore → update → apply
 - 没有未解决的 CRITICAL 问题。
 
 只要一项不满足，归档就会停止，且不能确认覆盖。存在 delta specs 时，归档流程
-会先展示同步影响，并让用户选择立即同步或不经同步直接归档。
+会先展示同步影响，并让用户选择立即同步或不经同步直接归档；`skip_specs` 变更无
+delta 时跳过同步提示。归档目录名若 change 名已带 `YYYY-MM-DD-` 前缀则不再叠日期。
 
 ## 三个容易混淆的操作
 
