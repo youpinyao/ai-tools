@@ -125,18 +125,43 @@ If **this** conversation participated in implementation (wrote application code 
      - Add SUGGESTION: "Code pattern deviation: <details>"
      - Recommendation: "Consider following project pattern: <example>"
 
-8. **Persist the independent verification conclusion**
+8. **Orchestrate code review (archive hard gate)**
+
+   When `verification.md` includes `## 代码审查（归档硬门禁）` (evidence-driven schema):
+
+   **Metadata first:**
+   - Fill Diff 范围、BASE_SHA、HEAD_SHA（默认相对仓库默认 base 的 branch changes；可用 `git merge-base` / `git rev-parse`）。
+   - Fill 变更摘要与需求依据（from proposal / tasks / specs / design）。
+
+   **Dispatch three tracks** (prefer parallel Task subagents; verifier orchestrates, does not self-approve):
+   1. **Code Review** — follow superpowers `requesting-code-review`: dispatch a general-purpose reviewer with the `code-reviewer.md` prompt template (`DESCRIPTION`, `PLAN_OR_REQUIREMENTS`, `BASE_SHA`, `HEAD_SHA`). Expect Critical / Important / Minor.
+   2. **Bugbot** — follow `review-bugbot`: exactly one `bugbot` subagent; default `Diff: branch changes`.
+   3. **Security Review** — follow `review-security`: exactly one `security-review` subagent; default `Diff: branch changes`.
+
+   **Record results into verification.md:**
+   - Update each 审查轨 row: 状态、Critical/高危、Important、Minor counts、证据摘要.
+   - Append every finding to Finding 处置台账（ID、轨、严重级、位置、摘要；处置/状态 initially 待执行 unless already fixed before this verify）.
+   - Pure docs / empty diff: mark track `不适用` with a concrete reason; do not fake a pass.
+
+   **Gate mapping (档位 1):**
+   - Applicable track still `待执行`, or dispatch failed without a compensated re-run → CRITICAL（阻塞）
+   - Unresolved Critical（含安全高危）→ CRITICAL（阻塞）
+   - Unresolved Important without 修复 or 技术反驳并接受（须写入「未执行项与剩余风险」且验证者确认）→ CRITICAL（阻塞）
+   - Minor → 可记入剩余风险；alone does NOT block `验证结论：通过`
+   - Implementer/response loop for findings should follow `receiving-code-review`（核实 → 修复或技术反驳；禁止表演式同意）. If fixes are still needed, set conclusion to `阻塞` and list required fixes—do not silently pass.
+
+9. **Persist the independent verification conclusion**
 
    If a `verification` artifact exists, update its `## 独立验证结论` section:
-   - Set `验证结论` to `通过` only when there are no CRITICAL issues, no failed required checks, and no applicable pending checks.
+   - Set `验证结论` to `通过` only when there are no CRITICAL issues, no failed required checks, no applicable pending checks, **and** code-review gate (step 8) has no blocking open findings.
    - Otherwise set `验证结论` to `阻塞`.
    - Set `验证者` to `独立 Agent（子 Agent）` when Task-dispatched, or `独立 Agent（新会话）` when user-opened.
-   - Record the verification scope, CRITICAL issues, WARNING issues, and whether residual risks were explicitly accepted.
+   - Record the verification scope, CRITICAL issues, WARNING issues, **代码审查**三轨摘要, and whether residual risks were explicitly accepted.
    - Add concise fresh command evidence to the relevant result rows.
 
    Do not erase implementation evidence or silently downgrade failures.
 
-9. **Generate Verification Report**
+10. **Generate Verification Report**
 
    **Summary Scorecard**:
    ```
@@ -148,6 +173,7 @@ If **this** conversation participated in implementation (wrote application code 
    | Completeness | X/Y tasks, N reqs|
    | Correctness  | M/N reqs covered |
    | Coherence    | Followed/Issues  |
+   | Code Review  | 三轨状态 / 阻塞 finding |
    ```
 
    **Issues by Priority**:
@@ -155,16 +181,18 @@ If **this** conversation participated in implementation (wrote application code 
    1. **CRITICAL** (Must fix before archive):
       - Incomplete tasks
       - Missing requirement implementations
+      - Code-review：未跑完的适用轨、未关闭 Critical/高危、未处置 Important
       - Each with specific, actionable recommendation
 
    2. **WARNING** (Should fix):
       - Spec/design divergences
       - Missing scenario coverage
+      - Accepted Important 技术反驳（须已写入剩余风险）
       - Each with specific recommendation
 
    3. **SUGGESTION** (Nice to fix):
       - Pattern inconsistencies
-      - Minor improvements
+      - Minor code-review findings
       - Each with specific recommendation
 
    **Final Assessment**:
@@ -177,7 +205,8 @@ If **this** conversation participated in implementation (wrote application code 
 - **Completeness**: Focus on objective checklist items (checkboxes, requirements list)
 - **Correctness**: Use keyword search, file path analysis, reasonable inference - don't require perfect certainty
 - **Coherence**: Look for glaring inconsistencies, don't nitpick style
-- **False Positives**: When uncertain, prefer SUGGESTION over WARNING, WARNING over CRITICAL
+- **Code Review**: Orchestrate real subagent reviews; never invent findings or mark tracks passed without dispatch evidence
+- **False Positives**: When uncertain, prefer SUGGESTION over WARNING, WARNING over CRITICAL（但未关闭的 Critical/高危与未处置 Important 仍为 CRITICAL）
 - **Actionability**: Every issue must have a specific recommendation with file/line references where applicable
 
 **Graceful Degradation**
@@ -185,9 +214,11 @@ If **this** conversation participated in implementation (wrote application code 
 - If only tasks.md exists: verify task completion only, skip spec/design checks
 - If tasks + specs exist: verify completeness and correctness, skip design
 - If full artifacts: verify all three dimensions
+- If verification.md lacks「代码审查」节（旧产物）: add the section from the current template before concluding, or treat missing applicable review as CRITICAL
 - Always note which checks were skipped and why
 - A completed task list is not proof of correctness
 - Never mark independent verification as passed with applicable pending or failed checks
+- Never mark passed with open Critical/高危 or undisposed Important from code review
 - Persist the conclusion to verification.md; chat output alone does not satisfy the archive gate
 
 **Output Format**

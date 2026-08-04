@@ -53,6 +53,51 @@
 | 向后兼容性 | 待确认 | 待确认 | 待执行 | |
 | 日志、指标、链路和告警 | 待确认 | 待确认 | 待执行 | |
 
+## 代码审查（归档硬门禁）
+
+<!--
+由独立 verify Agent 编排；实现 Agent 不得自填通过结论。
+必须派发三轨（均可 Task 子 Agent）：
+1. Code Review — superpowers requesting-code-review（Critical / Important / Minor）
+2. Bugbot — review-bugbot（Diff 默认 branch changes）
+3. Security Review — review-security（Diff 默认 branch changes）
+规划阶段一律「待执行」，禁止捏造审查结果。
+纯文档 / 无代码 diff 时可将适用性标为「不适用」并写明原因。
+Finding 处置遵循 receiving-code-review：先核实再修复或技术反驳，禁止表演式同意。
+-->
+
+### 审查元数据
+
+| 项 | 值 |
+|---|---|
+| Diff 范围 | branch changes（相对默认 base） / 指定 BASE..HEAD |
+| BASE_SHA | 待填写 |
+| HEAD_SHA | 待填写 |
+| 变更摘要（给 reviewer） | 待填写（来自 proposal / tasks） |
+| 需求依据 | 待填写（specs + design 路径） |
+
+### 审查轨
+
+| 轨 | 适用性 | 派发方式 | 状态 | Critical / 高危 | Important | Minor | 证据或说明 |
+|---|---|---|---|---|---|---|---|
+| Code Review（requesting-code-review） | 适用 | Task + code-reviewer 模板 | 待执行 | | | | |
+| Bugbot（review-bugbot） | 适用 | Task bugbot | 待执行 | | | | |
+| Security Review（review-security） | 适用 | Task security-review | 待执行 | | | | |
+
+### Finding 处置台账
+
+| ID | 轨 | 严重级 | 位置 | 摘要 | 处置 | 状态 |
+|---|---|---|---|---|---|---|
+| <!-- CR-1 --> | <!-- Code Review / Bugbot / Security --> | <!-- Critical / Important / Minor / 高危 --> | <!-- file:line --> | | <!-- 修复 / 技术反驳并接受 / 记入剩余风险 --> | 待执行 |
+
+### 审查门禁规则
+
+- 任一适用轨仍为「待执行」，或派发失败且无补偿审查 → 阻塞
+- 未关闭的 Critical（含安全高危）→ 阻塞
+- Important：须修复，或经 receiving-code-review 核实后书面技术反驳，并记入「未执行项与剩余风险」且由验证者确认接受 → 否则阻塞
+- Minor：默认可记入剩余风险，不单独阻塞「验证结论：通过」
+- 「不适用」须写具体原因（例如纯文档变更、无代码 diff）
+
 ## 实际执行结果
 
 | 检查项 | 执行命令或步骤 | 结果 | 证据或失败原因 |
@@ -63,6 +108,7 @@
 
 <!--
 列出无法执行或被跳过的检查，并说明原因、影响、补偿措施和剩余风险。
+含已接受的 Important 技术反驳与 Minor 项。
 没有未执行项时明确填写“无”。
 -->
 
@@ -82,8 +128,9 @@
 1. /opsx:apply 在实现证据门禁完成后，用 Task 派发独立子 Agent 跑 verify（隔离上下文，不继承实现会话历史）
 2. 用户新开 Agent 会话手动执行 /opsx:verify <change-name>
 
+验证者须编排代码审查三轨（Code Review / Bugbot / Security Review），将结果写入「代码审查」节后再下结论。
 验证者填写：`独立 Agent（子 Agent）` 或 `独立 Agent（新会话）`。
-归档门禁只接受“验证结论：通过”。存在 CRITICAL、失败或未处置的待执行项时必须填写“阻塞”。
+归档门禁只接受“验证结论：通过”。存在 CRITICAL、失败或未处置的待执行项、未关闭 Critical/高危、未处置 Important 时必须填写“阻塞”。
 -->
 
 - **验证结论：** 待执行
@@ -91,4 +138,5 @@
 - **验证范围：** 待填写
 - **CRITICAL：** 待填写
 - **WARNING：** 待填写
+- **代码审查：** 待填写（三轨状态与未关闭阻塞 finding 摘要）
 - **剩余风险是否已接受：** 待填写

@@ -177,6 +177,13 @@ artifacts:
       使用已从仓库确认的真实命令，不要编造命令。
       规划阶段将检查标记为待执行，不得捏造结果。
       实现后记录实际执行的命令、结果、跳过的检查和剩余风险。
+
+      必须包含「代码审查（归档硬门禁）」节：独立 verify Agent 编排三轨
+      （Code Review / Bugbot / Security Review，对应 superpowers requesting-code-review、
+      review-bugbot、review-security）。规划阶段三轨状态为待执行，禁止捏造审查结果。
+      门禁档位：Critical（含安全高危）阻塞；Important 须修复或书面技术反驳并接受；
+      Minor 记入剩余风险、不单独阻塞。Finding 处置遵循 receiving-code-review。
+
       独立验证结论应留给未参与实现此项变更的 Agent 填写。
       模板须说明：优先由 /opsx:apply 在证据门禁完成后 Task 派发独立子 Agent 跑 /opsx:verify；
       亦可由用户新开会话手动 verify。实现 Agent 不得自填「独立验证结论」。
@@ -188,8 +195,9 @@ apply:
   tracks: tasks.md
   instruction: |
     阅读上下文文件，逐项处理待办任务，并随进度标记为完成。
-    执行 verification.md 中定义的检查，并记录实际证据。
-    不要填写独立验证结论。
+    执行 verification.md 中定义的检查，并记录实际证据（不含独立验证结论与代码审查通过结论）。
+    不要填写独立验证结论，不要自填代码审查三轨为通过。
     实现证据门禁完成后：优先用 Task 派发独立子 Agent 执行 /opsx:verify（隔离上下文，不继承本会话实现历史）；
+    子 Agent 须编排代码审查三轨并写入 verification.md 后再下「独立验证结论」。
     若无法派发，再提示用户新开会话手动 /opsx:verify。
     遇到阻塞或需要澄清时暂停。

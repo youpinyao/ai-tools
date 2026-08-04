@@ -71,6 +71,12 @@ Archive a completed change in the experimental workflow.
    - Block archive if the conclusion is missing, `待执行`, or `阻塞`.
    - Block archive if any applicable check is `待执行` or `失败`.
    - Block archive if any CRITICAL issue is unresolved.
+   - **Code review gate（档位 1）:** when `## 代码审查（归档硬门禁）` exists:
+     - Block if any applicable 审查轨 is `待执行` or `失败`.
+     - Block if Finding 处置台账 has unresolved Critical / 安全高危.
+     - Block if any Important finding is still `待执行` / 未关闭，且未在「未执行项与剩余风险」中写明技术反驳并接受.
+     - Minor-only open items may proceed when recorded as accepted residual risk.
+     - Missing「代码审查」section on evidence-driven changes: block（须先补跑 verify）.
 
    Verification failures are hard gates. Do not offer a confirmation override.
 
@@ -123,7 +129,7 @@ Archive a completed change in the experimental workflow.
    - Schema that was used
    - Archive location
    - Whether specs were synced (if applicable)
-   - Independent verification status and any explicitly accepted warnings or residual risks
+   - Independent verification status, code-review gate status, and any explicitly accepted warnings or residual risks
 
 **Output On Success**
 
@@ -134,7 +140,7 @@ Archive a completed change in the experimental workflow.
 **Schema:** <schema-name>
 **Archived to:** the archive path derived from `planningHome.changesDir`/<target-name>/
 **Specs:** ✓ Synced to main specs (or "No delta specs" or "Sync skipped")
-**Verification:** ✓ Independent verification passed
+**Verification:** ✓ Independent verification passed（含代码审查门禁）
 
 All artifacts and tasks complete. Archive gate passed.
 ```
@@ -143,8 +149,9 @@ All artifacts and tasks complete. Archive gate passed.
 - Always prompt for change selection if not provided
 - Use artifact graph (openspec status --json) for completion checking
 - Treat `skipped` artifacts as satisfied when `skip_specs` is declared
-- Incomplete artifacts (neither done nor skipped), incomplete tasks, missing independent verification, pending/failed checks, and CRITICAL issues are hard blockers
-- Warnings may proceed only when residual risks are explicitly documented and accepted
+- Incomplete artifacts (neither done nor skipped), incomplete tasks, missing independent verification, pending/failed checks, CRITICAL issues, and code-review gate failures（未跑完适用轨 / 未关闭 Critical·高危 / 未处置 Important）are hard blockers
+- Warnings and Minor review findings may proceed only when residual risks are explicitly documented and accepted
+- Accepted Important 技术反驳 must appear in residual risks with verifier acknowledgment
 - Preserve .openspec.yaml when moving to archive (it moves with the directory)
 - Show clear summary of what happened
 - If sync is requested, run openspec-sync-specs inline and verify main specs before moving `changeRoot`
