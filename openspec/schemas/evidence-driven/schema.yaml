@@ -144,8 +144,9 @@ artifacts:
       编写准则：
       - 在带编号的 ## 标题下对相关任务分组
       - 每项任务必须使用复选框：`- [ ] X.Y 任务说明`
-      - 任务粒度应足够小，能够在一次会话中完成
-      - 按依赖关系排列任务，优先列出必须先完成的任务
+      - 任务粒度应足够小，能够由单个 implementer 子 Agent 在一次派发中完成（apply 默认按任务派发子 Agent）
+      - 按依赖关系排列任务，优先列出必须先完成的任务；相互独立的任务仍按顺序编号（运行时同一时刻只跑一个实现子 Agent）
+      - 每项任务写清可验证完成标准，避免含糊的“搞定某某模块”
 
       示例：
       ```
@@ -194,7 +195,13 @@ apply:
   requires: [verification]
   tracks: tasks.md
   instruction: |
-    阅读上下文文件，逐项处理待办任务，并随进度标记为完成。
+    阅读上下文文件后按任务实现。默认遵循 superpowers subagent-driven-development：
+    编排器只协调；对每个 pending 任务用 Task 派发全新 implementer 子 Agent，
+    完成后做任务级审查（spec 合规 + 代码质量），Critical/Important 须修复并复审，
+    通过后再将 tasks.md 中对应项 `- [ ]` 标为 `- [x]`。同一时刻只跑一个实现子 Agent。
+    不要在 apply 内做整分支终审或 finishing-a-development-branch；整分支审查留给独立 verify。
+    不要擅自 git commit，除非用户明确要求提交。
+    仅当 Task/子 Agent 不可用时，才回退为本会话直接实现，并在汇报中注明。
     执行 verification.md 中定义的检查，并记录实际证据（不含独立验证结论与代码审查通过结论）。
     不要填写独立验证结论，不要自填代码审查三轨为通过。
     实现证据门禁完成后：优先用 Task 派发独立子 Agent 执行 /opsx:verify（隔离上下文，不继承本会话实现历史）；

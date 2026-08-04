@@ -68,19 +68,28 @@ Implement tasks from an OpenSpec change.
    - Remaining tasks overview
    - Dynamic instruction from CLI
 
-6. **Implement tasks (loop until done or blocked)**
+6. **Implement tasks（默认：superpowers 子 Agent 驱动）**
 
-   For each pending task:
-   - Show which task is being worked on
-   - Make the code changes required
-   - Keep changes minimal and focused
-   - Mark task complete in the tasks file: `- [ ]` → `- [x]`
-   - Continue to next task
+   实现阶段**默认**遵循 superpowers `subagent-driven-development`：编排器（本会话）只做协调，不亲自写业务代码。
+
+   **编排约定：**
+   - 以 `tasks.md` 复选框为进度真源（`- [ ]` / `- [x]`）；可选用 `.superpowers/sdd/progress.md` 作恢复台账，但勾选 tasks 仍必须同步。
+   - **逐项**处理待办：对每个 pending 任务用 **Task** 派发**全新** implementer 子 Agent（不 `resume` 上一任务；不把本会话实现历史整段灌入）。
+   - 同一时刻**只跑一个**实现子 Agent（禁止并行改同一工作树，避免冲突）。
+   - 子 Agent 提示须包含：任务原文、相关 proposal/specs/design 要点或路径、全局约束、最小必要接口上下文；不要让子 Agent 通读整份无关历史。
+   - 实现子 Agent 完成后：派发**任务级** reviewer（spec 合规 + 代码质量）。Critical / Important 须再派 fix 子 Agent 并复审，通过后才勾选任务。
+   - 勾选：`- [ ]` → `- [x]`，再进入下一项。
+   - **不要**在 apply 内做 SDD 的「整分支终审」或 `finishing-a-development-branch`；整分支审查与归档门禁由后续独立 `/opsx:verify` 负责。
+   - **不要**擅自 `git commit`，除非用户在本会话明确要求提交。
+
+   **回退（仅当 Task / 子 Agent 不可用）：**
+   - 在本会话内直接实现该任务，仍保持最小改动与即时勾选；并在状态汇报中注明已回退。
 
    **Pause if:**
    - Task is unclear → ask for clarification
    - Implementation reveals a design issue → suggest updating artifacts
    - Error or blocker encountered → report and wait for guidance
+   - Implementer 报告 `BLOCKED` / 无法消解的歧义 → escalate to user
    - User interrupts
 
 7. **Complete the verification evidence gate**
@@ -114,14 +123,17 @@ Implement tasks from an OpenSpec change.
 
 ```
 ## Implementing: <change-name> (schema: <schema-name>)
+Mode: subagent-driven-development（Task 逐任务实现 + 任务级审查）
 
 Working on task 3/7: <task description>
-[...implementation happening...]
-✓ Task complete
+→ Task: implementer …
+→ Task: task-reviewer …
+✓ Task complete（已勾选 tasks.md）
 
 Working on task 4/7: <task description>
-[...implementation happening...]
-✓ Task complete
+→ Task: implementer …
+→ Task: task-reviewer …
+✓ Task complete（已勾选 tasks.md）
 ```
 
 **Output On Completion**
@@ -164,12 +176,14 @@ What would you like to do?
 ```
 
 **Guardrails**
-- Keep going through tasks until done or blocked
+- Default to superpowers `subagent-driven-development` for implementation; orchestrator coordinates, does not implement application code unless Task is unavailable
+- Keep going through tasks until done or blocked; do not pause for "should I continue?"
 - Always read context files before starting (from the apply instructions output)
 - If task is ambiguous, pause and ask before implementing
 - If implementation reveals issues, pause and suggest artifact updates
-- Keep code changes minimal and scoped to each task
-- Update task checkbox immediately after completing each task
+- Keep code changes minimal and scoped to each task; one implementer subagent at a time
+- Do not mark a task complete until task-level review approves (or fallback in-session work is done)
+- Update task checkbox immediately after a task is approved complete
 - Pause on errors, blockers, or unclear requirements - don't guess
 - Use contextFiles from CLI output, don't assume specific file names
 - Never treat completed task checkboxes as sufficient evidence for archive
@@ -177,6 +191,7 @@ What would you like to do?
 - Never self-pass「代码审查」三轨 or invent review findings from the implementation session
 - Prefer Task-dispatch of an independent `/opsx:verify` subagent after the evidence gate; only fall back to asking the user to open a fresh session
 - Never suggest archive before independent verification passes（含代码审查门禁）
+- Do not commit unless the user explicitly asks
 
 **Fluid Workflow Integration**
 
