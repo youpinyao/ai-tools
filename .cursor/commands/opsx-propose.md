@@ -22,6 +22,61 @@ When ready to implement, run /opsx:apply
 
 **Input**: The argument after `/opsx:propose` is the change name (kebab-case), OR a description of what the user wants to build.
 
+---
+
+## Superpowers 对接：brainstorming 前门 + writing-plans（薄适配）
+
+一键 propose 在撰写创意性制品（`proposal` / `design` / `specs`）以及生成完整任务清单之前，MUST 走下方**写死的 Spec 核心节奏**。生成或大幅修订 `tasks.md` 时 MUST 对齐下方 **writing-plans 粒度原则**。本仓库制品与本节裁剪为权威；**不要**把上游 `brainstorming` / `writing-plans` 的 checklist 全文或终态当作门禁。
+
+### 批准门触发点（写 proposal/design/specs 前）
+
+| 情形 | 是否触发前门 |
+|------|----------------|
+| 模糊想法 / 尚未就方案达成批准的 `/opsx:propose`（或等价） | **触发完整节奏**——创建或填写 proposal/design/specs 之前完成方案对比与设计批准 |
+| 用户已在同一会话明确选定方案包（如「都要」「全部按既定清单落地」） | **触发快捷路径**——复述范围确认后可写制品 |
+| 用户反对复述范围或撤回批准 | **停止写入**——回到澄清，不得继续生成 proposal/design/specs/tasks |
+
+### 结晶前核心节奏（本阶段唯一权威）
+
+仅取 Spec 核心节奏，按序执行（小变更可缩短篇幅，**不可为零**）：
+
+1. 理解上下文（可结合代码库与既有 OpenSpec 制品）
+2. 澄清意图
+3. 提出至少两个可行方案并给出推荐
+4. 呈现设计要点并获得用户批准
+5. **再**创建/填写 `proposal` / `design` / `specs`，并继续生成 tasks 等其余制品
+
+**禁止**：在未获批准（或未完成快捷复述确认）时直接生成完整设计与任务清单。
+
+### 已选定方案的快捷路径
+
+若用户已在同一会话明确选定方案：
+
+- MAY 将既有探索结论视为已批准设计摘要
+- MUST 在开始写 proposal/design/specs（及一键生成全套制品）前用简短确认**复述将落地的范围/环节清单**，供用户确认或修正
+- 用户反对时 MUST 停止写制品并回到澄清
+
+### 生成 tasks 时对齐 writing-plans（本节写死原则为权威）
+
+生成或大幅修订 `tasks.md` 时，MUST 遵循以下粒度原则（映射自 Spec / writing-plans，已写死于此）：
+
+- **文件地图**：先给出将触及的文件/模块地图（可写入 `design.md` 或 `tasks.md` 序言；模板含「文件 / 模块地图」时须填写）
+- **可测交付**：每项任务对应可独立验证的交付物；行为变更类任务 MUST 写明如何验证（测试命令或等价检查）
+- **可独立审查**：粒度适合「单个 implementer 子 Agent 一次派发 + 任务级审查可拒绝邻项而批准本项」
+- **禁止**仅用含糊的「实现某某模块」作为唯一描述
+
+**不以**强制落盘 `docs/superpowers/plans/` 为门禁；tasks 写入 OpenSpec change 即可。
+
+### 本仓库裁剪（写死；相对上游 brainstorming / writing-plans）
+
+- **真源**：设计/规范/任务写入 `openspec/changes/<name>/`；**本仓库 OpenSpec change 制品为本阶段真源**
+- **不适用的上游终态**：对本 propose 阶段，上游 `docs/superpowers/` 落盘、auto-commit、以及「必须另写 Superpowers plans 文档」**均不适用**——不得因上游 checklist 要求这些步骤而阻塞或改写本阶段流程
+- **不强制**另写 `docs/superpowers/specs/` 或 `docs/superpowers/plans/`（可提及，非门禁）
+- **不自动 commit**（未获用户明确要求时不要 commit）
+- **Read 上游的用途**：MAY Read `brainstorming` / `writing-plans`，**仅作**话术、方案对比或任务拆分写法参考；**不以**其 checklist 全文或终态为权威；冲突时以本节与 OpenSpec 制品为准
+
+---
+
 **Steps**
 
 1. **If no input provided, ask what they want to build**
@@ -33,7 +88,15 @@ When ready to implement, run /opsx:apply
 
    **IMPORTANT**: Do NOT proceed without understanding what the user wants to build.
 
-2. **Create the change directory**
+2. **批准门（写 proposal/design/specs 前）**
+
+   在创建或填写 `proposal` / `design` / `specs`（以及一键生成完整设计与任务清单）之前，完成上方 Superpowers 批准门：
+
+   - **模糊想法**：走完整节奏（≥2 方案 + 推荐 + 设计要点批准）
+   - **已选定方案**：复述将落地的范围/环节清单，待用户确认或修正
+   - 用户未批准或反对时：**停止**，不要进入步骤 3 之后的制品填写（可保留对话澄清；不要生成完整 proposal/design/specs/tasks）
+
+3. **Create the change directory**
    ```bash
    openspec new change "<name>"
    ```
@@ -41,7 +104,7 @@ When ready to implement, run /opsx:apply
 
    **`skip_specs` (OpenSpec 1.7+):** 若纯重构 / 工具链 / 文档等、无规范层行为变化，在创建 change 后立刻编辑其 `.openspec.yaml`，加入 `skip_specs: true`（保留已有 `schema:`）。不要捏造 capability 或空 specs 来应付校验。有需求变化时不要设置该标记。
 
-3. **Get the artifact build order**
+4. **Get the artifact build order**
    ```bash
    openspec status --change "<name>" --json
    ```
@@ -50,7 +113,7 @@ When ready to implement, run /opsx:apply
    - `artifacts`: list of all artifacts, each with its `status` and its `requires` edges
    - `planningHome`, `changeRoot`, `artifactPaths`, and `actionContext`: path and scope context. Use these instead of assuming repo-local paths.
 
-4. **Create every artifact in the required set**
+5. **Create every artifact in the required set**
 
    Use the **TodoWrite tool** to track progress through the artifacts.
 
@@ -72,6 +135,7 @@ When ready to implement, run /opsx:apply
       - Read any completed dependency files for context - always re-read them from disk, even if you saw them earlier in the conversation (the user may have edited them)
       - Create the artifact file using `template` as the structure and write it to `resolvedOutputPath`. If `resolvedOutputPath` is a glob, follow `instruction` to choose the concrete file path
       - Apply `context` and `rules` as constraints - but do NOT copy them into the file
+      - **`tasks` 制品**：按上方 writing-plans 粒度原则填写（文件地图、可测交付、可独立审查）；遵循 schema `instruction` 与模板结构
       - Show brief progress: "Created <artifact-id>"
 
    b. **Continue until every artifact in the required set exists**
@@ -88,7 +152,7 @@ When ready to implement, run /opsx:apply
       - Use **AskUserQuestion tool** to clarify
       - Then continue with creation
 
-5. **Show final status**
+6. **Show final status**
    ```bash
    openspec status --change "<name>"
    ```
@@ -100,6 +164,7 @@ After completing all artifacts, summarize:
 - List of artifacts created with brief descriptions, plus any skipped via `skip_specs` or conditional rules
 - What's ready: "All artifacts created! Ready for implementation."
 - Prompt: "Run `/opsx:apply` to start implementing."
+- 提醒：OpenSpec change 制品为真源；未要求则不自动 commit；未强制写入 `docs/superpowers/`
 
 **Artifact Creation Guidelines**
 
@@ -110,11 +175,14 @@ After completing all artifacts, summarize:
 - **IMPORTANT**: `context` and `rules` are constraints for YOU, not content for the file
   - Do NOT copy `<context>`, `<rules>`, `<project_context>` blocks into the artifact
   - These guide what you write, but should never appear in the output
+- **`tasks.md`**：对齐本节 writing-plans 原则（文件地图、可测交付、可独立审查）；不以 `docs/superpowers/plans/` 为门禁
 
 **Guardrails**
+- **Don't skip brainstorming gate** - 写 proposal/design/specs 前走批准门；已选定方案时 MUST 复述确认；用户反对则停止写入
+- **Don't auto-commit / don't force docs/superpowers** - OpenSpec 制品为真源；未要求不 commit；不强制 `docs/superpowers/`
 - Create every artifact the apply phase transitively depends on, not just the ids listed in `apply.requires`
 - Always read dependency artifacts before creating a new one
 - Never create specs (or any artifact) that status reports as `skipped`
-- If context is critically unclear, ask the user - but prefer making reasonable decisions to keep momentum
+- If context is critically unclear, ask the user - but prefer making reasonable decisions to keep momentum（批准门本身不可跳过）
 - If a change with that name already exists, ask if user wants to continue it or create a new one
 - Verify each artifact file exists after writing before proceeding to next

@@ -9,6 +9,11 @@ artifacts:
     instruction: |
       创建提案文档，说明为什么需要此项变更。
 
+      Superpowers 对接（薄适配）：撰写或覆盖本提案前 MUST 遵循 `brainstorming` 前门——
+      先澄清意图、对比至少两个可行方案并获用户批准后再写入。
+      若用户已在同一会话明确选定方案，MAY 将既有结论视为已批准，但 MUST 在动笔前
+      简短复述范围供确认；用户反对时 MUST 停止并回到澄清。纯只读探索不强制写提案。
+
       文档章节：
       - **背景与动机**：用 1～2 句话说明问题或机会。本变更解决什么问题？为什么现在需要变更？
       - **变更内容**：以项目符号列出变更。明确说明新增、修改或移除的能力。破坏性变更须标记为 **BREAKING**。
@@ -110,6 +115,13 @@ artifacts:
     instruction: |
       创建设计文档，说明如何实现此项变更。
 
+      Superpowers 对接（薄适配）：写设计前 MUST 遵循 `brainstorming` 前门——
+      呈现设计要点并获得用户批准后再写入或覆盖 design.md。
+      若用户已在同一会话明确选定方案，MAY 将既有探索结论视为已批准设计摘要，
+      但 MUST 在动笔前简短复述范围供确认；用户反对时 MUST 停止并回到澄清。
+      不强制另写 `docs/superpowers/specs/`；OpenSpec change 制品即为本仓库设计真源。
+      未获用户要求时 MUST NOT 自动 git commit。
+
       何时需要 design.md（至少符合一项时才创建）：
       - 跨多个服务或模块的横切变更，或者引入新的架构模式
       - 引入新的外部依赖，或者数据模型发生重大变化
@@ -141,6 +153,12 @@ artifacts:
       **重要：必须严格遵循下方模板。** apply 阶段通过解析复选框格式跟踪进度。
       未使用 `- [ ]` 格式的任务不会被跟踪。
 
+      Superpowers 对接（薄适配）：生成或大幅修订 tasks 时 MUST 对齐 `writing-plans`
+      粒度——先给出将触及的文件/模块地图（可写在 design 或 tasks 序言）；
+      每项任务对应可独立验证的交付物，边界清晰到任务级审查可批准一项而拒绝邻项；
+      行为变更类任务 MUST 写明如何验证（测试或等价检查）。
+      禁止仅用含糊的「实现某某模块」作为唯一描述。未获用户要求时 MUST NOT 自动 commit。
+
       编写准则：
       - 在带编号的 ## 标题下对相关任务分组
       - 每项任务必须使用复选框：`- [ ] X.Y 任务说明`
@@ -150,15 +168,19 @@ artifacts:
 
       示例：
       ```
+      ## 文件 / 模块地图
+
+      - `src/export/`：新建导出模块
+
       ## 1. 准备工作
 
-      - [ ] 1.1 创建新的模块结构
-      - [ ] 1.2 向 package.json 添加依赖
+      - [ ] 1.1 创建新的模块结构（交付：目录与入口文件存在；验证：路径可列出）
+      - [ ] 1.2 向 package.json 添加依赖（交付：依赖声明；验证：安装命令成功）
 
       ## 2. 核心实现
 
-      - [ ] 2.1 实现数据导出函数
-      - [ ] 2.2 添加 CSV 格式化工具
+      - [ ] 2.1 实现数据导出函数（交付：可调用导出 API；验证：单元测试先红后绿或约定等价检查）
+      - [ ] 2.2 添加 CSV 格式化工具（交付：CSV 序列化；验证：针对格式用例的测试通过）
       ```
 
       要构建什么以规范为依据，如何构建以设计为依据。
@@ -178,16 +200,29 @@ artifacts:
       使用已从仓库确认的真实命令，不要编造命令。
       规划阶段将检查标记为待执行，不得捏造结果。
       实现后记录实际执行的命令、结果、跳过的检查和剩余风险。
+      声称检查「通过」或「全部完成」时 MUST 遵循 `verification-before-completion`：
+      本回合实际执行适用命令并阅读输出；禁止仅用旧会话口头记忆作为唯一证据。
 
       必须包含「代码审查（归档硬门禁）」节：独立 verify Agent 编排三轨
       （Code Review / Bugbot / Security Review，对应 superpowers requesting-code-review、
       review-bugbot、review-security）。规划阶段三轨状态为待执行，禁止捏造审查结果。
+      Superpowers 对接（薄适配）：verify 执行时，在 Task 可用前提下 MUST 按
+      `dispatching-parallel-agents` 对适用轨默认并行派发；仅工具限制或用户要求时串行。
+      某轨不适用时 MUST 标明原因，不得假造结果。
+      硬规则：判定三轨「不适用」前 MUST 检查脏工作区（`git status` / `git diff HEAD` /
+      staged）；存在未提交变更时 MUST 纳入 Diff 范围审查或阻塞并要求明确范围；
+      **禁止**仅因 BASE==HEAD 空 commit diff 将三轨标为不适用并旁路归档硬门禁。
       门禁档位：Critical（含安全高危）阻塞；Important 须修复或书面技术反驳并接受；
       Minor 记入剩余风险、不单独阻塞。Finding 处置遵循 receiving-code-review。
 
       独立验证结论应留给未参与实现此项变更的 Agent 填写。
       模板须说明：优先由 /opsx:apply 在证据门禁完成后 Task 派发独立子 Agent 跑 /opsx:verify；
       亦可由用户新开会话手动 verify。实现 Agent 不得自填「独立验证结论」。
+
+      Superpowers 对接（薄适配）：当独立验证结论为「验证结论：通过」后，verify MUST
+      提示 `finishing-a-development-branch` 收尾选项（合并 / PR / 保留 / 清理等，按环境裁剪），
+      仅在用户选择后执行；规划阶段只写明挂点，不得伪造收尾结果。
+      finishing 不在 apply 中执行；archive 门禁通过后若尚未集成，MUST 再次提示该菜单。
     requires:
       - tasks
 
@@ -199,7 +234,33 @@ apply:
     编排器只协调；对每个 pending 任务用 Task 派发全新 implementer 子 Agent，
     完成后做任务级审查（spec 合规 + 代码质量），Critical/Important 须修复并复审，
     通过后再将 tasks.md 中对应项 `- [ ]` 标为 `- [x]`。同一时刻只跑一个实现子 Agent。
-    不要在 apply 内做整分支终审或 finishing-a-development-branch；整分支审查留给独立 verify。
+    `executing-plans` SHALL NOT 替代 SDD 成为默认主路径。
+    本段与 apply skill/command 双写关键约束；skill/command 可更严、不得更松；
+    冲突时以更严门禁为准。
+
+    Superpowers 对接（薄适配）——开工前：MUST 按 `using-git-worktrees` 的检测顺序
+    评估隔离状态；若未在隔离 worktree，向用户说明利弊并询问（大变更/脏树时推荐隔离）；
+    用户同意后创建或切换再派发实现子 Agent；用户要求在当前工作树继续时 MAY 跳过，
+    但 MUST 在汇报中注明。未完成评估前不得派发实现子 Agent、不得改业务代码。
+
+    Superpowers 对接（薄适配）——implementer 提示：MUST 要求遵循 `test-driven-development`
+    （行为变更先失败测试或仓库约定的等价红灯，再最小实现）；纯文档/纯配置/无行为断言
+    或用户明确豁免时 MAY 跳过，但 MUST 在任务汇报写明跳过理由。
+    行为变更的任务汇报 MUST 附上红灯证据（失败测试命令与输出，或仓库约定的等价红灯信号）；
+    任务级审查可将「行为变更却无红灯证据」列为 Critical/Important。
+
+    Superpowers 对接（薄适配）——阻塞与失败：测试失败、异常行为或不明根因时，
+    MUST 先遵循 `systematic-debugging` 收集证据定位根因，禁止连续盲改；
+    若根因在 design/specs/tasks，MUST 暂停实现（含暂停勾选后续任务）并建议更新制品。
+
+    Superpowers 对接（薄适配）——证据声称：执行与记录检查时 MUST 遵循
+    `verification-before-completion`——本回合实际执行适用命令并阅读输出后才可标「通过」；
+    无新鲜命令输出不得标通过；禁止沿用旧会话口头记忆作为唯一证据。
+
+    不要在 apply 内做整分支终审或 `finishing-a-development-branch`；
+    finishing 挂在独立 verify 通过后（及 archive 成功后若尚未集成）由对应阶段提示用户选择，
+    apply 仅可提醒「verify/archive 会提示收尾」，不得在未询问时强制推送或删分支。
+    整分支审查留给独立 verify。
     不要擅自 git commit，除非用户明确要求提交。
     仅当 Task/子 Agent 不可用时，才回退为本会话直接实现，并在汇报中注明。
     执行 verification.md 中定义的检查，并记录实际证据（不含独立验证结论与代码审查通过结论）。

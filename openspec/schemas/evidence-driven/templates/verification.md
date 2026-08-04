@@ -61,8 +61,12 @@
 1. Code Review — superpowers requesting-code-review（Critical / Important / Minor）
 2. Bugbot — review-bugbot（Diff 默认 branch changes）
 3. Security Review — review-security（Diff 默认 branch changes）
+派发策略（薄适配）：Task 可用时，适用轨 MUST 按 dispatching-parallel-agents 默认并行派发；
+仅工具限制或用户要求时串行。某轨不适用时标明原因，不得假造结果。
 规划阶段一律「待执行」，禁止捏造审查结果。
 纯文档 / 无代码 diff 时可将适用性标为「不适用」并写明原因。
+硬规则：判定「不适用」前 MUST 检查脏工作区（git status / git diff HEAD / staged）；
+存在未提交变更时须纳入 Diff 或阻塞要求明确范围；禁止仅因 BASE==HEAD 空 commit diff 旁路三轨。
 Finding 处置遵循 receiving-code-review：先核实再修复或技术反驳，禁止表演式同意。
 -->
 
@@ -80,9 +84,9 @@ Finding 处置遵循 receiving-code-review：先核实再修复或技术反驳�
 
 | 轨 | 适用性 | 派发方式 | 状态 | Critical / 高危 | Important | Minor | 证据或说明 |
 |---|---|---|---|---|---|---|---|
-| Code Review（requesting-code-review） | 适用 | Task + code-reviewer 模板 | 待执行 | | | | |
-| Bugbot（review-bugbot） | 适用 | Task bugbot | 待执行 | | | | |
-| Security Review（review-security） | 适用 | Task security-review | 待执行 | | | | |
+| Code Review（requesting-code-review） | 适用 | Task + code-reviewer 模板（默认与另两轨并行） | 待执行 | | | | |
+| Bugbot（review-bugbot） | 适用 | Task bugbot（默认与另两轨并行） | 待执行 | | | | |
+| Security Review（review-security） | 适用 | Task security-review（默认与另两轨并行） | 待执行 | | | | |
 
 ### Finding 处置台账
 
@@ -96,7 +100,7 @@ Finding 处置遵循 receiving-code-review：先核实再修复或技术反驳�
 - 未关闭的 Critical（含安全高危）→ 阻塞
 - Important：须修复，或经 receiving-code-review 核实后书面技术反驳，并记入「未执行项与剩余风险」且由验证者确认接受 → 否则阻塞
 - Minor：默认可记入剩余风险，不单独阻塞「验证结论：通过」
-- 「不适用」须写具体原因（例如纯文档变更、无代码 diff）
+- 「不适用」须写具体原因（例如纯文档变更、无代码 diff）；判定前须已检查脏工作区，禁止仅因 BASE==HEAD 空 commit diff 标不适用
 
 ## 实际执行结果
 
@@ -129,8 +133,14 @@ Finding 处置遵循 receiving-code-review：先核实再修复或技术反驳�
 2. 用户新开 Agent 会话手动执行 /opsx:verify <change-name>
 
 验证者须编排代码审查三轨（Code Review / Bugbot / Security Review），将结果写入「代码审查」节后再下结论。
+适用轨默认并行派发（见上节）；复跑自动化检查须本回合新鲜证据（verification-before-completion）。
 验证者填写：`独立 Agent（子 Agent）` 或 `独立 Agent（新会话）`。
 归档门禁只接受“验证结论：通过”。存在 CRITICAL、失败或未处置的待执行项、未关闭 Critical/高危、未处置 Important 时必须填写“阻塞”。
+
+Finishing 挂点（规划阶段只写明，不得伪造收尾结果）：
+当本区块「验证结论」写为「通过」后，verify MUST 向用户呈现 finishing-a-development-branch
+选项菜单（合并 / 创建 PR / 保留分支 / 清理 worktree 等，按环境裁剪），仅在用户选择后执行。
+finishing 不在 apply 中执行；archive 成功后若尚未集成，须再次提示该菜单。
 -->
 
 - **验证结论：** 待执行
@@ -140,3 +150,4 @@ Finding 处置遵循 receiving-code-review：先核实再修复或技术反驳�
 - **WARNING：** 待填写
 - **代码审查：** 待填写（三轨状态与未关闭阻塞 finding 摘要）
 - **剩余风险是否已接受：** 待填写
+- **Finishing：** 待执行（仅当验证结论为「通过」后提示用户选择；规划阶段勿填已完成）

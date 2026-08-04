@@ -11,6 +11,26 @@ Archive a completed change in the experimental workflow.
 
 **Input**: Optionally specify a change name after `/opsx:archive` (e.g., `/opsx:archive add-auth`). If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
 
+---
+
+## Superpowers 对接：finishing（薄适配）
+
+在归档门禁全部通过并完成归档移动之后，若尚未完成分支集成，MUST 遵循下方写死的门禁。本节与 Spec「Verify 通过后须提供分支收尾选项」中 archive 场景 / Design 决策 7 为权威；skill/command 可更严，不得更松；冲突时以更严门禁为准。MAY Read 上游 `finishing-a-development-branch` 作话术补充；**上游全文 checklist / 终态仅参考，本节下列步骤为权威**，避免与本节冲突。
+
+### Finishing：归档成功后若未集成则再提示（决策 7）
+
+当归档门禁通过且 `changeRoot` 已成功移至 archive 后：
+
+- 若分支尚未完成集成（未合并到目标分支、未创建/合并 PR、用户此前推迟了收尾等）→ MUST 遵循 `finishing-a-development-branch` 核心步骤：确认归档门禁已通过 → 检测工作区环境 → 向用户呈现结构化选项（合并 / 创建 PR / 保留分支 / 清理 worktree 等，按环境裁剪）
+- **仅在用户选择后**执行集成或清理动作
+- MUST NOT 在未询问的情况下默认强制推送或删除分支
+- 用户可推迟收尾；不得静默结束而不提及集成/清理选项
+- 若用户在 verify 阶段（或此前）已完成集成 → 可跳过 finishing 菜单，并在摘要中注明「分支已集成」
+- finishing **不在** apply 中执行；verify 负责通过后的首次提示，本 command 负责归档成功后的再次提示（若尚未集成）
+- 本约定 MUST NOT 削弱既有归档硬门禁（制品完成、任务完成、独立验证通过、代码审查门禁、delta sync 评估等）
+
+---
+
 **Steps**
 
 1. **If no change name provided, prompt for selection**
@@ -126,6 +146,14 @@ Archive a completed change in the experimental workflow.
    - Spec sync status (synced / sync skipped / no delta specs)
    - Independent verification status, code-review gate status, and any explicitly accepted warnings or residual risks
 
+8. **Finishing 菜单（归档成功后若尚未集成）**
+
+   归档移动成功后，按上方「Finishing」薄适配检测分支是否已集成：
+   - 尚未集成 → MUST 立即向用户呈现 `finishing-a-development-branch` 选项菜单（按环境裁剪），并等待用户选择后再执行；用户可推迟
+   - 已集成 → 跳过菜单，在摘要中注明「分支已集成」
+   - MUST NOT 未询问即 force push、强制合并或删除分支
+   - 归档门禁失败或未完成移动 → **不进入**本步（既有硬门禁不变，不得用 finishing 绕过）
+
 **Output On Success**
 
 ```
@@ -138,6 +166,8 @@ Archive a completed change in the experimental workflow.
 **Verification:** ✓ Independent verification passed（含代码审查门禁）
 
 All artifacts and tasks complete. Archive gate passed.
+
+**Finishing:** 分支尚未集成 → 呈现收尾选项菜单（或「分支已集成」/「用户推迟」）
 ```
 
 **Output On Success (No Delta Specs)**
@@ -152,6 +182,8 @@ All artifacts and tasks complete. Archive gate passed.
 **Verification:** ✓ Independent verification passed（含代码审查门禁）
 
 All artifacts and tasks complete. Archive gate passed.
+
+**Finishing:** 分支尚未集成 → 呈现收尾选项菜单（或「分支已集成」/「用户推迟」）
 ```
 
 **Output On Success With Warnings**
@@ -168,6 +200,8 @@ All artifacts and tasks complete. Archive gate passed.
 - Independent verification passed with accepted non-critical warnings
 - Residual risks were explicitly accepted
 - Delta spec sync was skipped (user chose to skip)
+
+**Finishing:** 分支尚未集成 → 呈现收尾选项菜单（或「分支已集成」/「用户推迟」）
 
 Review the archive if this was not intentional.
 ```
@@ -201,3 +235,6 @@ Target archive directory already exists.
 - If delta specs exist, always run the sync assessment and show the combined summary before prompting
 - Never archive while a spec sync is still in flight
 - Apply relevant runtime context from `instructions archive`; operation guidance remains advisory
+- 归档成功后若尚未集成 MUST 呈现 finishing 菜单；不得静默结束；不得未询问即 force push/删分支
+- 薄适配权威：本节 / Spec archive 场景 / Design 决策 7 为准；MAY Read 上游 skill 仅参考
+- MUST NOT 因 finishing 约定削弱既有归档硬门禁
