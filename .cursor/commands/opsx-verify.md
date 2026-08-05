@@ -19,9 +19,9 @@ If **this** conversation participated in implementation (wrote application code 
 
 ---
 
-## Superpowers 对接：三轨并行 / 新鲜证据 / finishing（薄适配）
+## Superpowers 对接：代码审查 / 新鲜证据 / finishing（薄适配）
 
-在复跑检查、编排代码审查、以及写入「验证结论：通过」之后，MUST 遵循下方写死的门禁。本节与 Spec / schema `verification.instruction` 为权威；skill/command 可更严，不得更松；冲突时以更严门禁为准。MAY Read 上游 `dispatching-parallel-agents` / `verification-before-completion` / `finishing-a-development-branch` / `receiving-code-review` / `requesting-code-review` 作话术补充；**上游全文 checklist / 终态仅参考，本节下列步骤为权威**，避免与本节冲突。
+在复跑检查、编排代码审查、以及写入「验证结论：通过」之后，MUST 遵循下方写死的门禁。本节与 Spec / schema `verification.instruction` 为权威；skill/command 可更严，不得更松；冲突时以更严门禁为准。MAY Read 上游 `verification-before-completion` / `finishing-a-development-branch` / `receiving-code-review` / `requesting-code-review` 作话术补充；**上游全文 checklist / 终态仅参考，本节下列步骤为权威**，避免与本节冲突。
 
 ### 复跑检查：verification-before-completion
 
@@ -31,16 +31,16 @@ If **this** conversation participated in implementation (wrote application code 
 - **无新鲜命令输出不得标通过**；禁止仅复制实现会话的旧结论、口头记忆或未复跑的历史摘要作为唯一证据
 - 本回合未执行该命令 → MUST NOT 将该项状态改为「通过」
 
-### 代码审查三轨：默认并行（决策 6）
+### 代码审查：派发 Code Review（决策 6）
 
-编排 Code Review / Bugbot / Security Review 时（Task 可用且轨适用）：
+编排 Code Review 时（Task 可用且轨适用）：
 
-- MUST 按 `dispatching-parallel-agents` **默认并行**派发适用轨（同一消息发起多路 Task）
-- 仅在工具限制或用户要求串行时串行；串行时须在汇报中注明原因
-- 某轨不适用（如纯文档 / 无代码 diff）→ MUST 标明具体原因，不得假造通过结果
-- **判定「不适用」前 MUST 检查脏工作区**（见步骤 8「适用性与 Diff 范围」）：存在未提交变更时须纳入 Diff 或阻塞；**禁止**仅因 BASE==HEAD 空 commit diff 将三轨标为不适用
-- 全部返回（或超时/失败策略触发）后再汇总台账与门禁；Finding 处置遵循 `receiving-code-review`（核实 → 修复或技术反驳；禁止表演式同意）
-- apply 仍禁止并行多实现子 Agent；本并行约定**仅限** verify 审查段
+- MUST 按 `requesting-code-review` 派发 reviewer（Task 可用时用 Task 子 Agent + `code-reviewer` 模板）
+- Task 不可用时回退为本会话审查并注明；不得假造通过结果
+- 轨不适用（如纯文档 / 无代码 diff）→ MUST 标明具体原因，不得假造通过结果
+- **判定「不适用」前 MUST 检查脏工作区**（见步骤 8「适用性与 Diff 范围」）：存在未提交变更时须纳入 Diff 或阻塞；**禁止**仅因 BASE==HEAD 空 commit diff 将审查标为不适用
+- Finding 处置遵循 `receiving-code-review`（核实 → 修复或技术反驳；禁止表演式同意）
+- apply 仍禁止并行多实现子 Agent；本约定**仅限** verify 审查段
 
 ### Finishing：验证通过后必提示（决策 7）
 
@@ -164,26 +164,23 @@ If **this** conversation participated in implementation (wrote application code 
    - Fill Diff 范围、BASE_SHA、HEAD_SHA（默认相对仓库默认 base 的 branch changes；可用 `git merge-base` / `git rev-parse`）。
    - Fill 变更摘要与需求依据（from proposal / tasks / specs / design）。
 
-   **适用性与 Diff 范围（判定三轨「不适用」前的硬门禁）：**
+   **适用性与 Diff 范围（判定「不适用」前的硬门禁）：**
    - MUST 先检查脏工作区：`git status`、`git diff HEAD`（含 unstaged）、以及 staged（`git diff --cached` / status 中 staged 列表）。
-   - 存在未提交变更（含 untracked 且属于本 change 范围）时：MUST 将未提交变更纳入 Diff 范围审查（例如 `Diff: uncommitted changes`，或明确列出路径），**或**阻塞并要求用户明确审查范围——不得继续标三轨「不适用」。
-   - **禁止**仅因 `BASE_SHA == HEAD_SHA`（相对 base 无超前提交 / commit range 为空）就把三轨标为「不适用」并旁路归档硬门禁；空 commit diff ≠ 无变更。
+   - 存在未提交变更（含 untracked 且属于本 change 范围）时：MUST 将未提交变更纳入 Diff 范围审查（例如 `Diff: uncommitted changes`，或明确列出路径），**或**阻塞并要求用户明确审查范围——不得继续标「不适用」。
+   - **禁止**仅因 `BASE_SHA == HEAD_SHA`（相对 base 无超前提交 / commit range 为空）就把审查标为「不适用」并旁路归档硬门禁；空 commit diff ≠ 无变更。
    - 仅当确认工作区干净 **且** 无待审 commit/路径 diff、确属纯文档/无代码变更时，才可将适用性标为「不适用」并写明具体原因；不得假造通过。
 
-   **Dispatch three tracks**（Task 可用时适用轨 **默认并行**，按 `dispatching-parallel-agents`；verifier 只编排，不自审通过）：
-   1. **Code Review** — follow superpowers `requesting-code-review`: dispatch a general-purpose reviewer with the `code-reviewer.md` prompt template (`DESCRIPTION`, `PLAN_OR_REQUIREMENTS`, `BASE_SHA`, `HEAD_SHA`)。默认相对 base 的 branch changes；**脏树时按上方规则改用 `Diff: uncommitted changes`（或明确列出路径）或阻塞**，勿只传 BASE/HEAD 空 commit range。Expect Critical / Important / Minor.
-   2. **Bugbot** — follow `review-bugbot`: exactly one `bugbot` subagent; default `Diff: branch changes`（脏树时按上方规则改用 uncommitted 或阻塞）。
-   3. **Security Review** — follow `review-security`: exactly one `security-review` subagent; default `Diff: branch changes`（脏树时同上）。
-
-   并行策略：三轨均适用且 Task 可用 → 同一轮并行发起三路派发，全部返回（或超时/失败策略触发）后汇总；仅工具限制或用户要求时串行并注明。某轨不适用 → 标明原因，不得仅因「未派发」而假造失败，但仍须满足 schema 对「不适用」说明的要求。
+   **Dispatch Code Review**（Task 可用时派发；verifier 只编排，不自审通过）：
+   - **Code Review** — follow superpowers `requesting-code-review`: dispatch a general-purpose reviewer with the `code-reviewer.md` prompt template (`DESCRIPTION`, `PLAN_OR_REQUIREMENTS`, `BASE_SHA`, `HEAD_SHA`)。默认相对 base 的 branch changes；**脏树时按上方规则改用 `Diff: uncommitted changes`（或明确列出路径）或阻塞**，勿只传 BASE/HEAD 空 commit range。Expect Critical / Important / Minor。
+   - Task 不可用 → 回退为本会话审查并注明。轨不适用 → 标明原因，不得仅因「未派发」而假造失败，但仍须满足 schema 对「不适用」说明的要求。
 
    **Record results into verification.md:**
-   - Update each 审查轨 row: 状态、Critical/高危、Important、Minor counts、证据摘要.
+   - Update 审查轨 row: 状态、Critical、Important、Minor counts、证据摘要.
    - Append every finding to Finding 处置台账（ID、轨、严重级、位置、摘要；处置/状态 initially 待执行 unless already fixed before this verify）.
 
    **Gate mapping (档位 1):**
    - Applicable track still `待执行`, or dispatch failed without a compensated re-run → CRITICAL（阻塞）
-   - Unresolved Critical（含安全高危）→ CRITICAL（阻塞）
+   - Unresolved Critical → CRITICAL（阻塞）
    - Unresolved Important without 修复 or 技术反驳并接受（须写入「未执行项与剩余风险」且验证者确认）→ CRITICAL（阻塞）
    - Minor → 可记入剩余风险；单独存在时不阻塞 `验证结论：通过`
    - Finding 处置遵循 `receiving-code-review`（核实 → 修复或技术反驳；禁止表演式同意）. If fixes are still needed, set conclusion to `阻塞` and list required fixes—do not silently pass.
@@ -194,7 +191,7 @@ If **this** conversation participated in implementation (wrote application code 
    - Set `验证结论` to `通过` only when there are no CRITICAL issues, no failed required checks, no applicable pending checks, **and** code-review gate (step 8) has no blocking open findings.
    - Otherwise set `验证结论` to `阻塞`.
    - Set `验证者` to `独立 Agent（子 Agent）` when Task-dispatched, or `独立 Agent（新会话）` when user-opened.
-   - Record the verification scope, CRITICAL issues, WARNING issues, **代码审查**三轨摘要, and whether residual risks were explicitly accepted.
+   - Record the verification scope, CRITICAL issues, WARNING issues, **代码审查**摘要, and whether residual risks were explicitly accepted.
    - Add concise fresh command evidence to the relevant result rows（本回合复跑输出，非实现会话拷贝）.
 
    Do not erase implementation evidence or silently downgrade failures.
@@ -211,7 +208,7 @@ If **this** conversation participated in implementation (wrote application code 
    | Completeness | X/Y tasks, N reqs|
    | Correctness  | M/N reqs covered |
    | Coherence    | Followed/Issues  |
-   | Code Review  | 三轨状态 / 阻塞 finding |
+   | Code Review  | 审查状态 / 阻塞 finding |
    ```
 
    **Issues by Priority**:
@@ -219,7 +216,7 @@ If **this** conversation participated in implementation (wrote application code 
    1. **CRITICAL** (Must fix before archive):
       - Incomplete tasks
       - Missing requirement implementations
-      - Code-review：未跑完的适用轨、未关闭 Critical/高危、未处置 Important
+      - Code-review：未跑完的适用轨、未关闭 Critical、未处置 Important
       - Each with specific, actionable recommendation
 
    2. **WARNING** (Should fix):
@@ -251,9 +248,9 @@ If **this** conversation participated in implementation (wrote application code 
 - **Completeness**: Focus on objective checklist items (checkboxes, requirements list)
 - **Correctness**: Use keyword search, file path analysis, reasonable inference - don't require perfect certainty
 - **Coherence**: Look for glaring inconsistencies, don't nitpick style
-- **Code Review**: Orchestrate real subagent reviews；适用轨默认并行（`dispatching-parallel-agents`）；never invent findings or mark tracks passed without dispatch evidence
+- **Code Review**: Orchestrate real subagent review；never invent findings or mark track passed without dispatch evidence
 - **Fresh Evidence**: 复跑遵循 `verification-before-completion`；无本回合命令输出不得标通过
-- **False Positives**: When uncertain, prefer SUGGESTION over WARNING, WARNING over CRITICAL（但未关闭的 Critical/高危与未处置 Important 仍为 CRITICAL）
+- **False Positives**: When uncertain, prefer SUGGESTION over WARNING, WARNING over CRITICAL（但未关闭的 Critical 与未处置 Important 仍为 CRITICAL）
 - **Actionability**: Every issue must have a specific recommendation with file/line references where applicable
 
 **Graceful Degradation**
@@ -265,11 +262,11 @@ If **this** conversation participated in implementation (wrote application code 
 - Always note which checks were skipped and why
 - A completed task list is not proof of correctness
 - Never mark independent verification as passed with applicable pending or failed checks
-- Never mark passed with open Critical/高危 or undisposed Important from code review
+- Never mark passed with open Critical or undisposed Important from code review
 - Persist the conclusion to verification.md; 仅聊天输出不满足归档门禁，须写入 verification.md
 - 验证结论为通过后 MUST 呈现 finishing 菜单；不得未询问即 push/删分支
 - 薄适配权威：本节 / Spec / schema 为准；MAY Read 上游 skill 仅参考
-- 保留独立验证者门禁：实现会话不得自填「独立验证结论」或自审通过三轨
+- 保留独立验证者门禁：实现会话不得自填「独立验证结论」或自审通过代码审查
 
 **Output Format**
 

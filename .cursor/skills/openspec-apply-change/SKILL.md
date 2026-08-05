@@ -162,11 +162,11 @@ Implement tasks from an OpenSpec change.
    - **无新鲜命令输出不得标「通过」**；禁止仅用旧会话口头记忆作为唯一证据。
    - List skipped checks, failures, and residual risks.
    - Do **not** fill or change `独立验证结论`; the implementer cannot verify itself.
-   - Do **not** mark「代码审查」三轨为通过或填写审查台账结论；代码审查由独立 verify Agent 编排.
+   - Do **not** mark「代码审查」为通过或填写审查台账结论；代码审查由独立 verify Agent 编排.
    - If any required check fails or remains `待执行`, pause and report the blocker（失败原因不明时先 `systematic-debugging`）。
    - If evidence is complete, **automatically dispatch** an independent verify Agent (preferred), then report its conclusion:
      1. Use the **Task** tool with a **fresh/isolated** subagent (do not `resume` the implementer; do not pass implementation chat history).
-     2. Instruct it to follow `.cursor/skills/openspec-verify-change/SKILL.md` / `/opsx-verify` for this change (pass `--store` when applicable), re-run applicable checks, **orchestrate code-review tracks (Code Review / Bugbot / Security Review)**, update `## 代码审查（归档硬门禁）`, and write `## 独立验证结论` only.
+     2. Instruct it to follow `.cursor/skills/openspec-verify-change/SKILL.md` / `/opsx-verify` for this change (pass `--store` when applicable), re-run applicable checks, **orchestrate Code Review**, update `## 代码审查（归档硬门禁）`, and write `## 独立验证结论` only.
      3. After it returns, summarize 通过/阻塞 for the user. Do **not** rewrite the conclusion yourself.
      4. **Fallback only** if Task/dispatch is unavailable: ask the user to open a fresh Agent conversation and run `/opsx:verify <change-name>`.
 
@@ -260,7 +260,7 @@ What would you like to do?
 - Use contextFiles from CLI output, don't assume specific file names
 - Never treat completed task checkboxes as sufficient evidence for archive
 - Never fill the independent verification conclusion from the implementation session
-- Never self-pass「代码审查」三轨 or invent review findings from the implementation session
+- Never self-pass「代码审查」 or invent review findings from the implementation session
 - Prefer Task-dispatch of an independent `/opsx:verify` subagent after the evidence gate; only fall back to asking the user to open a fresh session
 - Never suggest archive before independent verification passes（含代码审查门禁）
 - Do not run `finishing-a-development-branch` or whole-branch final review inside apply
