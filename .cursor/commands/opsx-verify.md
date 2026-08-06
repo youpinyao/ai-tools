@@ -9,7 +9,7 @@ Verify that an implementation matches the change artifacts (specs, tasks, design
 
 **Independence gate:** The verifier must **not** have implemented the change. Allowed runners:
 1. **Preferred:** A Task-dispatched subagent started by `/opsx:apply` after the implementation evidence gate (isolated context; no implementer history).
-2. A user-opened fresh Agent conversation that runs `/opsx-verify`.
+2. **Also valid:** 用户新开的独立 Agent 会话执行 `/opsx:verify`（未参与实现；Task 不可用时的回退）。
 
 If **this** conversation participated in implementation (wrote application code / marked implementation tasks done for this change), **stop**: do not fill `独立验证结论` yourself—dispatch a Task subagent for verify, or ask the user to open a fresh conversation. The implementer cannot approve its own work.
 
@@ -40,7 +40,6 @@ If **this** conversation participated in implementation (wrote application code 
 - 轨不适用（如纯文档 / 无代码 diff）→ MUST 标明具体原因，不得假造通过结果
 - **判定「不适用」前 MUST 检查脏工作区**（见步骤 8「适用性与 Diff 范围」）：存在未提交变更时须纳入 Diff 或阻塞；**禁止**仅因 BASE==HEAD 空 commit diff 将审查标为不适用
 - Finding 处置遵循 `receiving-code-review`（核实 → 修复或技术反驳；禁止表演式同意）
-- apply 仍禁止并行多实现子 Agent；本约定**仅限** verify 审查段
 
 ### Finishing：验证通过后必提示（决策 7）
 

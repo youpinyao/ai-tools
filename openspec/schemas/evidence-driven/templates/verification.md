@@ -124,9 +124,9 @@ Finding 处置遵循 receiving-code-review：先核实再修复或技术反驳�
 <!--
 必须由未参与实现的 Agent 执行 /opsx:verify（或等价流程）后填写。实现 Agent 不得自填本区块。
 
-推荐启动方式（二选一，优先 1）：
+推荐启动方式（优先 1）：
 1. /opsx:apply 在实现证据门禁完成后，用 Task 派发独立子 Agent 跑 verify（隔离上下文，不继承实现会话历史）
-2. 用户新开 Agent 会话手动执行 /opsx:verify <change-name>
+2. 用户新开 Agent 会话手动执行 /opsx:verify <change-name>（未参与实现；Task 不可用时的回退）
 
 验证者须编排 Code Review，将结果写入「代码审查」节后再下结论。
 复跑自动化检查须本回合新鲜证据（verification-before-completion）。
