@@ -13,7 +13,7 @@ Verify that an implementation matches the change artifacts (specs, tasks, design
 
 If **this** conversation participated in implementation (wrote application code / marked implementation tasks done for this change), **stop**: do not fill `独立验证结论` yourself—dispatch a Task subagent for verify, or ask the user to open a fresh conversation. The implementer cannot approve its own work.
 
-**Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`). Other commands do not take the flag. Hints printed by commands already carry the flag; keep it on follow-ups. Without a store, commands act on the nearest local `openspec/` root.
+**Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`, `view`). Once selected, treat `--store <id>` as sticky for the rest of the workflow. Every unscoped example of those commands below is shorthand: before running it, append the flag. For example, run `openspec status --change "<name>" --json --store "<id>"`, not the unscoped form shown below. Other commands do not take the flag. Hints printed by commands already carry the flag; keep it on follow-ups. Without a store, commands act on the nearest local `openspec/` root.
 
 **Input**: Optionally specify a change name after `/opsx:verify` (e.g., `/opsx:verify add-auth`). If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
 
@@ -48,7 +48,7 @@ If **this** conversation participated in implementation (wrote application code 
 - MUST 遵循 `finishing-a-development-branch` 核心步骤：确认门禁已通过 → 检测工作区环境 → 向用户呈现结构化选项（合并 / 创建 PR / 保留分支 / 清理 worktree 等，按环境裁剪）
 - **仅在用户选择后**执行集成或清理动作
 - MUST NOT 在未询问的情况下默认强制推送或删除分支
-- finishing **不在** apply 中执行；用户可推迟收尾。archive 成功后若尚未集成，由 archive 阶段再次提示（本 command 负责 verify 通过后的首次提示）
+- finishing **不在** apply 中执行；用户可推迟收尾。archive 成功后若尚未集成，由 archive 阶段再次提示（本 skill 负责 verify 通过后的首次提示）
 
 ---
 

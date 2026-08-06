@@ -56,6 +56,7 @@ archive（可在归档时同步 delta specs）
 - 代码已先于规划变化 → `/opsx-update-change-from-code`
 - 只合并 delta specs 到 main specs、不归档 → `/opsx-sync`
 - 纯重构 / 工具链 / 文档、无规范层行为变化 → 在 change 的 `.openspec.yaml` 设置 `skip_specs: true`（OpenSpec 1.7+），不要捏造空 specs
+- 退役整项能力（移除最后一条需求并删除 main spec）→ 设置 `retire_capabilities: true`（OpenSpec 1.8+）
 
 完整场景说明见 [AI-SDD 团队工作流](ai-sdd-workflow.md)。
 
@@ -84,7 +85,7 @@ proposal → specs / design → tasks → verification → apply → verify → 
 
 模板位于 `openspec/schemas/evidence-driven/templates/`（`proposal`、`spec`、`design`、`tasks`、`verification` 等）。
 
-兼容 OpenSpec CLI **1.7+**：零增量变更须声明 `skip_specs: true`；新增能力的 delta spec 建议以 `## Purpose` 开头。Skills 与 commands 为定向同步，勿对本仓库直接跑 `openspec update`（会覆盖定制门禁与扩展 skill）。
+兼容 OpenSpec CLI **1.8+**：零增量变更须声明 `skip_specs: true`；退役能力须声明 `retire_capabilities: true`；嵌套能力路径使用 `<capability-path>`（如 `identity/user-auth`）；新增能力的 delta spec 建议以 `## Purpose` 开头。Skills 与 commands 为定向同步，勿对本仓库直接跑 `openspec update`（会覆盖定制门禁与扩展 skill）。
 
 ## 许可证
 

@@ -18,8 +18,8 @@ artifacts:
       - **背景与动机**：用 1～2 句话说明问题或机会。本变更解决什么问题？为什么现在需要变更？
       - **变更内容**：以项目符号列出变更。明确说明新增、修改或移除的能力。破坏性变更须标记为 **BREAKING**。
       - **能力**：明确将创建或修改哪些规范：
-        - **新增能力**：列出本次引入的能力。每项能力对应一个新的 `specs/<名称>/spec.md`。名称使用 kebab-case（例如 `user-auth`、`data-export`）。
-        - **修改能力**：列出需求（REQUIREMENTS）发生变化的现有能力。仅在规范层行为变化时列出，不包括单纯的实现细节变化。每项能力都需要一个增量规范（delta spec）文件。检查 `openspec/specs/` 中已有的规范名称；没有需求变化时留空。
+        - **新增能力**：列出本次引入的能力。每项能力对应一个新的 `specs/<capability-path>/spec.md`。路径段使用 kebab-case（例如 `user-auth` 或 `identity/user-auth`），并遵循项目既有的规范目录组织方式。
+        - **修改能力**：列出需求（REQUIREMENTS）发生变化的现有能力。仅在规范层行为变化时列出，不包括单纯的实现细节变化。每项能力都需要一个增量规范（delta spec）文件。使用 `openspec/specs/` 下的既有完整路径；没有需求变化时留空。
       - **影响**：受影响的代码、API、依赖或系统。
 
       重要：能力章节至关重要，它建立提案与规范阶段之间的约定。
@@ -78,6 +78,10 @@ artifacts:
       2. 复制完整的需求块（从 `### Requirement:` 开始，包含其全部场景）
       3. 粘贴到 `## MODIFIED Requirements` 下，并根据新行为进行修改
       4. 确保标题文本完全匹配（忽略空白差异）
+
+      若本变更会移除某能力的最后一条需求并删除其 main spec，须在 change 的
+      `.openspec.yaml` 声明 `retire_capabilities: true`（OpenSpec 1.8+）；
+      否则 sync/archive 不得删除空能力的 `spec.md`。
 
       常见问题：MODIFIED 只包含部分内容会在归档时丢失细节。
       如果只是增加新关注点而未改变现有行为，应使用 ADDED。

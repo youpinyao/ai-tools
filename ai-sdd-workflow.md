@@ -17,7 +17,8 @@
 
 准备为一项新需求或修复建立完整规划？
   └─ /opsx-propose
-     （纯重构 / 工具链 / 文档、无规范层行为变化时：.openspec.yaml 加 skip_specs: true）
+     （纯重构 / 工具链 / 文档、无规范层行为变化时：.openspec.yaml 加 skip_specs: true；
+      退役整项能力时另加 retire_capabilities: true）
 
 已有 change，需要调整规划，但不改代码？
   └─ /opsx-update
@@ -99,7 +100,7 @@ proposal
 它会按 schema 生成达到实施条件所需的全部产物：
 
 - `proposal.md`：为什么做、做什么、影响什么。
-- `specs/<capability>/spec.md`：系统必须表现出的行为和可测试场景。
+- `specs/<capability-path>/spec.md`：系统必须表现出的行为和可测试场景。
 - `design.md`：关键技术决策、权衡、风险和迁移方案。
 - `tasks.md`：可逐项执行和勾选的实现任务。
 - `verification.md`：实现后要执行的检查；此时结果必须保持“待执行”。
@@ -114,6 +115,9 @@ change 名重新运行 `/opsx-propose`，不要把不相关的目标塞进旧 ch
 `.openspec.yaml` 中设置 `skip_specs: true`（保留 `schema:`）。OpenSpec 1.7+ 的
 `validate` 会拒绝「零增量且未声明 skip_specs」的 change；不要为了过校验而捏造
 需求。设置后 `specs` 产物状态为 `skipped`，propose / archive 不得再创建 specs。
+若本变更会移除某能力的最后一条需求并删除其 main spec，另须设置
+`retire_capabilities: true`（OpenSpec 1.8+）；未声明时 sync/archive 不得删除空能力的
+`spec.md`。嵌套能力路径使用 `<capability-path>`（如 `identity/user-auth`）。
 
 新增能力的 delta spec 建议以 `## Purpose` 开头，归档时会写入对应的 main spec。
 
