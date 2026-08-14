@@ -98,21 +98,25 @@ apply.tracks   = tasks.md
 ```
 
 `proposal`、`specs`、`design` 与 `tasks` 派生自 OpenSpec 1.9.0 官方
-`spec-driven` 语义。相对于该基线，自定义差异严格限定为四类：
+`spec-driven` 语义。相对于该基线，自定义差异限定为：
 
 1. 将面向使用者的正文翻译为简体中文。
 2. 将 schema 名称和描述改为 `evidence-driven`。
 3. 新增 `verification` 制品。
 4. 将 `apply.requires` 从 `[tasks]` 改为 `[verification]`，并在 apply instruction
    中增加执行适用检查、记录真实命令、结果、失败原因与剩余风险的要求。
+5. 将代码审查定为 verification 必做检查（apply 时阅读实现 diff 并记账），不构成
+   官方 archive 裁决。
 
 其中 `verification` 与 apply 的记录语义如下：
 
 - `verification.md` 在 apply 前规划验证范围、需求对应关系、自动化与人工检查、
-  非功能检查、发布后验证和回滚。
+  非功能检查、代码审查、发布后验证和回滚。
 - 规划阶段的检查保持“待执行”，不得预填成功结果或捏造仓库中不存在的命令。
 - apply 执行其中适用的检查，并记录真实命令、步骤、通过或失败结果、不适用原因、
   未执行项和剩余风险。
+- 代码审查必须实际阅读本次变更的实现 diff；存在未处理的 Critical 或 Important
+  时不得记为通过。仅当工作区相对本变更无实现 diff 时可记不适用，并写明原因。
 - 只有实际执行并读取输出后才能记录“通过”。
 
 schema 只定义这些制品及依赖，不扩展官方 verify、archive 或 sync 的行为。
@@ -161,10 +165,11 @@ retire_capabilities: true
 `evidence-driven` 的 apply instruction 还要求：
 
 1. 按 `tasks.md` 实施，完成任务后更新复选框。
-2. 执行 `verification.md` 中适用的自动化、人工和非功能检查。
+2. 执行 `verification.md` 中适用的自动化、人工和非功能检查，以及必做的代码审查。
 3. 如实记录实际命令、步骤、结果与失败原因。
 4. 对不适用项说明原因；把未执行项和失败项保留为剩余风险。
-5. 遇到阻塞或发现规划不一致时暂停，不伪造完成状态。
+5. 代码审查须阅读本次变更的实现 diff；未处理的 Critical 或 Important 不得记通过。
+6. 遇到阻塞或发现规划不一致时暂停，不伪造完成状态。
 
 `verification.md` 是验证计划与结果记录，不代表对官方 verify 或 archive 增加了本地
 裁决条件。

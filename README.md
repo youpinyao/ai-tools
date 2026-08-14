@@ -130,8 +130,9 @@ verify、archive 与 sync 的具体行为以当前 OpenSpec 官方生成物为�
 - `proposal`、`specs`、`design`、`tasks` 是官方语义的简体中文派生。
 - 新增 `verification.md`，用于规划验证并记录实际执行结果与剩余风险。
 - `verification` 依赖 `tasks`，`apply` 依赖 `verification` 并跟踪 `tasks.md`。
-- apply 应执行 `verification.md` 中适用的检查，如实记录命令、结果、失败原因和
-  未执行项；schema 不把这些记录扩展成额外的官方 verify 或 archive 行为。
+- apply 应执行 `verification.md` 中适用的检查，包括必做的代码审查，如实记录命令、
+  结果、失败原因和未执行项；schema 不把这些记录扩展成额外的官方 verify 或
+  archive 行为。
 
 兼容的官方 1.9.0 语义包括：
 

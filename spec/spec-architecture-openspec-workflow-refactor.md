@@ -1,6 +1,6 @@
 ---
 title: OpenSpec 官方优先工作流重构规格（官方 skills/commands 外置 + evidence-driven schema-only）
-version: 2.0
+version: 2.1
 date_created: 2026-08-14
 last_updated: 2026-08-14
 owner: ai-tools
@@ -32,6 +32,7 @@ tags:
 - 删除仓库中原有官方模板副本，避免再次误提交。
 - 从最新官方 `spec-driven` 重新构建 `evidence-driven`，而不是继续修补旧模板。
 - 保留“先规划验证、再进入 apply”的制品依赖。
+- 将代码审查定为 verification 必做检查，但不把它做成官方 archive 条件。
 - 保留 OpenSpec 1.9.0 的 `skip_specs`、嵌套 `<capability-path>`、新增能力 `## Purpose` 与完整 MODIFIED requirement 语义。
 - OpenSpec 自定义 schema、模板、规格和工作流文档使用简体中文。
 - 提供可重复执行的基线核对和 schema 校验方法。
@@ -138,6 +139,7 @@ apply.tracks   = tasks.md
 3. 新增 `verification` 制品。
 4. 将 `apply.requires` 从 `[tasks]` 改为 `[verification]`。
 5. 在 apply instruction 中增加“执行 `verification.md` 中适用检查并记录真实结果”的 schema-only 要求。
+6. 将代码审查定为 verification 必做检查（规划写入模板、apply 时实际阅读实现 diff 并记录结论），不构成官方 archive 裁决。
 
 不得加入或恢复以下旧定制：
 
@@ -174,6 +176,7 @@ apply.tracks   = tasks.md
 - 自动化验证；
 - 人工验证；
 - 非功能验证；
+- 代码审查（必做检查：范围、标准、发现项、结论）；
 - 实际执行结果；
 - 未执行项与剩余风险；
 - 发布后验证与回滚。
@@ -192,6 +195,16 @@ apply.tracks   = tasks.md
 - 不适用项记录 `不适用` 与具体原因。
 - 未执行项不得伪装为通过，必须进入剩余风险。
 
+代码审查 MUST：
+
+- 作为 verification 必做检查出现在模板中，并纳入需求对应关系与实际执行结果。
+- 规划阶段保持「待执行」，不得预填通过。
+- apply 时实际阅读本次变更的实现 diff 后再改状态。
+- 存在未处理的 Critical 或 Important 时记「失败」，并进入剩余风险。
+- Minor 可记后续项，不单独导致失败。
+- 仅当工作区相对本变更无实现 diff（纯规划、尚未编码）时可记「不适用」，并写明原因；文档、schema 与配置变更仍须审查。
+- 由当前 apply 会话执行；不得绑定独立 reviewer、自动派发或官方 archive 条件。
+
 模板 MUST NOT 包含：
 
 - `## 代码审查（归档硬门禁）`
@@ -204,8 +217,9 @@ apply.tracks   = tasks.md
 apply instruction MUST：
 
 - 沿用官方“读取上下文、逐项完成待办、完成即勾选、阻塞时暂停”的语义；
-- 要求执行 `verification.md` 中适用检查；
-- 要求记录真实命令、结果、失败原因与剩余风险。
+- 要求执行 `verification.md` 中适用检查，包括必做的代码审查；
+- 要求记录真实命令、结果、失败原因与剩余风险；
+- 要求代码审查实际阅读实现 diff；未处理的 Critical 或 Important 不得记为通过。
 
 apply instruction MUST NOT：
 
@@ -289,8 +303,9 @@ verify 与 archive 的具体行为以当前 OpenSpec 官方生成物为准。本
 - **AC-SCH-002**：`verification` 依赖 `tasks`，apply 依赖 `verification` 并跟踪 `tasks.md`。
 - **AC-SCH-003**：`openspec schema validate evidence-driven` 退出码为 0。
 - **AC-SCH-004**：模板与 schema instruction 使用简体中文，并保留代码标识符、路径和 CLI 名称。
-- **AC-VER-001**：verification 模板包含第 4.4 节规定的八类内容。
-- **AC-VER-002**：verification 模板不含代码审查硬门禁、独立验证结论、自动派发 verify 或 finishing。
+- **AC-VER-001**：verification 模板包含第 4.4 节规定的九类内容，其中包括独立「代码审查」章节。
+- **AC-VER-002**：verification 模板不含 `## 代码审查（归档硬门禁）`、独立验证结论、自动派发 verify 或 finishing；代码审查是 verification 必做检查，不是官方 archive 条件。
+- **AC-VER-003**：schema 的 verification 与 apply instruction 要求执行代码审查，未处理 Critical/Important 不得记通过。
 - **AC-DOC-001**：README 与工作流文档不再宣称本仓库定制官方 verify/archive/apply skill。
 - **AC-SCOPE-001**：from-code 旁路、中文规则与 Graphify 文档未被误删。
 
@@ -321,11 +336,12 @@ git ls-files '.cursor/skills/openspec-*' '.cursor/commands/opsx-*'
 3. `apply.requires` 为 `[verification]`。
 4. proposal/spec/design/tasks 保留官方基线关键语义。
 5. schema 与 verification 模板不含 `Superpowers`、`Task 派发`、`归档硬门禁`、`独立验证结论` 或 `Finishing`。
-6. README 与工作流文档指向官方初始化流程。
+6. verification 模板含 `## 代码审查`，且 schema instruction 要求该检查为必做。
+7. README 与工作流文档指向官方初始化流程。
 
 ## 8.3 人工核对
 
-将官方 `spec-driven` 与 `evidence-driven` 并排核对。除中文化、新增 verification、修改 apply 前置及记录验证结果外，不应存在无法解释的行为差异。
+将官方 `spec-driven` 与 `evidence-driven` 并排核对。除中文化、新增 verification、修改 apply 前置、记录验证结果及 verification 必做代码审查外，不应存在无法解释的行为差异。
 
 # 9. 风险与取舍
 
@@ -352,5 +368,6 @@ git ls-files '.cursor/skills/openspec-*' '.cursor/commands/opsx-*'
 - 选择“官方生成物不入库”，拒绝固定官方副本。
 - 选择“schema-only”，拒绝 Cursor rule 与 wrapper skills/commands。
 - 选择删除并从官方基线重建 schema templates，而不是继续增量修补旧模板。
-- 接受 schema-only 无法维持独立 verify、Code Review 归档硬门禁与 finishing 的能力边界。
+- 接受 schema-only 无法维持独立 verify、Code Review 作为 archive 条件与 finishing 的能力边界。
+- 选择把代码审查放在 verification 必做检查中，由 apply 会话阅读 diff 并记账，而不是恢复 archive 拦截。
 - 本规格取代 1.0 中与本决策冲突的 `APP-*`、`VER-*`、`CR-*`、`ARC-*` 与 Superpowers 薄适配要求。

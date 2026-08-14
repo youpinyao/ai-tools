@@ -31,8 +31,9 @@
 ### 1.1 相对纯官方 OpenSpec，你多得到什么
 
 - 默认 schema：`evidence-driven`（官方默认多为 `spec-driven`）。
-- 额外制品：`verification.md`（验证计划 + 实现侧真实结果记录）。
+- 额外制品：`verification.md`（验证计划 + 实现侧真实结果记录，含必做代码审查）。
 - 制品依赖：`tasks → verification`，且 `apply` 依赖 `verification`。
+- 代码审查在 verification 中必做，由 apply 会话阅读实现 diff 并记账；**不是**官方 archive 条件。
 - 可选：简体中文强制规则、`/opsx-update-change-from-code`。
 
 ### 1.2 相对旧版 ai-tools，你不再从本仓库获得什么
@@ -180,7 +181,7 @@ spec-driven:   proposal → specs/design → tasks → apply
 evidence-driven: proposal → specs/design → tasks → verification → apply
 ```
 
-官方 apply/verify/archive **不会**被本仓库改写；`verification` 的约束主要通过 schema 的 `apply.requires` 与模板指导进入工作流。apply 阶段应按模板执行适用检查并记录真实结果。
+官方 apply/verify/archive **不会**被本仓库改写；`verification` 的约束主要通过 schema 的 `apply.requires` 与模板指导进入工作流。apply 阶段应按模板执行适用检查（含必做代码审查）并记录真实结果。
 
 ## 6. 路径 C：从旧版 ai-tools 迁移
 
@@ -261,6 +262,7 @@ openspec list --json
 | apply 结束后强制独立子 Agent verify | 不再由本仓库保证；遵循官方 apply/verify |
 | archive 要求 `验证结论：通过` 且不可确认绕过 | 不再由本仓库保证；遵循官方 archive |
 | Code Review 作为归档硬门禁 | 不再由本仓库保证 |
+| 代码审查作为 verification 必做检查 | **保留**（schema 层，apply 记账；非 archive 条件） |
 | Superpowers brainstorming / finishing 写死在 skill | 不再由本仓库保证 |
 | `verification.md` 制品 | **保留**（schema 层） |
 | 中文规则、from-code | **可保留** |
@@ -273,8 +275,8 @@ openspec list --json
 2. 若必须带着 active change 迁移：
    - 保留 change 目录与 `.openspec.yaml`；
    - 刷新 schema 后运行 `openspec status --change "<name>" --json` 与 `openspec validate "<name>" --type change --strict`；
-   - 缺 `verification.md` 时按新模板补齐（规划阶段结果保持「待执行」）；
-   - 旧 verification 中「独立验证结论 / 代码审查硬门禁」章节可保留为项目约定，但**官方 archive 不一定再强制它们**。
+   - 缺 `verification.md` 时按新模板补齐（规划阶段结果保持「待执行」，须含代码审查章节）；
+   - 旧 verification 中「独立验证结论 / 代码审查硬门禁」章节可保留为项目约定，但**官方 archive 不一定再强制它们**；代码审查应改记为 verification 必做检查。
 
 ## 7. 日常升级（接入之后）
 
