@@ -1,1 +1,20 @@
 .DS_Store
+
+# SDD 临时进度区（不纳入版本控制）
+/.superpowers/
+
+# OpenSpec 官方 Cursor 生成物：由目标项目运行 openspec init/update 管理
+/.cursor/skills/openspec-explore/
+/.cursor/skills/openspec-propose/
+/.cursor/skills/openspec-update-change/
+/.cursor/skills/openspec-apply-change/
+/.cursor/skills/openspec-verify-change/
+/.cursor/skills/openspec-archive-change/
+/.cursor/skills/openspec-sync-specs/
+/.cursor/commands/opsx-explore.md
+/.cursor/commands/opsx-propose.md
+/.cursor/commands/opsx-update.md
+/.cursor/commands/opsx-apply.md
+/.cursor/commands/opsx-verify.md
+/.cursor/commands/opsx-archive.md
+/.cursor/commands/opsx-sync.md

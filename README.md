@@ -1,91 +1,149 @@
 # ai-tools
 
-面向 AI 编程助手的 **OpenSpec / AI-SDD 工作流工具包**：Cursor skills、`/opsx-*` 命令、`evidence-driven` schema，以及场景化团队工作流说明。
+面向 AI 编程助手的 **OpenSpec / AI-SDD 工作流工具包**。本仓库维护
+`evidence-driven` 自定义 schema、简体中文规则、可选的 from-code 旁路及场景文档；
+OpenSpec 官方 Cursor skills 与 `/opsx-*` commands 由 OpenSpec 在目标项目生成，本仓库
+不跟踪、不复制也不定制这些官方生成物。
 
-默认约定：OpenSpec 相关对话与规划产物使用**简体中文**（见 `.cursor/rules/openspec-chinese.mdc`）。
+默认约定：OpenSpec 相关对话与规划产物使用**简体中文**（见
+`.cursor/rules/openspec-chinese.mdc`）。
 
 ## 仓库包含什么
 
 | 内容 | 路径 | 说明 |
 |------|------|------|
-| Skills | `.cursor/skills/` | 8 个 OpenSpec 工作流 skills |
-| Commands | `.cursor/commands/` | 对应的 `/opsx-*` Cursor 命令 |
+| Schema | `openspec/schemas/evidence-driven/` | 官方 `spec-driven` 的中文派生，增加 `verification` 制品 |
+| 配置 | `openspec/config.yaml` | 默认使用 `schema: evidence-driven` |
 | 中文规则 | `.cursor/rules/openspec-chinese.mdc` | OpenSpec 相关输出强制简体中文 |
-| Schema | `openspec/schemas/evidence-driven/` | 带验证门禁的默认 schema |
-| 配置 | `openspec/config.yaml` | `schema: evidence-driven` |
-| 工作流文档 | [ai-sdd-workflow.md](ai-sdd-workflow.md) | 按场景选择命令与主线流程 |
-| Graphify 接入方案 | [graphify-integration.md](graphify-integration.md) | 在目标项目中用知识图谱增强 AI-SDD / OpenSpec 工作流 |
+| 可选 Skill | `.cursor/skills/openspec-update-change-from-code/` | 非官方的从代码回写 active change 旁路 |
+| 工作流文档 | [docs/ai-sdd-workflow.md](docs/ai-sdd-workflow.md) | 官方命令场景选择与 schema 制品说明 |
+| 接入与迁移 | [docs/ai-tools-integration.md](docs/ai-tools-integration.md) | 其它项目从官方 OpenSpec 或旧版 ai-tools 接入/升级 |
+| Graphify 接入方案 | [docs/graphify-integration.md](docs/graphify-integration.md) | 用知识图谱增强 AI-SDD / OpenSpec 工作流 |
 
-## 前置条件
+## 安装到目标项目
 
-- 支持 [Agent Skills](https://agentskills.io) 的 AI 编程助手（本仓库以 Cursor 为主）
-- [OpenSpec CLI](https://github.com/Fission-AI/OpenSpec)（`openspec` 需在 `PATH` 中）
+其它业务仓的完整接入、从旧版 ai-tools 迁移、以及日常升级步骤见
+[docs/ai-tools-integration.md](docs/ai-tools-integration.md)。下文是最短安装路径。
 
-## 如何使用
-
-将本仓库内容放到目标项目根目录（或复制 `.cursor/` 与 `openspec/`），使 Cursor 能加载 skills / commands / rules，并用 OpenSpec 读取 `evidence-driven` schema：
-
-```bash
-git clone https://github.com/youpinyao/ai-tools.git
-# 或按需复制 .cursor/、openspec/、ai-sdd-workflow.md 到业务仓库
-```
-
-也可通过 skills.sh 安装其中已发布的单个 skill（例如从代码回写变更）：
+前置条件是支持 [Agent Skills](https://agentskills.io) 的 AI 编程助手（本仓库以
+Cursor 为主）和 npm。以下命令中的 `AI_TOOLS_DIR` 是本仓库的绝对路径，
+`TARGET_PROJECT` 是目标项目的绝对路径：
 
 ```bash
-npx skills add youpinyao/ai-tools --skill openspec-update-change-from-code
+AI_TOOLS_DIR="/absolute/path/to/ai-tools"
+TARGET_PROJECT="/absolute/path/to/target-project"
 ```
+
+重要：本仓库自身不得运行 `openspec init` 或 `openspec update` 生成官方文件；
+这两个命令只在目标项目中运行。按以下顺序安装：
+
+1. 安装 npm 最新稳定版 OpenSpec：
+
+   ```bash
+   npm install --global @fission-ai/openspec@latest
+   ```
+
+2. 在目标项目根目录生成或升级 OpenSpec 官方 Cursor skills 与 commands。新项目
+   使用 `init`：
+
+   ```bash
+   cd "$TARGET_PROJECT"
+   openspec init --tools cursor
+   ```
+
+   已初始化的目标项目使用官方 `update` 升级生成物：
+
+   ```bash
+   cd "$TARGET_PROJECT"
+   openspec update
+   ```
+
+3. 将本仓库的 schema 复制到目标项目，并在目标配置中启用：
+
+   ```bash
+   mkdir -p "$TARGET_PROJECT/openspec/schemas"
+   cp -R \
+     "$AI_TOOLS_DIR/openspec/schemas/evidence-driven" \
+     "$TARGET_PROJECT/openspec/schemas/"
+   ```
+
+   然后编辑目标项目的 `openspec/config.yaml`：若文件已存在，只合并或设置下面的
+   字段，保留项目原有的其他配置；若文件不存在，再创建它。不要用本仓库的完整
+   `openspec/config.yaml` 盲目覆盖目标配置。
+
+   ```yaml
+   schema: evidence-driven
+   ```
+
+   中文规则可按需从本仓库明确复制到目标项目：
+
+   ```bash
+   mkdir -p "$TARGET_PROJECT/.cursor/rules"
+   cp \
+     "$AI_TOOLS_DIR/.cursor/rules/openspec-chinese.mdc" \
+     "$TARGET_PROJECT/.cursor/rules/openspec-chinese.mdc"
+   ```
+
+   from-code 旁路可选安装：
+
+   ```bash
+   cd "$TARGET_PROJECT"
+   npx skills add youpinyao/ai-tools --skill openspec-update-change-from-code
+   ```
+
+4. 在目标项目校验自定义 schema：
+
+   ```bash
+   cd "$TARGET_PROJECT"
+   openspec schema validate evidence-driven
+   ```
+
+官方 `/opsx-*` 命令及对应 skills 归 OpenSpec 管理；升级后的具体行为应以目标项目
+中当前 OpenSpec 官方生成物为准，不要从本仓库寻找或复制官方模板。
 
 ## 标准主线
 
 ```text
-[可选] explore
-    ↓
-propose
-    ↓
-apply（实现 tasks，并记录实现侧验证证据）
-    ↓
-verify（未参与实现的 Agent 独立复验；优先由 apply 自动派发子 Agent）
-    ↓
-archive（可在归档时同步 delta specs）
+官方 explore（可选）
+  → 官方 propose
+  → evidence-driven 制品（含 verification 计划）
+  → 官方 apply（执行适用检查并记录真实结果）
+  → 官方 verify（如使用）
+  → 官方 archive
 ```
 
-旁路场景：
+常见旁路：
 
-- 已有 change，只改规划不改代码 → `/opsx-update`
-- 代码已先于规划变化 → `/opsx-update-change-from-code`
-- 只合并 delta specs 到 main specs、不归档 → `/opsx-sync`
-- 纯重构 / 工具链 / 文档、无规范层行为变化 → 在 change 的 `.openspec.yaml` 设置 `skip_specs: true`（OpenSpec 1.7+），不要捏造空 specs
-- 退役整项能力（移除最后一条需求并删除 main spec）→ 设置 `retire_capabilities: true`（OpenSpec 1.8+）
+- 已有 change，只调整规划不改代码 → 使用官方 `/opsx-update`。
+- 代码已先于规划变化 → `/opsx-update-change-from-code`。
+- 只合并 delta specs 到 main specs、不归档 → 使用官方 `/opsx-sync`。
+- 无规范层行为变化 → 在 change 的 `.openspec.yaml` 设置 `skip_specs: true`，不要
+  捏造空 capability。
 
-完整场景说明见 [AI-SDD 团队工作流](ai-sdd-workflow.md)。
-
-## Skills 与命令
-
-| Skill | 命令 | 用途 |
-|-------|------|------|
-| `openspec-explore` | `/opsx-explore` | 探索想法、调研问题、澄清需求 |
-| `openspec-propose` | `/opsx-propose` | 新建 change，并一次生成规划产物 |
-| `openspec-update-change` | `/opsx-update` | 修订已有规划产物并保持一致（不改代码） |
-| `openspec-apply-change` | `/opsx-apply` | 按 tasks 开始或继续实现 |
-| `openspec-update-change-from-code` | `/opsx-update-change-from-code` | 以代码为准回写活跃 change |
-| `openspec-sync-specs` | `/opsx-sync` | 将 delta specs 同步到 main specs |
-| `openspec-verify-change` | `/opsx-verify` | 独立复验实现是否匹配变更产物 |
-| `openspec-archive-change` | `/opsx-archive` | 归档已完成的 change |
-
-`evidence-driven` 产物链路大致为：
-
-```text
-proposal → specs / design → tasks → verification → apply → verify → archive
-```
+verify、archive 与 sync 的具体行为以当前 OpenSpec 官方生成物为准。完整说明见
+[AI-SDD 场景化工作流](docs/ai-sdd-workflow.md)。
 
 ## Schema：`evidence-driven`
 
-在 OpenSpec 常见的提案、规范、设计、任务之上，增加验证计划、实现证据与独立验证门禁。项目通过 `openspec/config.yaml` 默认启用该 schema。
+`evidence-driven` 以 OpenSpec 1.9.0 官方 `spec-driven` 为本次语义基线：
 
-模板位于 `openspec/schemas/evidence-driven/templates/`（`proposal`、`spec`、`design`、`tasks`、`verification` 等）。
+- `proposal`、`specs`、`design`、`tasks` 是官方语义的简体中文派生。
+- 新增 `verification.md`，用于规划验证并记录实际执行结果与剩余风险。
+- `verification` 依赖 `tasks`，`apply` 依赖 `verification` 并跟踪 `tasks.md`。
+- apply 应执行 `verification.md` 中适用的检查，如实记录命令、结果、失败原因和
+  未执行项；schema 不把这些记录扩展成额外的官方 verify 或 archive 行为。
 
-兼容 OpenSpec CLI **1.8+**：零增量变更须声明 `skip_specs: true`；退役能力须声明 `retire_capabilities: true`；嵌套能力路径使用 `<capability-path>`（如 `identity/user-auth`）；新增能力的 delta spec 建议以 `## Purpose` 开头。Skills 与 commands 为定向同步，勿对本仓库直接跑 `openspec update`（会覆盖定制门禁与扩展 skill）。
+兼容的官方 1.9.0 语义包括：
+
+- 无规范层行为变化时在 `.openspec.yaml` 设置 `skip_specs: true`。
+- capability 使用完整 `<capability-path>`，支持 `identity/user-auth` 等嵌套路径。
+- 新增 capability 的 delta spec 以 `## Purpose` 开头；修改已有 capability 时不添加
+  delta `## Purpose`。
+- `MODIFIED` requirement 必须复制并修改完整 requirement 块及其全部 scenarios。
+- 退役整项能力时使用 `retire_capabilities: true`。
+
+后续升级 OpenSpec 时，应从当前官方 `spec-driven` 基线重新核对这些语义，而不是
+永久假定 1.9.0 的实现细节。
 
 ## 许可证
 
