@@ -42,12 +42,19 @@ Run:
 openspec status --change "<name>" --json
 ```
 
-Use `changeRoot`, `artifactPaths`, `actionContext`, and `schemaName` from the response. Read every
-existing artifact path returned by the CLI. Do not assume artifact names such as `proposal.md`,
-`design.md`, `tasks.md`, or `specs/**`; those are only common in the spec-driven schema.
+Use `changeRoot`, `artifactPaths`, `actionContext`, and `schemaName` from the response. Read and edit
+only the concrete files in `artifactPaths.<id>.existingOutputPaths`. Do not read or write
+`outputPath` or `resolvedOutputPath` as concrete files: either value may be a schema-relative path or
+an unresolved glob. Do not create an artifact or a new file under a glob artifact through this
+workflow. Do not assume artifact names such as `proposal.md`, `design.md`, `tasks.md`, or `specs/**`;
+those are only common in the spec-driven schema.
 
-If the change is archived, do not edit it silently. Ask whether to document the drift in a follow-up
-change or intentionally edit the archived copy.
+If `status` reports that the named change does not exist, run `openspec context --json` with the
+selected `--store <id>` when applicable and inspect matching entries under
+`<root.path>/openspec/changes/archive/`. If a matching archived change exists, stop and ask whether
+to document the drift in a follow-up active change or start a separately approved manual edit of the
+archived copy; do not continue this workflow against the archive. If none exists, report the
+original missing-change error.
 
 ### 3. Discover implementation evidence
 
@@ -84,12 +91,14 @@ Group drift by target file and record: documented intent → code reality → pr
 - If all drift is simple, briefly state the intended updates and apply them.
 - If any drift is complex, stop before applying those items and ask the user to approve all, a
   subset, or none.
-- In a mixed set, simple items may be applied while complex items remain pending.
+- In a mixed set, simple items that depend on a complex item must remain pending with it. Apply only
+  simple items that are demonstrably independent and cannot make the artifacts or related docs
+  inconsistent while complex items await a decision.
 
 ### 6. Update surgically
 
-- Modify only artifacts returned by the resolved change context and directly related repository
-  documentation allowed by `actionContext`.
+- Modify only concrete artifact files listed in `artifactPaths.<id>.existingOutputPaths` and directly
+  related repository documentation allowed by `actionContext`.
 - Preserve each schema's existing structure and terminology.
 - Keep unrelated requirements and prose unchanged.
 - Mark work complete only when implementation or verification evidence exists.
@@ -123,7 +132,7 @@ Next: optionally use openspec-sync-specs or openspec-archive-change
 
 ## Guardrails
 
-- Stay within `changeRoot`, `artifactPaths`, and `actionContext`.
+- Stay within `changeRoot`, concrete `artifactPaths.<id>.existingOutputPaths`, and `actionContext`.
 - Never write to main specs through this workflow.
 - Never leave a discovered related document stale while claiming synchronization is complete.
 - Prefer idempotent edits that produce no wording churn when rerun.
