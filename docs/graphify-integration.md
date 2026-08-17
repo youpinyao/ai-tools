@@ -39,21 +39,25 @@ pipx ensurepath
 
 ```text
 <project>/
+├── .agents/skills/graphify/     # Cursor 可调用的项目级 Graphify Skill
 ├── .cursor/rules/graphify.mdc   # Graphify 生成的查询优先规则
+├── .gitattributes               # graph.json merge driver 关联
 ├── .graphifyignore              # Graphify 专用排除规则
 └── graphify-out/
     ├── graph.json               # 可查询的完整图谱
     ├── GRAPH_REPORT.md          # 架构与关键关系摘要
-    └── graph.html               # 本地图谱可视化
+    ├── graph.html               # 本地图谱可视化
+    └── manifest.json            # 增量提取所需的可移植清单
 ```
 
-建议提交以上三个核心产物，让团队成员拉取代码后即可查询。`cost.json` 属于本地成本记录，`cache/` 是否提交取决于仓库体积和构建速度。
+建议提交项目级 Skill、Cursor rule、`.gitattributes`、`.graphifyignore`，以及 `graphify-out/` 中的三个核心图谱产物和 `manifest.json`，让团队成员拉取代码后即可查询并复用增量状态。`cost.json` 属于本地成本记录，`cache/` 是否提交取决于仓库体积和构建速度；包含本机路径的元数据不应提交。
 
 建议加入目标项目的 `.gitignore`：
 
 ```gitignore
 graphify-out/cost.json
 graphify-out/cache/
+graphify-out/.graphify_python
 ```
 
 建议建立 `.graphifyignore`，排除依赖、构建产物、密钥和无关大文件：
@@ -74,14 +78,17 @@ build/
 在目标项目根目录执行：
 
 ```bash
-# 安装项目级 Cursor 规则
-graphify cursor install --project
+# 安装 Cursor 可调用的项目级 Agent Skill
+graphify install --platform agents --project
 
-# 可选：安装本地 Git hook，在提交后更新图谱
+# 安装项目级 Cursor 查询优先规则
+graphify cursor install
+
+# 团队协作项目：安装本地 Git hook、注册 merge driver
 graphify hook install
 ```
 
-随后在 Cursor 中运行：
+项目级 Agent Skill 是 `/graphify` 工作流的执行入口；Cursor rule 只负责在图谱已存在时引导 Agent 优先执行限定查询，不能替代 Skill。个人单机使用可跳过 Git hook；需要提交共享图谱或处理并行修改的团队项目应安装 hook。随后在 Cursor 中运行：
 
 ```text
 /graphify .
@@ -153,26 +160,29 @@ graphify explain "RateLimiter"
 
 ## 7. 更新与团队协作
 
-推荐采用“本地 hook + 手动兜底”：
+推荐采用“提交前手动更新 + 本地 hook 异步兜底”：
 
 ```bash
 # 每位开发者在本地执行一次
 graphify hook install
 
-# 手动增量更新
+# 代码提交前手动增量更新，可将代码与对应图谱放入同一提交
 graphify update .
 
-# 或在 Cursor 中
+# 文档或其他语义内容发生变化时，在 Cursor 中更新
 /graphify . --update
 ```
 
+`graphify hook install` 安装的是异步 `post-commit` 和 `post-checkout` hook。提交完成后，hook 只在后台更新工作区中的图谱，不会修改刚刚创建的提交，也不会自动提交产物。因此，不应依赖 hook 将最新图谱自动带入当前代码提交；若未在提交前手动更新，应等待后台重建完成、检查产物后再单独提交。
+
 团队协作约定：
 
-1. 首位接入者生成并提交核心 `graphify-out/` 产物。
-2. 其他成员拉取后安装本地 hook。
-3. 代码提交后同步提交更新的图谱产物。
-4. 并行修改导致 `graph.json` 冲突时，使用 Graphify hook 安装的 merge driver 处理。
-5. 图谱节点异常减少时先排查提取错误；不要默认使用 `--allow-partial` 覆盖完整图谱。
+1. 首位接入者生成并提交项目级 Skill、Cursor rule、`.graphifyignore`、`.gitattributes`、核心图谱产物和 `manifest.json`。
+2. 其他成员拉取后执行 `graphify hook install`，在本地 Git 配置中注册 merge driver。
+3. 代码提交前优先运行 `graphify update .`，将代码与更新后的图谱产物放入同一提交。
+4. 若依赖 `post-commit` hook 兜底，等待后台重建完成后检查并另行提交图谱产物。
+5. 并行修改导致 `graph.json` 冲突时，由已注册的 Graphify merge driver 和仓库中的 `.gitattributes` 共同处理。
+6. 图谱节点异常减少时先排查提取错误；不要默认使用 `--allow-partial` 覆盖完整图谱。
 
 ## 8. 隐私与安全
 
@@ -193,21 +203,24 @@ graphify extract . --force
 移除项目接入时：
 
 ```bash
+graphify uninstall --project --platform agents
 graphify cursor uninstall
 graphify hook uninstall
 ```
 
-随后删除 `.cursor/rules/graphify.mdc`、`.graphifyignore` 和 `graphify-out/`。移除 Graphify 不影响 OpenSpec change、主规格或历史验证记录。
+上述命令会分别移除项目级 Agent Skill、Cursor rule、Git hook、merge driver 配置及其 `.gitattributes` 条目。随后删除 `.graphifyignore` 和 `graphify-out/`；若安装过程曾被中断，再检查并清理残留的 `.agents/skills/graphify/` 或 `.cursor/rules/graphify.mdc`。移除 Graphify 不影响 OpenSpec change、主规格或历史验证记录。
 
 ## 10. 验收清单
 
 - [ ] `graphify --version` 可正常执行。
+- [ ] Cursor 可发现并调用项目级 Graphify Skill。
 - [ ] Cursor 已加载项目级 Graphify rule。
-- [ ] 首次构建生成三个核心图谱产物。
+- [ ] 首次构建生成三个核心图谱产物和 `manifest.json`。
 - [ ] `query`、`path`、`explain` 各完成一次冒烟查询。
 - [ ] `.graphifyignore` 已排除密钥、依赖和构建产物。
-- [ ] Git 仅跟踪约定的核心图谱产物。
-- [ ] 一次代码变更后可通过 hook 或手动命令增量更新。
+- [ ] Git 仅跟踪约定的图谱产物和可移植元数据，不包含成本、缓存或本机路径。
+- [ ] `.gitattributes` 已提交，且本地 merge driver 已注册。
+- [ ] 一次代码变更后可通过提交前手动命令更新，或在异步 hook 完成后另行提交。
 - [ ] AI-SDD / OpenSpec 结论仍可追溯到源码、规范和测试证据。
 
 ## 11. 后续可选增强
