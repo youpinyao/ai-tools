@@ -16,7 +16,7 @@ OpenSpec 官方 Cursor skills 与 `/opsx-*` commands 由 OpenSpec 在目标项�
 | 配置 | `openspec/config.yaml` | 默认使用 `schema: evidence-driven` |
 | 中文规则 | `.cursor/rules/openspec-chinese.mdc` | OpenSpec 相关输出强制简体中文 |
 | 可选 Skill | `.cursor/skills/openspec-update-change-from-code/` | 非官方的从代码回写 active change 旁路 |
-| 工作流文档 | [docs/ai-sdd-workflow.md](docs/ai-sdd-workflow.md) | 官方命令场景选择与 schema 制品说明 |
+| 工作流文档 | [docs/ai-sdd-workflow.md](docs/ai-sdd-workflow.md) | 官方命令场景选择与推荐路径 |
 | 接入与迁移 | [docs/ai-tools-integration.md](docs/ai-tools-integration.md) | 其它项目从官方 OpenSpec 或旧版 ai-tools 接入/升级 |
 | Graphify 接入方案 | [docs/graphify-integration.md](docs/graphify-integration.md) | 用知识图谱增强 AI-SDD / OpenSpec 工作流 |
 
@@ -120,7 +120,7 @@ TARGET_PROJECT="/absolute/path/to/target-project"
 - 无规范层行为变化 → 在 change 的 `.openspec.yaml` 设置 `skip_specs: true`，不要
   捏造空 capability。
 
-verify、archive 与 sync 的具体行为以当前 OpenSpec 官方生成物为准。完整说明见
+verify、archive 与 sync 的具体行为以当前 OpenSpec 官方生成物为准。场景选择与推荐路径见
 [AI-SDD 场景化工作流](docs/ai-sdd-workflow.md)。
 
 ## Schema：`evidence-driven`

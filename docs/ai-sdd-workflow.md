@@ -1,214 +1,129 @@
 # OpenSpec 场景化工作流
 
-本文帮助使用 `evidence-driven` schema 的团队选择 OpenSpec 官方命令，并说明本仓库
-增加的 schema 制品语义。官方 Cursor skills 与 `/opsx-*` commands 不由本仓库维护：
-先在目标项目运行 `openspec init --tools cursor`，后续命令的具体行为以目标项目中
-当前 OpenSpec 官方生成物为准。
+本文按常见工作场景说明 OpenSpec 工作流的选择方式。先判断当前工作处于需求探索、
+方案调整、实现、验证还是代码回写阶段，再沿流程图选择对应路径。图中的步骤越多，
+通常意味着需要补充或更新的制品越多，整体工作量也越大。
 
-从官方 OpenSpec 或旧版 ai-tools 接入/升级本工具包，见
-[ai-tools-integration.md](./ai-tools-integration.md)。
+## 各个场景工作量
 
-`ai-tools` 仓库自身不得运行 `openspec init` 或 `openspec update` 生成官方文件；
-这些命令只在使用本工具包的目标项目中运行。
+下图展示六类场景的推荐路径。其中 `explore` 用于澄清问题，`propose` 用于建立
+change，`update` 用于调整已有规划，`apply` 用于实施任务，`verify` 用于核验实现，
+`archive` 用于结束 change，`sync` 用于在不归档的情况下将 delta specs 合并到
+main specs；图中的 `from-code` 是本仓库
+`/opsx-update-change-from-code` 命令的简称，仅用于从代码回写已有 active change。
 
-## 初始化
+```mermaid
+flowchart TD
+    Start{当前场景}
 
-```bash
-# 安装 npm 最新稳定版 OpenSpec
-npm install --global @fission-ai/openspec@latest
+    Start -->|1. 新需求，需要先探索| Explore[explore]
+    Explore --> Propose[propose]
 
-# 设置并进入目标项目
-TARGET_PROJECT="/absolute/path/to/target-project"
-cd "$TARGET_PROJECT"
+    Start -->|2. 已有方案，需要更新| ProposeUpdate[propose<br/>待更新]
+    ProposeUpdate --> Update[update]
 
-# 新目标项目：生成官方 Cursor skills 与 commands
-openspec init --tools cursor
+    Start -->|3. 实施中发现偏差| ApplyDrift[apply<br/>发现偏差]
+    ApplyDrift --> Update
 
-# 将 evidence-driven schema 复制到目标项目并合并设置 schema: evidence-driven 后校验
-openspec schema validate evidence-driven
+    Start -->|4. 验证中发现问题| VerifyFailed[verify<br/>发现问题]
+    VerifyFailed --> ProblemType{问题类型}
+    ProblemType -->|实现缺陷| Apply
+    ProblemType -->|规划错误或制品矛盾| Update
+    ProblemType -->|验证证据不足| AddEvidence[补充验证检查]
+    AddEvidence --> Verify
+
+    Start -->|5 / 6. 已有代码| ActiveChange{是否存在对应的<br/>active change?}
+    ActiveChange -->|是：场景 5| FromCode[from-code]
+    FromCode --> Verify
+    ActiveChange -->|否：场景 6| ProposeFromCode[propose<br/>基于代码事实]
+    Start -->|独立同步 delta specs，不归档| Sync[sync]
+    Sync --> Synced([main specs 已同步<br/>change 保持 active])
+
+    Propose --> Apply[apply]
+    ProposeFromCode --> Apply
+    Update --> Apply
+    Apply --> Verify[verify]
+    Verify -->|通过后建议归档| Archive[archive]
+    Archive --> Done([change 已结束])
 ```
 
-若目标项目已经初始化，升级 OpenSpec 后应在该目标项目根目录使用官方更新路径，
-而不是再次初始化或从本仓库复制官方生成物：
+## 场景说明
 
-```bash
-cd "$TARGET_PROJECT"
-openspec update
-openspec schema validate evidence-driven
-```
+### 场景 1：新需求，需要先探索
 
-安装 schema 时，只复制本仓库的 `openspec/schemas/evidence-driven/` 到目标项目的
-`openspec/schemas/evidence-driven/`。对于目标项目已有的 `openspec/config.yaml`，
-只合并或设置 `schema: evidence-driven`，保留其他配置，不要用本仓库的完整配置文件
-覆盖它。可执行的路径变量与复制命令见项目 README。
+当需求目标、范围或实现方向尚不明确时，先通过 `explore` 梳理问题、约束和可选方案。
+结论明确后使用 `propose` 建立 change，再依次完成实现与验证。
 
-中文规则与 `/opsx-update-change-from-code` 是按需安装的本仓库扩展；其余
-`/opsx-*` 命令由 OpenSpec 生成。
+推荐路径：`explore → propose → apply → verify → archive`。
 
-## 按场景选择命令
+该场景步骤最多，但能在实施前消除关键歧义，适合影响范围较大、存在多种实现方案，
+或需要先确认边界的新需求。
 
-```text
-需求或方案仍需探索？
-  └─ 官方 /opsx-explore
+### 场景 2：已有方案，需要更新
 
-准备为新工作建立 change？
-  └─ 官方 /opsx-propose
+当 change 已经建立，但 proposal、specs、design、tasks 或 verification 与最新决策
+不一致时，使用 `update` 更新规划，再继续实施和验证。
 
-已有 change，需要调整规划？
-  └─ 官方 /opsx-update
+推荐路径：`propose（待更新）→ update → apply → verify → archive`。
 
-准备开始或继续实现 tasks？
-  └─ 官方 /opsx-apply
+更新时应说明变化原因及受影响的制品，确保任务、设计和验证计划仍然相互一致。
 
-代码已先于规划变化，需要按代码事实回写 active change？
-  └─ 本仓库 /opsx-update-change-from-code
+### 场景 3：实施中发现偏差
 
-需要使用规格同步、实现核验或结束 change？
-  ├─ 官方 /opsx-sync
-  ├─ 官方 /opsx-verify
-  └─ 官方 /opsx-archive
-```
+在 `apply` 过程中，如果发现原方案遗漏边界、任务拆分不合理或实现约束发生变化，
+应暂停实施并通过 `update` 回写规划，然后基于更新后的 change 继续工作。
 
-explore、propose、update 与 apply 也应以当前官方生成物的说明为准。尤其是 verify、
-archive 与 sync，本仓库不覆盖其条件、交互或执行步骤，也不推断未来版本的行为。
+推荐路径：`apply（发现偏差）→ update → apply → verify → archive`。
 
-常见主线可以概括为：
+如果偏差来自实现缺陷，应直接修复代码；只有确认规划本身需要变化时，才更新 change，
+避免为了迁就错误实现而修改规格。
 
-```text
-官方 explore（可选）
-  → 官方 propose
-  → evidence-driven 制品（含 verification 计划）
-  → 官方 apply（实现 tasks 并记录真实验证结果）
-  → 官方 verify（如使用）
-  → 官方 archive
-```
+### 场景 4：验证中发现问题
 
-这只是场景导航，不是额外的流程约束。实现中发现规划有误时，可按官方命令说明返回
-explore 或 update，再继续 apply。
+在 `verify` 阶段发现问题时，应先判断问题类型，再选择处理路径：
 
-## `evidence-driven` 制品图
+- 实现不满足需求：返回 `apply` 修复实现，再重新验证。
+- 规划错误或制品之间存在矛盾：使用 `update` 修正规划，再通过 `apply` 完成必要
+  修改并重新验证。
+- 验证证据不足：补充并执行缺失的检查，再重新验证；不要仅为补证据而修改规划。
 
-```text
-proposal
-  ├─→ specs ─┐
-  └─→ design ─┴─→ tasks → verification
+重新验证时应覆盖受影响的需求与场景，并保留失败原因、处理结果和剩余风险。
 
-apply.requires = [verification]
-apply.tracks   = tasks.md
-```
+### 场景 5：已有代码，且存在 active change
 
-`proposal`、`specs`、`design` 与 `tasks` 派生自 OpenSpec 1.9.0 官方
-`spec-driven` 语义。相对于该基线，自定义差异限定为：
+当代码已经发生变化，同时存在对应的 active change 时，使用
+`/opsx-update-change-from-code` 比较代码事实与现有制品，将确认需要保留的实现回写
+到 change，再执行验证。
 
-1. 将面向使用者的正文翻译为简体中文。
-2. 将 schema 名称和描述改为 `evidence-driven`。
-3. 新增 `verification` 制品。
-4. 将 `apply.requires` 从 `[tasks]` 改为 `[verification]`，并在 apply instruction
-   中增加执行适用检查、记录真实命令、结果、失败原因与剩余风险的要求。
-5. 将代码审查定为 verification 必做检查（apply 时阅读实现 diff 并记账），不构成
-   官方 archive 裁决。
+推荐路径：`/opsx-update-change-from-code → verify → archive`。
 
-其中 `verification` 与 apply 的记录语义如下：
+该路径适用于“实现领先于规划”的情况，不用于把缺陷合理化。若代码行为不正确，
+仍应修复代码，而不是将错误行为写入 change。
 
-- `verification.md` 在 apply 前规划验证范围、需求对应关系、自动化与人工检查、
-  非功能检查、代码审查、发布后验证和回滚。
-- 规划阶段的检查保持“待执行”，不得预填成功结果或捏造仓库中不存在的命令。
-- apply 执行其中适用的检查，并记录真实命令、步骤、通过或失败结果、不适用原因、
-  未执行项和剩余风险。
-- 代码审查必须实际阅读本次变更相对明确基线或提交范围的完整 diff，并仅在“实际
-  执行结果”中维护权威状态；存在未处理的 Critical 或 Important 时不得记为通过。
-  仅当该完整 diff 为空时可记不适用，并写明原因；工作区干净或实现已提交不能单独
-  作为依据。
-- 只有实际执行并读取输出后才能记录“通过”。
+### 场景 6：已有代码，但不存在 active change
 
-schema 只定义这些制品及依赖，不扩展官方 verify、archive 或 sync 的行为。
+当代码已经存在，却没有可更新的 active change 时，应直接基于可确认的代码事实使用
+`propose` 建立完整 change，记录目标、范围和验证方式，再通过 `apply` 补齐任务或
+调整实现，最后执行验证。不要先建立空 change 再调用
+`/opsx-update-change-from-code`：该命令只更新已有制品，不负责创建缺失制品。
 
-## OpenSpec 1.9.0 规格语义
+推荐路径：`propose（基于代码事实）→ apply → verify → archive`。
 
-### 无 specs 的 change
+新建 change 时应以可确认的代码事实为依据，同时区分“当前已经实现的行为”和
+“仍需完成的工作”，避免把现状直接当作正确需求。
 
-纯重构、工具链或文档变更若没有规范层行为变化，应在 change 的
-`.openspec.yaml` 中保留 `schema:` 并设置：
+## 独立旁路：同步 delta specs
 
-```yaml
-skip_specs: true
-```
+需要将 active change 内的 delta specs 合并到 main specs、但暂不归档时，可独立使用
+官方 `/opsx-sync`。该命令只同步规格，不会结束 change；是否需要先执行 `verify`，
+以及后续何时归档，遵循目标项目当前官方生成物。
 
-不要为了生成 specs 而捏造空 capability。
+## 使用原则
 
-### capability 路径与 Purpose
-
-- delta spec 位于 `specs/<capability-path>/spec.md`。
-- `<capability-path>` 是完整 capability 路径，支持
-  `identity/user-auth` 之类的嵌套目录。
-- 新增 capability 的 delta spec 以 `## Purpose` 开头。
-- 修改已有 capability 时不添加 delta `## Purpose`。
-
-### 完整的 MODIFIED requirement
-
-修改现有 requirement 时，`## MODIFIED Requirements` 中必须复制并修改完整的
-requirement 块，包括该 requirement 的全部 scenarios。不要只写变化的句子或省略
-未变化的 scenarios，否则未包含的内容可能在同步时丢失。
-
-### 退役 capability
-
-若 change 会移除某 capability 的最后一条 requirement 并删除其 main spec，应按
-OpenSpec 1.9.0 语义在 `.openspec.yaml` 设置：
-
-```yaml
-retire_capabilities: true
-```
-
-涉及 sync 或 archive 时，实际处理方式仍以当前 OpenSpec 官方生成物为准。
-
-## apply 与验证记录
-
-使用官方 `/opsx-apply <change-name>` 开始或继续实现。除遵循当前官方生成物外，
-`evidence-driven` 的 apply instruction 还要求：
-
-1. 按 `tasks.md` 实施，完成任务后更新复选框。
-2. 执行 `verification.md` 中适用的自动化、人工和非功能检查，以及必做的代码审查。
-3. 如实记录实际命令、步骤、结果与失败原因。
-4. 对不适用项说明原因；把未执行项和失败项保留为剩余风险。
-5. 代码审查须阅读本次变更的实现 diff；未处理的 Critical 或 Important 不得记通过。
-6. 遇到阻塞或发现规划不一致时暂停，不伪造完成状态。
-
-`verification.md` 是验证计划与结果记录，不代表对官方 verify 或 archive 增加了本地
-裁决条件。
-
-## from-code 独立旁路
-
-```text
-/opsx-update-change-from-code <change-name>
-```
-
-该命令是本仓库保留的非官方旁路，适用于实现已经发生且确认应保留，但 active
-change 落后于代码事实的情况。它以代码证据和用户明确决策为依据，比较并回写
-proposal、specs、design、tasks、verification 及允许范围内的相关文档。
-
-它不实现新功能、不修改 main specs，也不结束 change。若代码偏离规划属于缺陷，
-应修复代码，而不是用该旁路把缺陷写进规划。
-
-## 状态与校验
-
-```bash
-# 查看 active changes
-openspec list --json
-
-# 查看 change 的产物状态
-openspec status --change "<change-name>"
-openspec status --change "<change-name>" --json
-
-# 查看 apply 的动态上下文与指令
-openspec instructions apply --change "<change-name>" --json
-
-# 严格校验 change
-openspec validate "<change-name>" --type change --strict
-
-# 校验自定义 schema
-openspec schema validate evidence-driven
-```
-
-应通过 OpenSpec 状态和指令输出取得实际上下文，不要在工具或文档中硬编码 change
-产物路径。OpenSpec 升级后，应重新核对官方 `spec-driven` 基线和目标项目中的官方
-生成物。
+- 不确定需求或方案时先 `explore`，不要在关键问题未澄清时直接实施。
+- 已有 active change 时优先更新该 change，避免为同一工作重复建立规划。
+- 实现或验证阶段发现规划偏差时，通过 `update` 保持制品与最新决策一致。
+- `/opsx-update-change-from-code` 只负责按已确认的代码事实回写已有 active change，
+  不能建立 change，也不能替代缺陷修复。
+- 实现完成后建议核验；`verify`、`sync`、`archive` 的
+  具体条件与行为遵循目标项目当前 OpenSpec 官方生成物。
