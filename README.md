@@ -1,4 +1,4 @@
-# ai-tools
+# ai-tools：OpenSpec / AI-SDD 工作流工具包
 
 面向 AI 编程助手的 **OpenSpec / AI-SDD 工作流工具包**。本仓库维护
 `evidence-driven` 自定义 schema、简体中文规则、可选的 from-code 旁路及场景文档；
@@ -16,18 +16,28 @@ OpenSpec 官方 Cursor skills 与 `/opsx-*` commands 由 OpenSpec 在目标项�
 | 配置 | `openspec/config.yaml` | 默认使用 `schema: evidence-driven` |
 | 中文规则 | `.cursor/rules/openspec-chinese.mdc` | OpenSpec 相关输出强制简体中文 |
 | 可选 Skill | `.cursor/skills/openspec-update-change-from-code/` | 非官方的从代码回写 active change 旁路 |
+| 可选 Command | `.cursor/commands/opsx-update-change-from-code.md` | 在 Cursor 中暴露 `/opsx-update-change-from-code` |
 | 工作流文档 | [docs/ai-sdd-workflow.md](docs/ai-sdd-workflow.md) | 官方命令场景选择与推荐路径 |
 | 接入与迁移 | [docs/ai-tools-integration.md](docs/ai-tools-integration.md) | 其它项目从官方 OpenSpec 或旧版 ai-tools 接入/升级 |
-| Graphify 接入方案 | [docs/graphify-integration.md](docs/graphify-integration.md) | 用知识图谱增强 AI-SDD / OpenSpec 工作流 |
+| 升级维护 | [docs/openspec-upgrade-plan.md](docs/openspec-upgrade-plan.md) | OpenSpec 版本升级与语义复核清单 |
+| 可选 Graphify 方案 | [docs/graphify-integration.md](docs/graphify-integration.md) | 用知识图谱增强 AI-SDD / OpenSpec 工作流 |
 
 ## 安装到目标项目
 
 其它业务仓的完整接入、从旧版 ai-tools 迁移、以及日常升级步骤见
-[docs/ai-tools-integration.md](docs/ai-tools-integration.md)。下文是最短安装路径。
+[docs/ai-tools-integration.md](docs/ai-tools-integration.md)。下文只完成官方生成层、自定义
+schema 与可选旁路的基础安装；完整的 verify 修复闭环及 sync/archive 流转门禁还须按
+[接入文档 5.1 节](docs/ai-tools-integration.md#51-补充-verify-修复闭环与流转门禁)
+安装 `AI_TOOLS_VERIFY_GATE_V1` 增强规则。
 
-前置条件是支持 [Agent Skills](https://agentskills.io) 的 AI 编程助手（本仓库以
-Cursor 为主）和 npm。以下命令中的 `AI_TOOLS_DIR` 是本仓库的绝对路径，
-`TARGET_PROJECT` 是目标项目的绝对路径：
+前置条件：
+
+- Node.js ≥ 20.19.0，并可使用 npm 安装 OpenSpec CLI。
+- 支持 [Agent Skills](https://agentskills.io) 的 AI 编程助手（本仓库以 Cursor 为主）。
+- 若安装完整验证闭环，还需 Python 3.8+ 计算确定性工作区指纹。
+
+以下命令中的 `AI_TOOLS_DIR` 是本仓库的绝对路径，`TARGET_PROJECT` 是目标项目的
+绝对路径：
 
 ```bash
 AI_TOOLS_DIR="/absolute/path/to/ai-tools"
@@ -88,7 +98,15 @@ TARGET_PROJECT="/absolute/path/to/target-project"
 
    ```bash
    cd "$TARGET_PROJECT"
-   npx skills add youpinyao/ai-tools --skill openspec-update-change-from-code
+   npx skills add "$AI_TOOLS_DIR" \
+     --skill openspec-update-change-from-code \
+     --agent cursor
+
+   # 如需在 Cursor 中使用同名 slash command，同时安装 command 文件
+   mkdir -p "$TARGET_PROJECT/.cursor/commands"
+   cp \
+     "$AI_TOOLS_DIR/.cursor/commands/opsx-update-change-from-code.md" \
+     "$TARGET_PROJECT/.cursor/commands/opsx-update-change-from-code.md"
    ```
 
 4. 在目标项目校验自定义 schema：
@@ -98,19 +116,30 @@ TARGET_PROJECT="/absolute/path/to/target-project"
    openspec schema validate evidence-driven
    ```
 
+5. 要完成当前 ai-tools 接入，必须继续执行
+   [接入文档 5.1 节](docs/ai-tools-integration.md#51-补充-verify-修复闭环与流转门禁)：
+   创建统一工作区指纹脚本，并向 apply、verify、sync、archive 的 8 个官方
+   command/skill 文件幂等追加 `AI_TOOLS_VERIFY_GATE_V1` 规则。仅复制 schema 不会
+   自动获得这些流转门禁。
+
 官方 `/opsx-*` 命令及对应 skills 归 OpenSpec 管理；升级后的具体行为应以目标项目
 中当前 OpenSpec 官方生成物为准，不要从本仓库寻找或复制官方模板。
 
 ## 标准主线
 
+安装 `AI_TOOLS_VERIFY_GATE_V1` 后的增强主线：
+
 ```text
 官方 explore（可选）
   → 官方 propose
   → evidence-driven 制品（含 verification 计划）
-  → 官方 apply（执行适用检查并记录真实结果）
-  → 官方 verify（如使用）
+  → evidence-driven schema 下的 apply（执行适用检查并记录真实结果）
+  → 独立 verify
   → 官方 archive
 ```
+
+未安装增强规则时，独立 verify 派发及 sync/archive 门禁不成立；具体行为仍以目标项目
+当前 OpenSpec 官方生成物为准。
 
 常见旁路：
 
@@ -141,7 +170,6 @@ verify、archive 与 sync 的具体行为以当前 OpenSpec 官方生成物为�
 - 新增 capability 的 delta spec 以 `## Purpose` 开头；修改已有 capability 时不添加
   delta `## Purpose`。
 - `MODIFIED` requirement 必须复制并修改完整 requirement 块及其全部 scenarios。
-- 退役整项能力时使用 `retire_capabilities: true`。
 
 后续升级 OpenSpec 时，应从当前官方 `spec-driven` 基线重新核对这些语义，而不是
 永久假定 1.9.0 的实现细节。
