@@ -2,9 +2,9 @@
 
 > **供智能体执行者使用：** 必须使用子技能 `superpowers:subagent-driven-development`（推荐）或 `superpowers:executing-plans`，逐项实施本计划。任务使用复选框语法记录完成状态。
 
-**目标：** 消除工作流文档对官方 OpenSpec 流转条件的过度约束，并让 README 的入口说明与实际内容一致。
+**目标：** 消除工作流文档对官方 OpenSpec 流转条件的过度约束，让 README 的入口说明与实际内容一致，并分层补充本仓库的 SDD 增强闭环。
 
-**架构：** `docs/ai-sdd-workflow.md` 只负责场景导航和推荐路径，官方命令的实际条件继续由目标项目当前生成物决定。`README.md` 负责概述 `evidence-driven` schema 语义，不在工作流文档中重复维护。
+**架构：** `docs/ai-sdd-workflow.md` 以官方命令场景导航和推荐路径为主，并用独立章节说明本仓库增强规则形成的 SDD 闭环；官方命令的实际条件继续由目标项目当前生成物决定。`README.md` 负责概述 `evidence-driven` schema 语义，不在工作流文档中重复维护。
 
 **技术栈：** Markdown、Mermaid、ripgrep。
 
@@ -110,3 +110,53 @@ git status --short
 ```
 
 预期：除用户已有变更、两份目标文档及本次设计/计划记录外，没有其他文件变化。
+
+### 任务 4：补充 SDD 增强闭环
+
+**文件：**
+- 修改：`docs/ai-sdd-workflow.md`
+
+**接口：**
+- 输入：`evidence-driven` 的制品依赖、验证记录，以及接入文档中的
+  `AI_TOOLS_VERIFY_GATE_V1` 增强规则。
+- 输出：与官方场景导航分层、包含发布后反馈路径的 SDD 闭环说明。
+
+- [x] **步骤 1：新增独立闭环章节和 Mermaid 图**
+
+在“各个场景工作量”之后新增“SDD 增强闭环”章节。图中必须包含：
+
+- `proposal / specs / design / tasks / verification` 到 `apply` 的制品驱动链路。
+- `verify` 先直接修复可安全处理的阻塞并复验；仍未解决时按实现缺陷、规划偏差、
+  证据不足回流。
+- Verify 门禁通过后按目标进入 `sync` 或 `archive`。
+- `sync` 后如需归档，必须先重新验证并刷新已经失效的工作区指纹。
+- 发布后发现问题时，active change 按问题类型回到 `update`、`apply` 或补充检查，
+  已归档 change 建立新 change。
+
+章节开头必须说明：这张图描述本仓库 `evidence-driven` 与验证增强规则组合后的闭环，
+不改变前一张图所表达的官方命令默认语义。
+
+- [x] **步骤 2：明确门禁生效条件和闭环退出条件**
+
+正文必须区分：
+
+- schema 自身保证 `verification` 制品存在并由 `apply` 跟踪。
+- 只有按 `docs/ai-tools-integration.md` 安装 `AI_TOOLS_VERIFY_GATE_V1` 后，
+  `sync` / `archive` 才受验证状态、阻塞项和工作区指纹约束。
+- verify 直接修复、sync 后复验和 active change 问题分流必须与接入文档规则一致。
+- 未安装增强规则时，`verify`、`sync`、`archive` 的实际条件仍以目标项目当前官方
+  生成物为准。
+
+- [x] **步骤 3：执行结构与语义检查**
+
+运行：
+
+```bash
+rg -n 'SDD 增强闭环|AI_TOOLS_VERIFY_GATE_V1|发布后|active change|新 change' docs/ai-sdd-workflow.md
+rg -n '具体条件与行为遵循目标项目当前 OpenSpec 官方生成物' docs/ai-sdd-workflow.md
+git diff --check -- docs/ai-sdd-workflow.md
+```
+
+预期：前两个搜索均命中，`git diff --check` 无输出且退出码为 0。最终阅读 Mermaid，
+确认没有把增强门禁写成官方默认行为，也没有把独立 `sync` 旁路改成官方强制
+`verify → sync → archive` 链路。

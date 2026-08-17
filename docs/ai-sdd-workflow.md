@@ -47,6 +47,71 @@ flowchart TD
     Archive --> Done([change 已结束])
 ```
 
+## SDD 增强闭环
+
+上一张图用于选择官方命令场景和推荐路径。目标项目使用本仓库
+`evidence-driven` schema，并按[接入文档](ai-tools-integration.md#51-补充-verify-修复闭环与流转门禁)
+安装 `AI_TOOLS_VERIFY_GATE_V1` 增强规则后，可形成下面的规格驱动、证据验证和反馈
+回流闭环；该增强闭环不改变 OpenSpec 官方命令的默认语义。
+
+```mermaid
+flowchart TD
+    Baseline[main specs 与当前代码事实] --> Plan[propose 或 update]
+    Plan --> Proposal[proposal]
+    Proposal --> Specs[specs]
+    Proposal --> Design[design]
+    Specs --> Tasks[tasks]
+    Design --> Tasks
+    Tasks --> VerificationPlan[verification 计划]
+    VerificationPlan --> ApplyLoop[apply]
+    ApplyLoop --> VerifyLoop[独立 verify]
+    VerifyLoop --> Repairable{存在可安全修复的阻塞?}
+    Repairable -->|是| RepairInVerify[verify 直接修复并复验]
+    RepairInVerify --> VerifyLoop
+    Repairable -->|否| VerifyResult{最终验证结果}
+
+    VerifyResult -->|仍有实现缺陷| ApplyLoop
+    VerifyResult -->|规划偏差或制品矛盾| UpdateArtifacts[update 制品]
+    UpdateArtifacts --> Proposal
+    VerifyResult -->|证据不足| AddChecks[补充并执行检查]
+    AddChecks --> VerifyLoop
+
+    VerifyResult -->|通过| Gate{Verify 门禁}
+    Gate -->|sync| Synced[delta specs 已同步<br/>change 保持 active]
+    Synced --> ActiveNext{active change 后续}
+    ActiveNext -->|继续实施| ApplyLoop
+    ActiveNext -->|发布后发现问题| ActiveProblem{问题类型}
+    ActiveProblem -->|实现缺陷| ApplyLoop
+    ActiveProblem -->|规划偏差| UpdateArtifacts
+    ActiveProblem -->|证据不足| AddChecks
+    ActiveNext -->|无后续变化，准备结束| VerifyLoop
+    Gate -->|archive| ArchiveLoop
+
+    ArchiveLoop[archive]
+    ArchiveLoop --> Closed[change 已结束<br/>适用的规格变化已沉淀]
+    Closed --> PostRelease{发布后验证是否发现问题?}
+    PostRelease -->|否| NewBaseline([形成下一轮基线])
+    NewBaseline --> Baseline
+    PostRelease -->|是| NewChange[建立新 change]
+    NewChange --> Proposal
+```
+
+闭环中的约束分为两层：
+
+- `evidence-driven` schema 建立 `proposal / specs / design / tasks / verification`
+  之间的制品依赖，要求 `apply` 在 `verification.md` 已存在后实施，并跟踪
+  `tasks.md`；`verification.md` 负责保存需求与检查的对应关系、实际证据和剩余风险。
+- 安装 `AI_TOOLS_VERIFY_GATE_V1` 后，`apply` 完成时会派发独立 `verify`。验证过程中
+  可安全修复的阻塞会在最多三轮“验证—修复—重新验证”内直接处理；仍未解决的问题
+  再按类型回到 `apply`、`update` 或补充检查。
+- `sync` 或 `archive` 入口会检查验证状态为通过、阻塞项为无，并确认记录的工作区
+  指纹仍与当前状态一致。验证后的代码或制品变化会使旧门禁失效；`sync` 更新
+  main specs 后如果还要归档，也必须先重新验证并刷新门禁。
+- 未安装增强规则时，这些门禁不成立；`verify`、`sync`、`archive` 的具体条件与行为
+  仍以目标项目当前 OpenSpec 官方生成物为准。
+- 发布后发现问题时，不修改已归档 change：change 仍为 active 时通过 `update` /
+  `apply` 回流，已经归档时建立新 change，进入下一轮规格驱动闭环。
+
 ## 场景说明
 
 ### 场景 1：新需求，需要先探索
