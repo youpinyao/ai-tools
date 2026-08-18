@@ -26,9 +26,10 @@ OpenSpec 官方 Cursor skills 与 `/opsx-*` commands 由 OpenSpec 在目标项�
 
 其它业务仓的完整接入、从旧版 ai-tools 迁移、以及日常升级步骤见
 [docs/ai-tools-integration.md](docs/ai-tools-integration.md)。下文只完成官方生成层、自定义
-schema 与可选旁路的基础安装；完整的 verify 修复闭环及 sync/archive 流转门禁还须按
+schema 与可选旁路的基础安装；完整的 propose worktree 选择、verify 修复闭环及
+sync/archive 流转门禁还须按
 [接入文档 5.1 节](docs/ai-tools-integration.md#51-补充-verify-修复闭环与流转门禁)
-安装 `AI_TOOLS_VERIFY_GATE_V1` 增强规则。
+安装 `AI_TOOLS_VERIFY_GATE_V1` 与 `AI_TOOLS_PROPOSE_WORKTREE_V1` 增强规则。
 
 前置条件：
 
@@ -118,8 +119,9 @@ TARGET_PROJECT="/absolute/path/to/target-project"
 
 5. 要完成当前 ai-tools 接入，必须继续执行
    [接入文档 5.1 节](docs/ai-tools-integration.md#51-补充-verify-修复闭环与流转门禁)：
-   创建统一工作区指纹脚本，并向 apply、verify、sync、archive 的 8 个官方
-   command/skill 文件幂等追加 `AI_TOOLS_VERIFY_GATE_V1` 规则。增强规则同时提供
+   创建统一工作区指纹脚本，向 apply、verify、sync、archive 的 8 个官方
+   command/skill 文件幂等追加 `AI_TOOLS_VERIFY_GATE_V1` 规则，并向 propose 的 2 个
+   官方 command/skill 文件幂等追加 `AI_TOOLS_PROPOSE_WORKTREE_V1` 规则。增强规则同时提供
    apply 子 Agent 派发、独立 verify 子 Agent 派发、防递归标记（
    `AI_TOOLS_DELEGATED_APPLY_V1`、`AI_TOOLS_DELEGATED_VERIFY_V1`）与阶段内并行开关
    （`AI_TOOLS_PARALLEL_DISPATCH_V1`）：apply 时入口 Agent 先派发 apply 子 Agent，
@@ -129,6 +131,8 @@ TARGET_PROJECT="/absolute/path/to/target-project"
    调查者；列表中没有则按官方默认串行。不得因磁盘上能读到 `SKILL.md` 而启用并行。
    后续安装该 skill 无需再次替换注入。未安装增强规则时，这些派发行为不成立。仅复制
    schema 不会自动获得这些流转门禁与子 Agent 编排。
+   也必须注入 propose worktree 选择，否则 `/opsx-propose` 会跳过起始询问，直接在当前
+   工作区创建 change。
 
 官方 `/opsx-*` 命令及对应 skills 归 OpenSpec 管理；升级后的具体行为应以目标项目
 中当前 OpenSpec 官方生成物为准，不要从本仓库寻找或复制官方模板。
@@ -139,7 +143,7 @@ TARGET_PROJECT="/absolute/path/to/target-project"
 
 ```text
 官方 explore（可选）
-  → 官方 propose
+  → 官方 propose（先询问隔离 worktree 或当前工作区）
   → evidence-driven 制品（含 verification 计划）
   → apply 子 Agent（实施并记录真实结果）
   → 独立 verify 子 Agent
@@ -151,7 +155,7 @@ skills 列表含 `dispatching-parallel-agents` 时，阶段子 Agent 才按该 s
 带独立身份标记的工作者；否则与现网串行路径相同。
 
 单独运行 `/opsx-verify` 时，入口 Agent 也按同一规则派发独立 verify 子 Agent 执行验证
-闭环。未安装增强规则时，apply/verify 子 Agent 派发及 sync/archive 门禁均不成立；
+闭环。未安装增强规则时，propose 起始 worktree 询问、apply/verify 子 Agent 派发及 sync/archive 门禁均不成立；
 具体行为仍以目标项目当前 OpenSpec 官方生成物为准。
 
 常见旁路：

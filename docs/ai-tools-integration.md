@@ -23,10 +23,10 @@
 
 | 层级 | 谁维护 | 内容 |
 |------|--------|------|
-| 官方生成层 | OpenSpec CLI 为基线，项目补充验证闭环与流转门禁 | explore / propose / update / apply / verify / archive / sync |
-| 自定义层 | ai-tools | `evidence-driven` schema（含 `verification`）、验证闭环与流转门禁、工作区指纹脚本、中文规则、from-code 旁路 |
+| 官方生成层 | OpenSpec CLI 为基线，项目补充 propose worktree 选择、验证闭环与流转门禁 | explore / propose / update / apply / verify / archive / sync |
+| 自定义层 | ai-tools | `evidence-driven` schema（含 `verification`）、propose worktree 选择、验证闭环与流转门禁、工作区指纹脚本、中文规则、from-code 旁路 |
 
-**不要**再把本仓库里的官方 skill/command 副本拷进业务仓覆盖官方文件。应先由 `openspec init` / `openspec update` 生成官方层，再按本文向 apply、verify、sync、archive 的 command/skill 追加项目规则。本仓库 `.gitignore` 已忽略那 7 组官方路径。
+**不要**再把本仓库里的官方 skill/command 副本拷进业务仓覆盖官方文件。应先由 `openspec init` / `openspec update` 生成官方层，再按本文向 propose、apply、verify、sync、archive 的 command/skill 追加项目规则。本仓库 `.gitignore` 已忽略那 7 组官方路径。
 
 ### 1.1 相对纯官方 OpenSpec，你多得到什么
 
@@ -34,12 +34,13 @@
 - 额外制品：`verification.md`（验证计划 + 实现侧真实结果记录，含必做代码审查）。
 - 制品依赖：`tasks → verification`，且 `apply` 依赖 `verification`；该 schema 依赖只表示制品已创建，流转门禁另以 verification 中的 Verify 门禁标记为准。
 - 代码审查在 verification 中必做：apply 子 Agent 针对完整实现 diff 执行首次审查并记账；verify 子 Agent 每次安全修复代码后，必须针对修复后的完整 diff 重新执行审查并更新结论。未处理的 Critical/Important 会使 Verify 门禁失败，因此也是项目级 sync/archive 流转条件。
+- 每次 `/opsx-propose` 或 `openspec-propose` skill 启动时，必须先询问使用隔离 worktree 还是当前工作区；该询问发生在创建 change 或写入任何制品之前。未安装增强规则时，该询问不成立。
 - 入口 Agent 先派发 apply 子 Agent；成功后再派发独立 verify 子 Agent。单独运行 `/opsx-verify` 时，入口 Agent 同样派发 verify 子 Agent。apply / verify 阶段仍串行。阶段子 Agent 每次运行时仅当本会话可用 skills 列表中存在 `dispatching-parallel-agents` 时，才对独立域并行派发带工作者身份标记的实施者 / 调查者；列表中没有则按官方默认串行，不得因磁盘或插件缓存中能读到 `SKILL.md` 而启用并行。后续安装该 skill 无需再次替换注入。verify 子 Agent 仅直接修复可安全、在当前 change 范围内且无需用户决策的阻塞并重新验证（最多 3 轮）；遇正式规则列出的其它情况停止并返回入口 Agent。verification 完成且无阻塞项后，才可进入 sync 或 archive。
 - 可选：简体中文强制规则、`/opsx-update-change-from-code`。
 
 ### 1.2 相对旧版 ai-tools，你不再从本仓库获得什么
 
-旧版曾在仓库内跟踪并深度定制官方 skills/commands（含 Code Review 归档硬门禁、Superpowers finishing 等）。当前版本不再分发整套分叉模板，仅要求在官方生成物上追加验证闭环与流转门禁。
+旧版曾在仓库内跟踪并深度定制官方 skills/commands（含 Code Review 归档硬门禁、Superpowers finishing 等）。当前版本不再分发整套分叉模板，仅要求在官方生成物上追加 propose worktree 选择、验证闭环与流转门禁。
 
 接入后：
 
@@ -168,7 +169,7 @@ openspec schema validate evidence-driven
 
 ### 5.1 补充 verify 修复闭环与流转门禁
 
-安装或更新 OpenSpec 官方 command/skills 后，必须确保 apply、verify、sync、archive 都含当前规则。每个文件只保留一个增强块；`AI_TOOLS_VERIFY_GATE_V1` 是唯一幂等标记。
+安装或更新 OpenSpec 官方 command/skills 后，必须确保 propose、apply、verify、sync、archive 都含当前规则。apply、verify、sync、archive 每个文件只保留一个 `AI_TOOLS_VERIFY_GATE_V1` 增强块；propose command/skill 每个文件只保留一个 `AI_TOOLS_PROPOSE_WORKTREE_V1` 增强块。两套标记不得混写。
 
 #### 统一工作区指纹
 
@@ -418,7 +419,101 @@ done
 
 `MISSING` 表示尚无增强块，只向这些文件追加当前 A/B/C 节的对应完整文本。`STALE` 表示文件只有一个 `AI_TOOLS_VERIFY_GATE_V1` 标记，但 apply/verify 块缺少当前委派标记、`AI_TOOLS_PARALLEL_DISPATCH_V1` 或对应工作者标记（apply 为 `AI_TOOLS_WORKER_APPLY_V1`，verify 为 `AI_TOOLS_WORKER_VERIFY_V1`）；必须用当前 A/B 节的完整注入文本替换旧块，不得再次追加。缺少 Superpowers 或缺少 `dispatching-parallel-agents` 不得标为 `STALE`。出现 `DUPLICATE` 时先清理重复块，再按当前文本保留唯一一块。`NOFILE` 表示官方文件不存在，应先恢复官方生成层。若官方模板升级后结构发生变化，应先人工确认追加位置是否仍适用。上述检查同时验收 apply 两个文件的 APPLY、并行与工作者标记，以及 verify 两个文件的 VERIFY、并行与工作者标记，无需维护第二套检查逻辑。
 
-这是对官方生成物的项目级追加，不要用旧版完整文件覆盖新版官方模板。路径 A、B 均须执行本节；路径 C 在重新生成官方层后也须执行本节。
+#### D. Propose：起始 worktree 选择
+
+向以下两个文件追加或替换为以下内容（`STALE` 时替换旧块）：
+
+- `.cursor/commands/opsx-propose.md`
+- `.cursor/skills/openspec-propose/SKILL.md`
+
+command 与 skill 使用同一规则正文；仅当官方文件标题层级会与本节冲突时，才把本节 `##` / `###` 降一级，不得改语义。
+
+```markdown
+<!-- AI_TOOLS_PROPOSE_WORKTREE_V1 -->
+## Propose 起始工作区选择（AI_TOOLS_PROPOSE_WORKTREE_ASK_ALWAYS_V1）
+
+在执行任何官方 propose 主体步骤前，必须先完成工作区选择。不得创建 change、不得分配 change 名称、不得写入 `openspec/changes/` 下任何制品，也不得运行 `openspec new change`。
+
+无论工作区是否干净、是否已经处于 linked worktree，每次 `/opsx-propose` 或 `openspec-propose` skill 调用都必须询问，不得根据状态跳过，不得替用户选择。
+
+向用户说明并提供两个选项：
+
+- `使用隔离 worktree`：基于当前 `HEAD` 准备隔离工作区后再继续官方 propose。当前工作区的未提交改动不会自动出现在新 worktree。
+- `在当前工作区继续`：保留当前目录和分支，继续官方 propose。
+
+用户取消、拒绝回答或未明确选择时立即停止，不得继续官方 propose。
+
+### 选择当前工作区
+
+保留当前目录和分支，进入官方 propose。不得创建 worktree，不得切换分支。
+
+### 选择隔离 worktree（AI_TOOLS_PROPOSE_WORKTREE_REUSE_V1）
+
+1. 先检测当前 Git 布局，且必须排除 submodule 误判。依次取：
+   `GIT_DIR=$(cd "$(git rev-parse --git-dir)" && pwd -P)`；
+   `GIT_COMMON=$(cd "$(git rev-parse --git-common-dir)" && pwd -P)`；
+   `SUPERPROJECT=$(git rev-parse --show-superproject-working-tree 2>/dev/null || true)`。
+2. 若 `SUPERPROJECT` 非空：当前是 submodule，按普通仓库处理，不得当作 linked worktree。
+3. 若 `GIT_DIR != GIT_COMMON` 且 `SUPERPROJECT` 为空：已处于 linked worktree。复用当前 worktree，报告路径与当前分支（或 detached HEAD），不得再创建嵌套 worktree，然后进入下方「准备完成后」。
+4. 否则（普通 checkout，或 submodule）：优先使用运行环境已有的原生 worktree 能力（例如 `EnterWorktree`、`WorktreeCreate`、`/worktree`）。仅当没有原生能力时才使用 `git worktree`。
+5. 手工 `git worktree` 时：
+   - 目录优先顺序：项目明确约定 > 已有 `.worktrees/` > 已有 `worktrees/` > 默认 `.worktrees/`。两者都存在时用 `.worktrees/`。
+   - 项目内目录必须先运行 `git check-ignore -q <目录>`；未忽略则立即停止并报告，不得在未忽略目录创建 worktree，不得擅自修改 `.gitignore`。
+   - 使用尚未占用的临时工作分支和路径，例如 `openspec/propose-<YYYYMMDD-HHMMSS>`。最终 change 名称仍由官方 propose 流程确定，不得预先用 change 名称命名分支。
+   - 基于当前 `HEAD` 创建：`git worktree add -b "<branch>" "<path>" HEAD`。不得把未提交改动自动搬运到新 worktree。
+   - 不得使用 `git reset --hard`、强制删除分支、`git worktree remove --force` 或其它破坏性清理。
+6. 进入目标 worktree 后，执行项目可识别的基础 setup：存在 `package.json` 则安装依赖；存在 `Cargo.toml` 则构建；存在 `requirements.txt` / `pyproject.toml` / `go.mod` 则按对应工具安装。没有这些文件则跳过该项。
+7. 再执行项目可识别的基线检查：仓库已有明确测试命令时才运行。没有可识别测试命令则跳过。setup 或基线检查失败时暂停并报告原因；在用户明确同意继续前，不得进入官方 propose。
+
+### 失败处理（AI_TOOLS_PROPOSE_WORKTREE_NO_DOWNGRADE_V1）
+
+用户取消、worktree 创建失败、目录未被忽略、sandbox 拒绝、setup 失败或基线检查失败且用户未明确同意继续时，立即停止并报告原因；不得静默退回当前工作区继续 propose。所有阻塞必须发生在 OpenSpec change 和制品创建之前。
+
+准备完成后，才进入官方 propose 主体。
+```
+
+首次接入、追加或替换前，以及每次 `openspec update` 或 ai-tools 自定义层升级后，在目标项目根目录运行：
+
+```bash
+command -v rg >/dev/null || {
+  echo 'ERROR: ripgrep (rg) is required'
+  exit 1
+}
+
+for file in \
+  .cursor/commands/opsx-propose.md \
+  .cursor/skills/openspec-propose/SKILL.md
+do
+  if [ ! -f "$file" ]; then
+    echo "NOFILE    $file"
+    continue
+  fi
+  count="$( { rg -o --fixed-strings 'AI_TOOLS_PROPOSE_WORKTREE_V1' "$file" || true; } | wc -l | tr -d ' ')"
+  case "$count" in
+    0) echo "MISSING   $file" ;;
+    1)
+      required="AI_TOOLS_PROPOSE_WORKTREE_ASK_ALWAYS_V1 AI_TOOLS_PROPOSE_WORKTREE_REUSE_V1 AI_TOOLS_PROPOSE_WORKTREE_NO_DOWNGRADE_V1"
+      stale_missing=""
+      for marker in $required; do
+        if ! rg -q --fixed-strings "$marker" "$file"; then
+          stale_missing="$marker"
+          break
+        fi
+      done
+      if [ -n "$stale_missing" ]; then
+        echo "STALE     $file (missing $stale_missing)"
+      else
+        echo "OK        $file"
+      fi
+      ;;
+    *) echo "DUPLICATE $file ($count markers)" ;;
+  esac
+done
+```
+
+`MISSING` 表示尚无增强块，只向这两个文件追加当前 D 节完整文本。`STALE` 表示文件只有一个 `AI_TOOLS_PROPOSE_WORKTREE_V1` 标记，但缺少 `AI_TOOLS_PROPOSE_WORKTREE_ASK_ALWAYS_V1`、`AI_TOOLS_PROPOSE_WORKTREE_REUSE_V1` 或 `AI_TOOLS_PROPOSE_WORKTREE_NO_DOWNGRADE_V1`；必须用当前 D 节完整注入文本替换旧块，不得再次追加。出现 `DUPLICATE` 时先清理重复块，再按当前文本保留唯一一块。`NOFILE` 表示官方 propose 文件不存在，应先运行 `openspec init --tools cursor` 或 `openspec update`。不要把 propose 块写入 apply/verify/sync/archive 文件，也不要把 `AI_TOOLS_VERIFY_GATE_V1` 写入 propose 文件。
+
+这是对官方生成物的项目级追加，不要用旧版完整文件覆盖新版官方模板。路径 A、B 均须执行本节的 A/B/C 与 D；路径 C 在重新生成官方层后也须执行本节的 A/B/C 与 D。仅复制 schema 不会自动获得 propose worktree 选择。
 
 ### 5.2 已有 active change 怎么办
 
@@ -441,6 +536,8 @@ evidence-driven: proposal → specs/design → tasks → verification → apply
 
 阶段内并行仅当运行时本会话可用 skills 列表含 `dispatching-parallel-agents` 时启用；列表中没有则与仅派发阶段子 Agent 的串行路径相同。磁盘或插件缓存中的 `SKILL.md` 不足以为可用。
 
+propose 的 worktree 选择按 5.1 节 D 段注入，发生在官方 propose 主体之前，不改变后续制品依赖。
+
 ## 6. 路径 C：从旧版 ai-tools 迁移
 
 旧版特征通常包括：
@@ -452,7 +549,7 @@ evidence-driven: proposal → specs/design → tasks → verification → apply
 ### 6.1 迁移原则
 
 1. **官方层归还官方**：删除本地分叉的官方 skill/command，再用 `openspec update`（或 `init`）重新生成。
-2. **自定义层只留明确约定的内容**：`evidence-driven`、5.1 节的验证闭环与流转门禁及工作区指纹脚本、中文规则、from-code。
+2. **自定义层只留明确约定的内容**：`evidence-driven`、5.1 节的 propose worktree 选择、验证闭环与流转门禁及工作区指纹脚本、中文规则、from-code。
 3. **不要**把旧分叉文件「合并进」新官方模板；仅在官方生成物上追加带幂等标记的规则，其它旧门禁迁到项目自有 rule/skill。
 4. **先备份再删**：至少保留分支或补丁，便于对照旧门禁文案。
 
@@ -513,7 +610,7 @@ openspec schema validate evidence-driven
 openspec list --json
 ```
 
-重新生成官方层后，还必须按 5.1 节向 apply、verify、sync、archive 的 command/skill 追加验证闭环与流转门禁。
+重新生成官方层后，还必须按 5.1 节向 propose、apply、verify、sync、archive 的 command/skill 追加 propose worktree 选择以及验证闭环与流转门禁。
 
 ### 6.3 迁移后行为变化清单（给团队的预期管理）
 
@@ -525,6 +622,7 @@ openspec list --json
 | Code Review 作为归档硬门禁 | 不再由本仓库保证 |
 | 代码审查作为 verification 必做检查 | **保留**（未处理的 Critical/Important 会阻塞项目级 sync/archive 门禁） |
 | Superpowers brainstorming / finishing 写死在 skill | 不再由本仓库保证 |
+| propose 直接在当前工作区创建 change | 每次 propose 先询问隔离 worktree 或当前工作区；选择 worktree 时普通 checkout 先进入新 worktree，已处于 linked worktree 则复用，失败不得静默降级（按 5.1 节 D 段追加） |
 | `verification.md` 制品 | **保留**（schema 层） |
 | 中文规则、from-code | **可保留** |
 
@@ -550,7 +648,7 @@ openspec update
 openspec schema validate evidence-driven
 ```
 
-`openspec update` 可能刷新官方 skills/commands。升级完成后必须运行 5.1 节的检查并处理 `MISSING`、`STALE`、`DUPLICATE` 或 `NOFILE`：仅 `MISSING` 追加；`STALE` 表示旧 V1 块缺少当前委派标记、`AI_TOOLS_PARALLEL_DISPATCH_V1` 或对应工作者标记，须用当前 A/B 节完整文本替换旧块；`DUPLICATE` 先清理；全部文件最终必须为 `OK`。
+`openspec update` 可能刷新官方 skills/commands。升级完成后必须运行 5.1 节的两套检查并处理 `MISSING`、`STALE`、`DUPLICATE` 或 `NOFILE`：apply/verify/sync/archive 仅 `MISSING` 追加；其 `STALE` 表示旧 V1 块缺少当前委派标记、`AI_TOOLS_PARALLEL_DISPATCH_V1` 或对应工作者标记，须用当前 A/B 节完整文本替换旧块。propose 仅 `MISSING` 追加；其 `STALE` 表示旧块缺少 `AI_TOOLS_PROPOSE_WORKTREE_ASK_ALWAYS_V1`、`AI_TOOLS_PROPOSE_WORKTREE_REUSE_V1` 或 `AI_TOOLS_PROPOSE_WORKTREE_NO_DOWNGRADE_V1`，须用当前 D 节完整文本替换旧块。`DUPLICATE` 先清理；10 个文件最终必须全部为 `OK`。
 
 ### 7.2 升级 ai-tools 自定义层
 
@@ -572,7 +670,7 @@ openspec schema validate evidence-driven
 
 **禁止**用本仓库完整 `openspec/config.yaml` 覆盖目标配置；只合并 `schema: evidence-driven`。
 
-ai-tools 自定义层升级后也必须运行 5.1 节同一检查脚本，识别并替换 `STALE` 的旧 V1 apply/verify 块（含缺少 `AI_TOOLS_PARALLEL_DISPATCH_V1` 或工作者标记的情况）；验收前所有文件都应输出 `OK`。
+ai-tools 自定义层升级后也必须运行 5.1 节两套检查脚本，识别并替换 `STALE` 的旧 V1 apply/verify 块（含缺少 `AI_TOOLS_PARALLEL_DISPATCH_V1` 或工作者标记的情况）以及 `STALE` 的旧 propose worktree 块；验收前 10 个文件都应输出 `OK`。
 
 ### 7.3 本仓库（ai-tools）自身注意事项
 
@@ -581,8 +679,8 @@ ai-tools 自定义层升级后也必须运行 5.1 节同一检查脚本，识别
 
 ## 8. 验收清单
 
-首次接入或任何升级后，必须在目标项目实际运行 5.1 节脚本并处理所有异常状态，直到
-8 个文件全部输出 `OK`，然后确认：
+首次接入或任何升级后，必须在目标项目实际运行 5.1 节两套脚本并处理所有异常状态，直到
+apply/verify/sync/archive 8 个文件以及 propose 2 个文件全部输出 `OK`，然后确认：
 
 - [ ] `openspec --version` 为团队约定的最新稳定版。
 - [ ] 存在官方 `/opsx-propose`、`/opsx-apply` 等（Cursor 重启后可见）。
@@ -590,13 +688,13 @@ ai-tools 自定义层升级后也必须运行 5.1 节同一检查脚本，识别
 - [ ] `openspec/config.yaml` 含 `schema: evidence-driven`，且项目原有 context/rules 未丢。
 - [ ] `openspec schema validate evidence-driven` 通过。
 - [ ] 旧分叉官方 skill/command 已从 Git 跟踪中移除（路径 C）。
-- [ ] 运行 5.1 节同一脚本，8 个文件均输出 `OK`，没有 `MISSING`、`STALE`、`DUPLICATE` 或 `NOFILE`；其中 apply command/skill 含 `AI_TOOLS_DELEGATED_APPLY_V1`、`AI_TOOLS_PARALLEL_DISPATCH_V1` 与 `AI_TOOLS_WORKER_APPLY_V1`，verify command/skill 含 `AI_TOOLS_DELEGATED_VERIFY_V1`、`AI_TOOLS_PARALLEL_DISPATCH_V1` 与 `AI_TOOLS_WORKER_VERIFY_V1`。
+- [ ] 运行 5.1 节两套脚本，8 个 verify 门禁文件与 2 个 propose 文件均输出 `OK`，没有 `MISSING`、`STALE`、`DUPLICATE` 或 `NOFILE`；其中 apply command/skill 含 `AI_TOOLS_DELEGATED_APPLY_V1`、`AI_TOOLS_PARALLEL_DISPATCH_V1` 与 `AI_TOOLS_WORKER_APPLY_V1`，verify command/skill 含 `AI_TOOLS_DELEGATED_VERIFY_V1`、`AI_TOOLS_PARALLEL_DISPATCH_V1` 与 `AI_TOOLS_WORKER_VERIFY_V1`，propose command/skill 含 `AI_TOOLS_PROPOSE_WORKTREE_ASK_ALWAYS_V1`、`AI_TOOLS_PROPOSE_WORKTREE_REUSE_V1` 与 `AI_TOOLS_PROPOSE_WORKTREE_NO_DOWNGRADE_V1`。
 - [ ] verify 子 Agent 最多修复复验 3 轮；每次修改代码后都对修复后的完整 diff 重新执行代码审查、更新 verification 的审查范围与结论，且未处理的 Critical/Important 会阻塞通过。
 - [ ] sync / archive command/skill 已追加入口门禁：仅 Verify 门禁为“通过、无阻塞”且验证指纹与当前工作区一致时才可继续。
 - [ ] `.cursor/scripts/openspec-verification-fingerprint.py` 存在，verify 与 sync/archive 使用同一脚本计算指纹。
-- [ ] 8 个定制文件各自仅有一个 `AI_TOOLS_VERIFY_GATE_V1` 标记；旧 V1 块已按 `STALE` 规则替换而非重复追加。
+- [ ] 8 个 verify 门禁文件各自仅有一个 `AI_TOOLS_VERIFY_GATE_V1` 标记；2 个 propose 文件各自仅有一个 `AI_TOOLS_PROPOSE_WORKTREE_V1` 标记；旧块已按 `STALE` 规则替换而非重复追加。
 - [ ] 仍需要时：中文规则、`openspec-update-change-from-code` 可用。
-- [ ] 试跑：`/opsx-propose` 小 change，确认生成 `verification.md`，且 apply 前依赖满足。
+- [ ] 试跑：`/opsx-propose` 小 change，确认启动后先询问隔离 worktree 或当前工作区，生成 `verification.md`，且 apply 前依赖满足。
 
 冒烟命令示例：
 
@@ -617,6 +715,10 @@ openspec status --change "smoke-ai-tools-integration"
 ### 接入后官方 verify 变「弱」了？
 
 verify 主体仍跟随官方生成物；增强规则要求无论由 apply 衔接还是单独运行 `/opsx-verify`，都由入口 Agent 派发独立 verify 子 Agent 执行。verify 子 Agent 仅对可安全、在当前 change 范围内且不需要用户决策的阻塞直接修复并重新验证（最多 3 轮）；其余情况停止并将阻塞返回入口 Agent。结构化结论写回 verification，sync/archive 会在各自入口强制检查该结论。若还需要不可绕过的 Code Review 等更严门禁，应另加项目规则或独立 skill。
+
+### 每次 propose 都要选 worktree 吗？已经在 worktree 里呢？
+
+要。安装 5.1 节 D 段后，每次 `/opsx-propose` 或 `openspec-propose` skill 都必须先问，即使工作区干净或已经处于 linked worktree。选择「在当前工作区继续」则原地创建 change。选择「使用隔离 worktree」时：普通 checkout 先创建并进入新 worktree；已处于 linked worktree 则复用当前目录，不嵌套创建。未提交改动不会自动进入新 worktree。创建失败不得静默改在当前目录继续。未安装该增强块时，官方 propose 仍直接在当前工作区执行。
 
 ### 安装增强规则后还要再装 Superpowers 吗？注入要不要再替换？
 

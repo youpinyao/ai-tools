@@ -101,6 +101,10 @@ flowchart TD
 - `evidence-driven` schema 建立 `proposal / specs / design / tasks / verification`
   之间的制品依赖，要求 `apply` 在 `verification.md` 已存在后实施，并跟踪
   `tasks.md`；`verification.md` 负责保存需求与检查的对应关系、实际证据和剩余风险。
+- 安装 `AI_TOOLS_PROPOSE_WORKTREE_V1` 后，每次 `propose` 都必须先询问使用隔离
+  worktree 还是当前工作区；询问和 worktree 准备发生在创建 change 或写入制品之前。
+  已处于 linked worktree 时选择隔离工作区则复用当前目录。未安装该增强块时，
+  `propose` 仍以目标项目当前 OpenSpec 官方生成物为准。
 - 安装 `AI_TOOLS_VERIFY_GATE_V1` 后，入口 Agent 负责编排，不直接执行 apply 或 verify
   主体；apply 子 Agent 成功后才派发独立 verify 子 Agent；单独运行 `/opsx-verify` 时，
   入口 Agent 同样派发 verify 子 Agent。验证过程中可安全修复的阻塞由 verify 子 Agent
@@ -123,6 +127,7 @@ flowchart TD
 
 当需求目标、范围或实现方向尚不明确时，先通过 `explore` 梳理问题、约束和可选方案。
 结论明确后使用 `propose` 建立 change，再依次完成实现与验证。
+`propose` 开始时若已安装 worktree 选择规则，应先选择隔离 worktree 或当前工作区。
 
 推荐路径：`explore → propose → apply → verify → archive`。
 
@@ -177,6 +182,7 @@ flowchart TD
 `propose` 建立完整 change，记录目标、范围和验证方式，再通过 `apply` 补齐任务或
 调整实现，最后执行验证。不要先建立空 change 再调用
 `/opsx-update-change-from-code`：该命令只更新已有制品，不负责创建缺失制品。
+`propose` 开始时若已安装 worktree 选择规则，应先选择隔离 worktree 或当前工作区。
 
 推荐路径：`propose（基于代码事实）→ apply → verify → archive`。
 
