@@ -63,10 +63,10 @@ flowchart TD
     Specs --> Tasks[tasks]
     Design --> Tasks
     Tasks --> VerificationPlan[verification 计划]
-    VerificationPlan --> ApplyLoop[apply]
-    ApplyLoop --> VerifyLoop[独立 verify]
+    VerificationPlan --> ApplyLoop[apply 子 Agent]
+    ApplyLoop --> VerifyLoop[独立 verify 子 Agent]
     VerifyLoop --> Repairable{存在可安全修复的阻塞?}
-    Repairable -->|是| RepairInVerify[verify 直接修复并复验]
+    Repairable -->|是| RepairInVerify[verify 子 Agent 直接修复并复验]
     RepairInVerify --> VerifyLoop
     Repairable -->|否| VerifyResult{最终验证结果}
 
@@ -101,14 +101,17 @@ flowchart TD
 - `evidence-driven` schema 建立 `proposal / specs / design / tasks / verification`
   之间的制品依赖，要求 `apply` 在 `verification.md` 已存在后实施，并跟踪
   `tasks.md`；`verification.md` 负责保存需求与检查的对应关系、实际证据和剩余风险。
-- 安装 `AI_TOOLS_VERIFY_GATE_V1` 后，`apply` 完成时会派发独立 `verify`。验证过程中
-  可安全修复的阻塞会在最多三轮“验证—修复—重新验证”内直接处理；仍未解决的问题
-  再按类型回到 `apply`、`update` 或补充检查。
+- 安装 `AI_TOOLS_VERIFY_GATE_V1` 后，入口 Agent 负责编排，不直接执行 apply 或 verify
+  主体；apply 子 Agent 成功后才派发独立 verify 子 Agent；单独运行 `/opsx-verify` 时，
+  入口 Agent 同样派发 verify 子 Agent。验证过程中可安全修复的阻塞由 verify 子 Agent
+  在最多三轮“验证—修复—重新验证”内直接处理；每次修改代码后都针对修复后的完整
+  diff 重新执行代码审查并更新 verification。仍未解决的问题再按类型回到 `apply`、
+  `update` 或补充检查。
 - `sync` 或 `archive` 入口会检查验证状态为通过、阻塞项为无，并确认记录的工作区
   指纹仍与当前状态一致。验证后的代码或制品变化会使旧门禁失效；`sync` 更新
   main specs 后如果还要归档，也必须先重新验证并刷新门禁。
-- 未安装增强规则时，这些门禁不成立；`verify`、`sync`、`archive` 的具体条件与行为
-  仍以目标项目当前 OpenSpec 官方生成物为准。
+- 未安装增强规则时，以上子 Agent 派发与门禁均不成立；`verify`、`sync`、`archive`
+  的具体条件与行为仍以目标项目当前 OpenSpec 官方生成物为准。
 - 发布后发现问题时，不修改已归档 change：change 仍为 active 时通过 `update` /
   `apply` 回流，已经归档时建立新 change，进入下一轮规格驱动闭环。
 
@@ -147,7 +150,8 @@ flowchart TD
 
 在 `verify` 阶段发现问题时，应先判断问题类型，再选择处理路径：
 
-- 实现不满足需求：返回 `apply` 修复实现，再重新验证。
+- 实现不满足需求：若修复安全、在当前 change 范围内且无需用户决策，由 verify 子
+  Agent 直接修复并复验；否则返回 `apply` 修复实现，再重新验证。
 - 规划错误或制品之间存在矛盾：使用 `update` 修正规划，再通过 `apply` 完成必要
   修改并重新验证。
 - 验证证据不足：补充并执行缺失的检查，再重新验证；不要仅为补证据而修改规划。
@@ -190,5 +194,7 @@ flowchart TD
 - 实现或验证阶段发现规划偏差时，通过 `update` 保持制品与最新决策一致。
 - `/opsx-update-change-from-code` 只负责按已确认的代码事实回写已有 active change，
   不能建立 change，也不能替代缺陷修复。
-- 实现完成后建议核验；`verify`、`sync`、`archive` 的
-  具体条件与行为遵循目标项目当前 OpenSpec 官方生成物。
+- 实现完成后建议核验。安装 `AI_TOOLS_VERIFY_GATE_V1` 后，apply 与单独
+  `/opsx-verify` 均由入口 Agent 派发子 Agent 执行，并通过 Verify 门禁与工作区指纹
+  约束 sync/archive；未安装增强规则时，`verify`、`sync`、`archive` 的具体条件与行为
+  遵循目标项目当前 OpenSpec 官方生成物。

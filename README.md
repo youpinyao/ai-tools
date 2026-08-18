@@ -119,8 +119,12 @@ TARGET_PROJECT="/absolute/path/to/target-project"
 5. 要完成当前 ai-tools 接入，必须继续执行
    [接入文档 5.1 节](docs/ai-tools-integration.md#51-补充-verify-修复闭环与流转门禁)：
    创建统一工作区指纹脚本，并向 apply、verify、sync、archive 的 8 个官方
-   command/skill 文件幂等追加 `AI_TOOLS_VERIFY_GATE_V1` 规则。仅复制 schema 不会
-   自动获得这些流转门禁。
+   command/skill 文件幂等追加 `AI_TOOLS_VERIFY_GATE_V1` 规则。增强规则同时提供
+   apply 子 Agent 派发、独立 verify 子 Agent 派发与防递归标记（
+   `AI_TOOLS_DELEGATED_APPLY_V1`、`AI_TOOLS_DELEGATED_VERIFY_V1`）：apply 时入口
+   Agent 先派发 apply 子 Agent，成功后再派发 verify 子 Agent；用户单独运行
+   `/opsx-verify` 时，入口 Agent 同样派发 verify 子 Agent。未安装增强规则时，这些
+   派发行为不成立。仅复制 schema 不会自动获得这些流转门禁与子 Agent 编排。
 
 官方 `/opsx-*` 命令及对应 skills 归 OpenSpec 管理；升级后的具体行为应以目标项目
 中当前 OpenSpec 官方生成物为准，不要从本仓库寻找或复制官方模板。
@@ -133,13 +137,14 @@ TARGET_PROJECT="/absolute/path/to/target-project"
 官方 explore（可选）
   → 官方 propose
   → evidence-driven 制品（含 verification 计划）
-  → evidence-driven schema 下的 apply（执行适用检查并记录真实结果）
-  → 独立 verify
+  → apply 子 Agent（实施并记录真实结果）
+  → 独立 verify 子 Agent
   → 官方 archive
 ```
 
-未安装增强规则时，独立 verify 派发及 sync/archive 门禁不成立；具体行为仍以目标项目
-当前 OpenSpec 官方生成物为准。
+单独运行 `/opsx-verify` 时，入口 Agent 也按同一规则派发独立 verify 子 Agent 执行验证
+闭环。未安装增强规则时，apply/verify 子 Agent 派发及 sync/archive 门禁均不成立；
+具体行为仍以目标项目当前 OpenSpec 官方生成物为准。
 
 常见旁路：
 
