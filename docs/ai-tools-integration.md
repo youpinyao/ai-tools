@@ -369,7 +369,7 @@ if __name__ == "__main__":
 门禁块缺失、状态不是“通过”、阻塞项不是“无”、验证指纹不匹配，或存在多个门禁块时，立即停止；不得通过用户确认绕过。验证后发生的任何代码或制品变化都会使旧门禁失效，应先重新执行 verify，修复阻塞并刷新门禁结果。
 ```
 
-首次接入、追加或替换前，以及每次 `openspec update` 或 ai-tools 自定义层升级后运行（本仓库也可在目标项目根目录执行 `scripts/check-verify-gate-markers.sh`）：
+首次接入、追加或替换前，以及每次 `openspec update` 或 ai-tools 自定义层升级后，在目标项目根目录运行：
 
 ```bash
 command -v rg >/dev/null || {
@@ -416,7 +416,7 @@ do
 done
 ```
 
-`MISSING` 表示尚无增强块，只向这些文件追加当前 A/B/C 节的对应完整文本。`STALE` 表示文件只有一个 `AI_TOOLS_VERIFY_GATE_V1` 标记，但 apply/verify 块缺少当前委派标记、`AI_TOOLS_PARALLEL_DISPATCH_V1` 或对应工作者标记（apply 为 `AI_TOOLS_WORKER_APPLY_V1`，verify 为 `AI_TOOLS_WORKER_VERIFY_V1`）；必须用当前 A/B 节的完整注入文本替换旧块，不得再次追加。缺少 Superpowers 或缺少 `dispatching-parallel-agents` 不得标为 `STALE`。出现 `DUPLICATE` 时先清理重复块，再按当前文本保留唯一一块。`NOFILE` 表示官方文件不存在，应先恢复官方生成层。若官方模板升级后结构发生变化，应先人工确认追加位置是否仍适用。该同一脚本也直接验收 apply 两个文件的 APPLY、并行与工作者标记，以及 verify 两个文件的 VERIFY、并行与工作者标记，无需维护第二套检查逻辑。
+`MISSING` 表示尚无增强块，只向这些文件追加当前 A/B/C 节的对应完整文本。`STALE` 表示文件只有一个 `AI_TOOLS_VERIFY_GATE_V1` 标记，但 apply/verify 块缺少当前委派标记、`AI_TOOLS_PARALLEL_DISPATCH_V1` 或对应工作者标记（apply 为 `AI_TOOLS_WORKER_APPLY_V1`，verify 为 `AI_TOOLS_WORKER_VERIFY_V1`）；必须用当前 A/B 节的完整注入文本替换旧块，不得再次追加。缺少 Superpowers 或缺少 `dispatching-parallel-agents` 不得标为 `STALE`。出现 `DUPLICATE` 时先清理重复块，再按当前文本保留唯一一块。`NOFILE` 表示官方文件不存在，应先恢复官方生成层。若官方模板升级后结构发生变化，应先人工确认追加位置是否仍适用。上述检查同时验收 apply 两个文件的 APPLY、并行与工作者标记，以及 verify 两个文件的 VERIFY、并行与工作者标记，无需维护第二套检查逻辑。
 
 这是对官方生成物的项目级追加，不要用旧版完整文件覆盖新版官方模板。路径 A、B 均须执行本节；路径 C 在重新生成官方层后也须执行本节。
 
