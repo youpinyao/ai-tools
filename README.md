@@ -120,11 +120,15 @@ TARGET_PROJECT="/absolute/path/to/target-project"
    [接入文档 5.1 节](docs/ai-tools-integration.md#51-补充-verify-修复闭环与流转门禁)：
    创建统一工作区指纹脚本，并向 apply、verify、sync、archive 的 8 个官方
    command/skill 文件幂等追加 `AI_TOOLS_VERIFY_GATE_V1` 规则。增强规则同时提供
-   apply 子 Agent 派发、独立 verify 子 Agent 派发与防递归标记（
-   `AI_TOOLS_DELEGATED_APPLY_V1`、`AI_TOOLS_DELEGATED_VERIFY_V1`）：apply 时入口
-   Agent 先派发 apply 子 Agent，成功后再派发 verify 子 Agent；用户单独运行
-   `/opsx-verify` 时，入口 Agent 同样派发 verify 子 Agent。未安装增强规则时，这些
-   派发行为不成立。仅复制 schema 不会自动获得这些流转门禁与子 Agent 编排。
+   apply 子 Agent 派发、独立 verify 子 Agent 派发、防递归标记（
+   `AI_TOOLS_DELEGATED_APPLY_V1`、`AI_TOOLS_DELEGATED_VERIFY_V1`）与阶段内并行开关
+   （`AI_TOOLS_PARALLEL_DISPATCH_V1`）：apply 时入口 Agent 先派发 apply 子 Agent，
+   成功后再派发 verify 子 Agent；用户单独运行 `/opsx-verify` 时，入口 Agent 同样
+   派发 verify 子 Agent。阶段子 Agent 每次运行时仅当本会话可用 skills 列表含
+   `dispatching-parallel-agents` 时，才对独立域并行派发带工作者身份标记的实施者 /
+   调查者；列表中没有则按官方默认串行。不得因磁盘上能读到 `SKILL.md` 而启用并行。
+   后续安装该 skill 无需再次替换注入。未安装增强规则时，这些派发行为不成立。仅复制
+   schema 不会自动获得这些流转门禁与子 Agent 编排。
 
 官方 `/opsx-*` 命令及对应 skills 归 OpenSpec 管理；升级后的具体行为应以目标项目
 中当前 OpenSpec 官方生成物为准，不要从本仓库寻找或复制官方模板。
@@ -141,6 +145,10 @@ TARGET_PROJECT="/absolute/path/to/target-project"
   → 独立 verify 子 Agent
   → 官方 archive
 ```
+
+apply 与 verify 两个阶段始终串行。阶段内并行不是接入时开关：仅当本会话可用
+skills 列表含 `dispatching-parallel-agents` 时，阶段子 Agent 才按该 skill 派发
+带独立身份标记的工作者；否则与现网串行路径相同。
 
 单独运行 `/opsx-verify` 时，入口 Agent 也按同一规则派发独立 verify 子 Agent 执行验证
 闭环。未安装增强规则时，apply/verify 子 Agent 派发及 sync/archive 门禁均不成立；

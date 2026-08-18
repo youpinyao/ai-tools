@@ -106,7 +106,9 @@ flowchart TD
   入口 Agent 同样派发 verify 子 Agent。验证过程中可安全修复的阻塞由 verify 子 Agent
   在最多三轮“验证—修复—重新验证”内直接处理；每次修改代码后都针对修复后的完整
   diff 重新执行代码审查并更新 verification。仍未解决的问题再按类型回到 `apply`、
-  `update` 或补充检查。
+  `update` 或补充检查。阶段内是否并行由每次运行时本会话可用 skills 列表是否含
+  `dispatching-parallel-agents` 决定；缺 skill 时与仅派发阶段子 Agent 的串行行为相同，
+  后续安装无需再替换注入。磁盘上能读到 `SKILL.md` 不足以为可用。
 - `sync` 或 `archive` 入口会检查验证状态为通过、阻塞项为无，并确认记录的工作区
   指纹仍与当前状态一致。验证后的代码或制品变化会使旧门禁失效；`sync` 更新
   main specs 后如果还要归档，也必须先重新验证并刷新门禁。
@@ -195,6 +197,7 @@ flowchart TD
 - `/opsx-update-change-from-code` 只负责按已确认的代码事实回写已有 active change，
   不能建立 change，也不能替代缺陷修复。
 - 实现完成后建议核验。安装 `AI_TOOLS_VERIFY_GATE_V1` 后，apply 与单独
-  `/opsx-verify` 均由入口 Agent 派发子 Agent 执行，并通过 Verify 门禁与工作区指纹
+  `/opsx-verify` 均由入口 Agent 派发子 Agent 执行，阶段内并行仅当运行时会话 skills
+  列表含 `dispatching-parallel-agents` 时启用，并通过 Verify 门禁与工作区指纹
   约束 sync/archive；未安装增强规则时，`verify`、`sync`、`archive` 的具体条件与行为
   遵循目标项目当前 OpenSpec 官方生成物。
