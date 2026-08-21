@@ -119,7 +119,10 @@ flowchart TD
   指纹仍与当前状态一致。验证后的代码或制品变化会使旧门禁失效；`sync` 更新
   main specs 后如果还要归档，也必须先重新验证并刷新门禁。
 - 未安装增强规则时，以上子 Agent 派发与门禁均不成立；`verify`、`sync`、`archive`
-  的具体条件与行为仍以目标项目当前 OpenSpec 官方生成物为准。
+  的具体条件与行为仍以目标项目当前 OpenSpec 官方生成物为准。OpenSpec 1.10.0 官方
+  `/opsx-verify` 只输出会话记分卡（Completeness / Correctness / Coherence），不写
+  `verification.md`；官方 `/opsx-archive` 对未完成制品或任务仅警告并允许用户确认
+  继续。项目级 Verify 门禁不是官方行为。
 - 发布后发现问题时，不修改已归档 change：change 仍为 active 时通过 `update` /
   `apply` 回流，已经归档时建立新 change，进入下一轮规格驱动闭环。
 
@@ -204,8 +207,12 @@ flowchart TD
 - 实现或验证阶段发现规划偏差时，通过 `update` 保持制品与最新决策一致。
 - `/opsx-update-change-from-code` 只负责按已确认的代码事实回写已有 active change，
   不能建立 change，也不能替代缺陷修复。
+- 编写 `tasks.md` 时，每项任务必须在 `- [ ]` 说明中写明如何验证完成。
+- 定位或修改主规范时使用 `openspec instructions apply --change "<name>" --json` 或
+  `openspec status --change "<name>" --json` 中的 `planningHome.root`，不要假设仓库相对路径。
 - 实现完成后建议核验。安装 `AI_TOOLS_VERIFY_GATE_V1` 后，apply 与单独
   `/opsx-verify` 均由入口 Agent 派发子 Agent 执行，阶段内并行仅当运行时会话 skills
   列表含 `dispatching-parallel-agents` 时启用，并通过 Verify 门禁与工作区指纹
   约束 sync/archive；未安装增强规则时，`verify`、`sync`、`archive` 的具体条件与行为
-  遵循目标项目当前 OpenSpec 官方生成物。
+  遵循目标项目当前 OpenSpec 官方生成物（1.10.0 官方 verify 仅为会话记分卡，官方
+  archive 允许确认绕过）。

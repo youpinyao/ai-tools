@@ -48,10 +48,19 @@ TARGET_PROJECT="/absolute/path/to/target-project"
 重要：本仓库自身不得运行 `openspec init` 或 `openspec update` 生成官方文件；
 这两个命令只在目标项目中运行。按以下顺序安装：
 
-1. 安装 npm 最新稳定版 OpenSpec：
+1. 安装 npm 最新稳定版 OpenSpec。普通使用者可用 `@latest` 快捷安装，但必须立刻核对版本：
 
    ```bash
    npm install --global @fission-ai/openspec@latest
+   openspec --version
+   ```
+
+   团队执行升级时应记录并固定 `npm view` 解析出的精确版本，避免 `@latest` 在执行过程中再次漂移：
+
+   ```bash
+   TARGET_VERSION="$(npm view @fission-ai/openspec version)"
+   npm install --global "@fission-ai/openspec@$TARGET_VERSION"
+   test "$(openspec --version)" = "$TARGET_VERSION"
    ```
 
 2. 在目标项目根目录生成或升级 OpenSpec 官方 Cursor skills 与 commands。新项目
@@ -135,7 +144,21 @@ TARGET_PROJECT="/absolute/path/to/target-project"
    工作区创建 change。
 
 官方 `/opsx-*` 命令及对应 skills 归 OpenSpec 管理；升级后的具体行为应以目标项目
-中当前 OpenSpec 官方生成物为准，不要从本仓库寻找或复制官方模板。
+中当前 OpenSpec 官方生成物为准，不要从本仓库寻找或复制官方模板。当前 CLI 1.10.0
+已确认的命令（以 `openspec --help` 为准，不要猜测未列出的参数）：
+
+- 新项目：`openspec init --tools cursor`
+- 已初始化：`openspec update`（`--force` 可在工具已是最新时仍刷新）
+- 校验 schema：`openspec schema validate evidence-driven`（schema 子命令仍标为 experimental）
+- 新建 change：`openspec new change "<name>" --schema evidence-driven`
+- JSON：`openspec list --json`、`openspec status --change "<name>" --json`、
+  `openspec validate "<name>" --type change --strict --json`、
+  `openspec instructions apply --change "<name>" --json`
+
+主规范位于 `<planningHome.root>/openspec/specs/<capability-path>/spec.md`，
+`planningHome.root` 来自 `openspec instructions apply --change "<name>" --json` 或
+`openspec status --change "<name>" --json`。
+归档目录为 `<planningHome.changesDir>/archive/`（仓库内通常是 `openspec/changes/archive/`）。
 
 ## 标准主线
 
@@ -171,7 +194,7 @@ verify、archive 与 sync 的具体行为以当前 OpenSpec 官方生成物为�
 
 ## Schema：`evidence-driven`
 
-`evidence-driven` 以 OpenSpec 1.9.0 官方 `spec-driven` 为本次语义基线：
+`evidence-driven` 以 OpenSpec 1.10.0 官方 `spec-driven` 为本次语义基线：
 
 - `proposal`、`specs`、`design`、`tasks` 是官方语义的简体中文派生。
 - 新增 `verification.md`，用于规划验证并记录实际执行结果与剩余风险。
@@ -180,16 +203,23 @@ verify、archive 与 sync 的具体行为以当前 OpenSpec 官方生成物为�
   结果、失败原因和未执行项；schema 不把这些记录扩展成额外的官方 verify 或
   archive 行为。
 
-兼容的官方 1.9.0 语义包括：
+兼容的官方 1.10.0 语义包括：
 
+- 用 `planningHome.root` 定位主规范，不要写死仓库相对路径。
+- 每项任务必须在 `- [ ]` 说明中写明如何验证完成。
 - 无规范层行为变化时在 `.openspec.yaml` 设置 `skip_specs: true`。
 - capability 使用完整 `<capability-path>`，支持 `identity/user-auth` 等嵌套路径。
-- 新增 capability 的 delta spec 以 `## Purpose` 开头；修改已有 capability 时不添加
+- 新增 capability 的 delta spec 以 `## Purpose` 开头（50 个以上字符，否则
+  `openspec validate --strict` 会报过短）；修改已有 capability 时不添加
   delta `## Purpose`。
-- `MODIFIED` requirement 必须复制并修改完整 requirement 块及其全部 scenarios。
+- `MODIFIED` requirement 必须复制并修改完整 requirement 块及其全部
+  `#### Scenario`。
+- 官方 `/opsx-verify` 只在会话中输出 Completeness / Correctness / Coherence
+  记分卡，不写 `verification.md`。官方 `/opsx-archive` 对未完成制品或任务仅警告
+  并允许确认继续。项目级 `AI_TOOLS_VERIFY_GATE_V1` 是额外门禁，不是官方硬门禁。
 
 后续升级 OpenSpec 时，应从当前官方 `spec-driven` 基线重新核对这些语义，而不是
-永久假定 1.9.0 的实现细节。
+永久假定 1.10.0 的实现细节。
 
 ## 许可证
 

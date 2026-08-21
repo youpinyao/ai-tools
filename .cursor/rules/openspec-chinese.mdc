@@ -5,7 +5,7 @@ alwaysApply: true
 
 # OpenSpec 中文强制
 
-在 OpenSpec 相关工作中（explore / propose / apply / verify / archive / sync / update / update-from-code，以及 `/opsx-*` 命令与对应 skills），**必须全程使用简体中文**。
+在 OpenSpec 相关工作中（explore / propose / apply / verify / archive / sync / update / update-from-code，以及全部 `/opsx-*` 命令——含 `/opsx-update-change-from-code`——与对应 skills），**必须全程使用简体中文**。
 
 ## 适用范围
 

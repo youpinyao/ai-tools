@@ -84,10 +84,14 @@ artifacts:
       `TBD ... Update Purpose after archive` 占位符，需要手动补充。
       不要给现有能力的增量添加 `## Purpose`——该规范已有 Purpose，增量中的内容会被忽略。
       若要修改现有能力的 Purpose（包括遗留的 `TBD` 占位符），请直接编辑
-      `openspec/specs/<capability-path>/spec.md`。
+      `<planningHome.root>/openspec/specs/<capability-path>/spec.md`。
+      `planningHome.root` 来自 `openspec instructions ... --json` 的响应。
+      始终使用该字段，不要使用仓库相对路径：当变更位于 store 中时，它会解析到
+      store（无论来源是 `--store`、项目的 `store:` 指针，还是全局默认 store），
+      否则解析到当前仓库。不要自行判断属于哪种情况；该字段已经给出结果。
 
       MODIFIED 需求处理流程：
-      1. 在 `openspec/specs/<capability-path>/spec.md` 中找到现有需求
+      1. 在 `<planningHome.root>/openspec/specs/<capability-path>/spec.md` 中找到现有需求（与上文相同的 store-aware 根路径）
       2. 复制完整的需求块（从 `### Requirement:` 开始，包含全部场景）
       3. 粘贴到 `## MODIFIED Requirements` 下，并根据新行为进行修改
       4. 确保标题文本完全匹配（忽略空白差异）
@@ -172,22 +176,24 @@ artifacts:
       - 每项任务必须使用复选框：`- [ ] X.Y 任务说明`
       - 任务应足够小，可以在一个会话中完成
       - 按依赖关系排列任务（哪些必须先完成？）
+      - 每项任务必须说明如何验证完成（测试、命令、可观察行为或交付制品）。
+        将验证方式写在该任务的复选框说明中。仅当检查跨越多个实现任务的更广
+        集成或系统行为时，才单独设立验证任务。
 
       示例：
       ```
       ## 1. 准备工作
 
-      - [ ] 1.1 创建新的模块结构
-      - [ ] 1.2 向 package.json 添加依赖
+      - [ ] 1.1 创建新的模块结构，并确认预期文件已存在
+      - [ ] 1.2 向 package.json 添加依赖，并确认依赖安装成功
 
       ## 2. 核心实现
 
-      - [ ] 2.1 实现数据导出函数
-      - [ ] 2.2 添加 CSV 格式化工具
+      - [ ] 2.1 实现数据导出函数，并确认导出测试通过
+      - [ ] 2.2 添加 CSV 格式化工具，并确认单元测试覆盖引号与分隔符
       ```
 
       要构建什么以规范为依据，如何构建以设计为依据。
-      每项任务都应可验证——能够明确判断它何时完成。
     requires:
       - specs
       - design
