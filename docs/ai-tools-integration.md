@@ -25,8 +25,8 @@
 
 | 层级 | 谁维护 | 内容 |
 |------|--------|------|
-| 官方生成层 | OpenSpec CLI 为基线，项目补充 propose worktree 选择、验证闭环与流转门禁 | explore / propose / update / apply / verify / archive / sync |
-| 自定义层 | ai-tools | `evidence-driven` schema（含 `verification`）、propose worktree 选择、验证闭环与流转门禁、工作区指纹脚本、中文规则、from-code 旁路 |
+| 官方生成层 | OpenSpec CLI 为基线，项目补充 propose worktree 选择、隔离 worktree 收尾、验证闭环与流转门禁 | explore / propose / update / apply / verify / archive / sync |
+| 自定义层 | ai-tools | `evidence-driven` schema（含 `verification`）、propose worktree 选择、隔离 worktree 收尾、验证闭环与流转门禁、工作区指纹脚本、中文规则、from-code 旁路 |
 
 **不要**再把本仓库里的官方 skill/command 副本拷进业务仓覆盖官方文件。应先由 `openspec init` / `openspec update` 生成官方层，再按本文向 propose、apply、verify、sync、archive 的 command/skill 追加项目规则。本仓库 `.gitignore` 已忽略那 7 组官方路径。
 
@@ -37,16 +37,17 @@
 - 制品依赖：`tasks → verification`，且 `apply` 依赖 `verification`；该 schema 依赖只表示制品已创建，流转门禁另以 verification 中的 Verify 门禁标记为准。
 - 代码审查在 verification 中必做：apply 子 Agent 针对完整实现 diff 执行首次审查并记账；verify 子 Agent 每次安全修复代码后，必须针对修复后的完整 diff 重新执行审查并更新结论。未处理的 Critical/Important 会使 Verify 门禁失败，因此也是项目级 sync/archive 流转条件。
 - 每次 `/opsx-propose` 或 `openspec-propose` skill 启动时，必须先询问使用隔离 worktree 还是当前工作区；该询问发生在创建 change 或写入任何制品之前。未安装增强规则时，该询问不成立。
+- 入口 Agent 准备结束 propose / apply / verify / sync / archive 时，若存在本次相关隔离 worktree（本会话创建，或位于项目 worktree 父目录），必须先询问是否合并到主分支并清理，再结束回复。不得自动合并或删除。未提交改动须先经用户明确同意提交。未安装收尾增强块时，该询问不成立。
 - 入口 Agent 先派发 apply 子 Agent；成功后再派发独立 verify 子 Agent。单独运行 `/opsx-verify` 时，入口 Agent 同样派发 verify 子 Agent。apply / verify 阶段仍串行。阶段子 Agent 每次运行时仅当本会话可用 skills 列表中存在 `dispatching-parallel-agents` 时，才对独立域并行派发带工作者身份标记的实施者 / 调查者；列表中没有则按官方默认串行，不得因磁盘或插件缓存中能读到 `SKILL.md` 而启用并行。后续安装该 skill 无需再次替换注入。verify 子 Agent 仅直接修复可安全、在当前 change 范围内且无需用户决策的阻塞并重新验证（最多 3 轮）；遇正式规则列出的其它情况停止并返回入口 Agent。verification 完成且无阻塞项后，才可进入 sync 或 archive。
 - 可选：简体中文强制规则、`/opsx-update-change-from-code`。
 
 ### 1.2 相对旧版 ai-tools，你不再从本仓库获得什么
 
-旧版曾在仓库内跟踪并深度定制官方 skills/commands（含 Code Review 归档硬门禁、Superpowers finishing 等）。当前版本不再分发整套分叉模板，仅要求在官方生成物上追加 propose worktree 选择、验证闭环与流转门禁。
+旧版曾在仓库内跟踪并深度定制官方 skills/commands（含 Code Review 归档硬门禁、Superpowers finishing 等）。当前版本不再分发整套分叉模板，仅要求在官方生成物上追加 propose worktree 选择、隔离 worktree 收尾、验证闭环与流转门禁。
 
 接入后：
 
-- apply / verify / archive / sync 的主体行为仍以目标项目中**当前官方生成物**为准；项目追加规则负责入口编排（派发 apply/verify 子 Agent）、修复验证阻塞并强制检查流转门禁。
+- apply / verify / archive / sync 的主体行为仍以目标项目中**当前官方生成物**为准；项目追加规则负责入口编排（派发 apply/verify 子 Agent）、修复验证阻塞、强制检查流转门禁，以及隔离 worktree 跑完后的收尾询问。
 - 若业务仍需要旧硬门禁，应另立项目内规则或独立 skill，而不是期待本仓库继续提供分叉模板。
 
 ## 2. 前置条件
@@ -181,9 +182,9 @@ openspec schema validate evidence-driven
 
 ### 5.1 补充 verify 修复闭环与流转门禁
 
-安装或更新 OpenSpec 官方 command/skills 后，必须确保 propose、apply、verify、sync、archive 都含当前规则。apply、verify、sync、archive 每个文件只保留一个 `AI_TOOLS_VERIFY_GATE_V1` 增强块；propose command/skill 每个文件只保留一个 `AI_TOOLS_PROPOSE_WORKTREE_V1` 增强块。两套标记不得混写。
+安装或更新 OpenSpec 官方 command/skills 后，必须确保 propose、apply、verify、sync、archive 都含当前规则。apply、verify、sync、archive 每个文件只保留一个 `AI_TOOLS_VERIFY_GATE_V1` 增强块；propose command/skill 每个文件只保留一个 `AI_TOOLS_PROPOSE_WORKTREE_V1` 增强块；上述 10 个文件每个还只保留一个 `AI_TOOLS_WORKTREE_FINISH_V1` 收尾块。三套标记不得混写：Verify 门禁不得写入 propose，propose worktree 选择不得写入 apply/verify/sync/archive，收尾块必须同时出现在全部 10 个文件且不得并入另外两套块的正文。
 
-插入位置：YAML frontmatter 之后、官方正文（含 Store selection 与 **Steps**）之前，使 Agent 先读到项目规则。1.10.0 的 `openspec init --tools cursor` 仍生成下列 10 个目标文件；官方 apply 在制品缺失时可能提示未随 init 生成的 `/opsx-continue`，不要把它纳入本仓库 `.gitignore` 或本节幂等清单。官方流程本身不提供 worktree 选择、子 Agent 编排、`verification.md` 持久化门禁或工作区指纹；下列 A/B/C/D 仍是项目级追加，不是官方已实现能力。
+插入位置：YAML frontmatter 之后、官方正文（含 Store selection 与 **Steps**）之前，使 Agent 先读到项目规则。1.10.0 的 `openspec init --tools cursor` 仍生成下列 10 个目标文件；官方 apply 在制品缺失时可能提示未随 init 生成的 `/opsx-continue`，不要把它纳入本仓库 `.gitignore` 或本节幂等清单。官方流程本身不提供 worktree 选择、隔离 worktree 收尾、子 Agent 编排、`verification.md` 持久化门禁或工作区指纹；下列 A/B/C/D/E 仍是项目级追加，不是官方已实现能力。
 
 #### 统一工作区指纹
 
@@ -314,6 +315,7 @@ if __name__ == "__main__":
    完成后把结果或阻塞返回入口 Agent。
 4. 仅当 Verify 门禁为“状态：通过、阻塞项：无”且指纹匹配时，入口 Agent 才可结束 apply 并建议 sync 或 archive。
 5. Verify 门禁缺失、状态未通过、存在阻塞、指纹不匹配或 verify 子 Agent 失败时，入口 Agent 不得宣告 apply 完成；change 保持 active，必须报告具体阻塞原因，且不得建议 sync 或 archive。
+6. 入口 Agent 准备结束本命令（含成功后的 verify、apply/verify 失败停止，或会话 worktree 已创建但官方主体未完成）时，必须按同文件「隔离 worktree 收尾」节询问用户。实施者与 apply 子 Agent 不得询问、不得合并或删除 worktree。
 ```
 
 #### B. Verify：修复、复验并持久化结论
@@ -368,6 +370,8 @@ if __name__ == "__main__":
 7. 未通过时同样新增或替换该门禁块，将状态写为 `阻塞`，在“阻塞项”中列出具体问题，并将验证指纹写为 `无效`；不得保留旧的“通过”结果。
 
 单独运行 `/opsx-verify` 时也执行以上步骤；其最终指纹一致性仍由后续 sync/archive 入口强制重新计算并复核。
+
+入口 Agent 准备结束本命令（含验证失败停止）时，必须按同文件「隔离 worktree 收尾」节询问用户。调查者与 verify 子 Agent 不得询问、不得合并或删除 worktree。
 ```
 
 #### C. Sync / Archive：入口处强制检查
@@ -390,6 +394,8 @@ if __name__ == "__main__":
 本门禁发生在官方 sync / archive 主体之前。官方 archive 对未完成制品或任务仅警告并允许用户确认继续，且 `openspec instructions archive --json` 被标明为不得阻断归档的 advisory 输入；上述官方行为不得用来绕过本门禁。
 
 门禁块缺失、状态不是“通过”、阻塞项不是“无”、验证指纹不匹配，或存在多个门禁块时，立即停止；不得通过用户确认绕过。验证后发生的任何代码或制品变化都会使旧门禁失效，应先重新执行 verify，修复阻塞并刷新门禁结果。
+
+官方 sync / archive 主体结束后，或门禁拦住导致官方主体未开始时，入口 Agent 必须按同文件「隔离 worktree 收尾」节询问用户。
 ```
 
 首次接入、追加或替换前，以及每次 `openspec update` 或 ai-tools 自定义层升级后，在目标项目根目录运行：
@@ -489,6 +495,7 @@ command 与 skill 使用同一规则正文；仅当官方文件标题层级会�
    - 使用尚未占用的临时工作分支和绝对路径，例如 `NEW_PATH="$MAIN_WORKTREE/.worktrees/openspec/propose-<YYYYMMDD-HHMMSS>"`。创建前断言 `$NEW_PATH` 满足第 5 条。最终 change 名称仍由官方 propose 流程确定，不得预先用 change 名称命名分支。
    - 基于当前 `HEAD` 创建：`git worktree add -b "<branch>" "$NEW_PATH" HEAD`。不得把未提交改动自动搬运到新 worktree。
    - 不得使用 `git reset --hard`、强制删除分支、`git worktree remove --force` 或其它破坏性清理。
+8. 创建成功后（原生或手工）必须冻结 `$SESSION_WORKTREE`（新路径经 `pwd -P`）与 `$SESSION_BRANCH`（新分支名），供同文件收尾节使用（AI_TOOLS_PROPOSE_WORKTREE_SESSION_V1）。未冻结不得进入官方 propose。
 
 ### 进入目标 worktree（AI_TOOLS_PROPOSE_WORKTREE_WORKSPACE_ROOT_V1）
 
@@ -502,9 +509,9 @@ command 与 skill 使用同一规则正文；仅当官方文件标题层级会�
 
 ### 失败处理（AI_TOOLS_PROPOSE_WORKTREE_NO_DOWNGRADE_V1）
 
-用户取消、worktree 创建失败、目录未被忽略、sandbox 拒绝、会话工作区未切到新 worktree、setup 失败或基线检查失败且用户未明确同意继续时，立即停止并报告原因；不得静默退回当前工作区继续 propose。所有阻塞必须发生在 OpenSpec change 和制品创建之前。
+用户取消、worktree 创建失败、目录未被忽略、sandbox 拒绝、会话工作区未切到新 worktree、setup 失败或基线检查失败且用户未明确同意继续时，立即停止并报告原因；不得静默退回当前工作区继续 propose。所有阻塞必须发生在 OpenSpec change 和制品创建之前。若 `$SESSION_WORKTREE` 已存在，入口 Agent 准备结束回复时仍须按同文件「隔离 worktree 收尾」节询问本次 worktree 的清理或保留。
 
-准备完成后，才进入官方 propose 主体。
+准备完成后，才进入官方 propose 主体。无论官方 propose 是否完成，入口 Agent 准备结束回复时必须按同文件「隔离 worktree 收尾」节询问。
 ```
 
 首次接入、追加或替换前，以及每次 `openspec update` 或 ai-tools 自定义层升级后，在目标项目根目录运行：
@@ -527,7 +534,7 @@ do
   case "$count" in
     0) echo "MISSING   $file" ;;
     1)
-      required="AI_TOOLS_PROPOSE_WORKTREE_ASK_ALWAYS_V1 AI_TOOLS_PROPOSE_WORKTREE_INDEPENDENT_V1 AI_TOOLS_PROPOSE_WORKTREE_WORKSPACE_ROOT_V1 AI_TOOLS_PROPOSE_WORKTREE_NO_DOWNGRADE_V1"
+      required="AI_TOOLS_PROPOSE_WORKTREE_ASK_ALWAYS_V1 AI_TOOLS_PROPOSE_WORKTREE_INDEPENDENT_V1 AI_TOOLS_PROPOSE_WORKTREE_WORKSPACE_ROOT_V1 AI_TOOLS_PROPOSE_WORKTREE_NO_DOWNGRADE_V1 AI_TOOLS_PROPOSE_WORKTREE_SESSION_V1"
       stale_missing=""
       for marker in $required; do
         if ! rg -q --fixed-strings "$marker" "$file"; then
@@ -546,9 +553,196 @@ do
 done
 ```
 
-`MISSING` 表示尚无增强块，只向这两个文件追加当前 D 节完整文本。`STALE` 表示文件只有一个 `AI_TOOLS_PROPOSE_WORKTREE_V1` 标记，但缺少 `AI_TOOLS_PROPOSE_WORKTREE_ASK_ALWAYS_V1`、`AI_TOOLS_PROPOSE_WORKTREE_INDEPENDENT_V1`、`AI_TOOLS_PROPOSE_WORKTREE_WORKSPACE_ROOT_V1` 或 `AI_TOOLS_PROPOSE_WORKTREE_NO_DOWNGRADE_V1`（含仍只有旧标记 `AI_TOOLS_PROPOSE_WORKTREE_REUSE_V1` 的块）；必须用当前 D 节完整注入文本替换旧块，不得再次追加。出现 `DUPLICATE` 时先清理重复块，再按当前文本保留唯一一块。`NOFILE` 表示官方 propose 文件不存在，应先运行 `openspec init --tools cursor` 或 `openspec update`。不要把 propose 块写入 apply/verify/sync/archive 文件，也不要把 `AI_TOOLS_VERIFY_GATE_V1` 写入 propose 文件。
+`MISSING` 表示尚无增强块，只向这两个文件追加当前 D 节完整文本。`STALE` 表示文件只有一个 `AI_TOOLS_PROPOSE_WORKTREE_V1` 标记，但缺少 `AI_TOOLS_PROPOSE_WORKTREE_ASK_ALWAYS_V1`、`AI_TOOLS_PROPOSE_WORKTREE_INDEPENDENT_V1`、`AI_TOOLS_PROPOSE_WORKTREE_WORKSPACE_ROOT_V1`、`AI_TOOLS_PROPOSE_WORKTREE_NO_DOWNGRADE_V1` 或 `AI_TOOLS_PROPOSE_WORKTREE_SESSION_V1`（含仍只有旧标记 `AI_TOOLS_PROPOSE_WORKTREE_REUSE_V1`、或未冻结 `$SESSION_WORKTREE` 的块）；必须用当前 D 节完整注入文本替换旧块，不得再次追加。出现 `DUPLICATE` 时先清理重复块，再按当前文本保留唯一一块。`NOFILE` 表示官方 propose 文件不存在，应先运行 `openspec init --tools cursor` 或 `openspec update`。不要把 propose 块写入 apply/verify/sync/archive 文件，也不要把 `AI_TOOLS_VERIFY_GATE_V1` 写入 propose 文件。不要把 `AI_TOOLS_WORKTREE_FINISH_V1` 写入 D 节正文；收尾使用独立的 E 节块。
 
-这是对官方生成物的项目级追加，不要用旧版完整文件覆盖新版官方模板。路径 A、B 均须执行本节的 A/B/C 与 D；路径 C 在重新生成官方层后也须执行本节的 A/B/C 与 D。仅复制 schema 不会自动获得 propose worktree 选择。
+#### E. 隔离 worktree 收尾
+
+向以下 10 个文件追加或替换为以下内容（`STALE` 时替换旧收尾块）。每个文件在已有 A/B/C 或 D 块之后再追加本块，不得把本块并入 `AI_TOOLS_VERIFY_GATE_V1` 或 `AI_TOOLS_PROPOSE_WORKTREE_V1` 正文。
+
+- `.cursor/commands/opsx-propose.md`
+- `.cursor/skills/openspec-propose/SKILL.md`
+- `.cursor/commands/opsx-apply.md`
+- `.cursor/skills/openspec-apply-change/SKILL.md`
+- `.cursor/commands/opsx-verify.md`
+- `.cursor/skills/openspec-verify-change/SKILL.md`
+- `.cursor/commands/opsx-sync.md`
+- `.cursor/skills/openspec-sync-specs/SKILL.md`
+- `.cursor/commands/opsx-archive.md`
+- `.cursor/skills/openspec-archive-change/SKILL.md`
+
+command 与 skill 使用同一规则正文；仅当官方文件标题层级会与本节冲突时，才把本节 `##` / `###` 降一级，不得改语义。插入位置：已有项目增强块之后、官方 **Steps** 之前；若尚无项目增强块，则紧接 YAML frontmatter 之后。本块约束入口 Agent 在准备结束回复时的收尾，包括官方主体未完成但本次 worktree 已存在的路径；不替代 D 节起始询问，也不替代 A/B/C 的 Verify 门禁。
+
+```markdown
+<!-- AI_TOOLS_WORKTREE_FINISH_V1 -->
+## 隔离 worktree 收尾（AI_TOOLS_WORKTREE_FINISH_ASK_ALWAYS_V1）
+
+当入口 Agent 准备结束回复时，必须先判断是否询问本次隔离 worktree 收尾。触发包括：官方主体成功结束；apply 入口已等完衔接的 verify 或 apply/verify 失败停止；以及本次 worktree 已创建或已切入，但官方主体未完成（setup / 基线失败、Verify 门禁拦住 sync/archive、用户在官方主体前取消）。本询问不得发生在官方主体或已衔接的 verify 仍在执行时。
+
+只检查父 Agent 或用户下发给本次任务的提示文本；本规则正文中出现的标记字符串不计入判定。若提示文本显式包含 `AI_TOOLS_WORKER_APPLY_V1`、`AI_TOOLS_WORKER_VERIFY_V1`、`AI_TOOLS_DELEGATED_APPLY_V1` 或 `AI_TOOLS_DELEGATED_VERIFY_V1`，当前不是入口 Agent：不得询问用户，不得合并或删除 worktree，把结果返回上级后结束。
+
+同一入口命令在本会话中只询问一次。apply 入口衔接 verify 时，只在整条链路结束后询问，不得在 verify 开始前询问。用户在本命令中选择「保留 worktree」后，本命令不得再次追问。
+
+### 收尾对象（AI_TOOLS_WORKTREE_FINISH_SCOPE_V1）
+
+询问前一次性解析并冻结下列变量；之后不得因切换工作区而重新用 `git rev-parse --show-toplevel` 覆盖 `$FINISH_WORKTREE`：
+
+`GIT_DIR=$(cd "$(git rev-parse --git-dir)" && pwd -P)`；
+`GIT_COMMON=$(cd "$(git rev-parse --git-common-dir)" && pwd -P)`；
+`SUPERPROJECT=$(git rev-parse --show-superproject-working-tree 2>/dev/null || true)`；
+`CURRENT_WORKTREE=$(cd "$(git rev-parse --show-toplevel)" && pwd -P)`；
+`MAIN_WORKTREE=$(git worktree list --porcelain | awk '/^worktree / {print substr($0,10); exit}')`；
+`MAIN_WORKTREE=$(cd "$MAIN_WORKTREE" && pwd -P)`；
+`CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)`；
+`TARGET_BRANCH=$(git -C "$MAIN_WORKTREE" rev-parse --abbrev-ref HEAD)`。
+
+若本会话按 D 节新建过隔离 worktree，使用当时冻结的 `$SESSION_WORKTREE` 与 `$SESSION_BRANCH`（均须已经 `pwd -P` / 具名分支）。
+
+对 `git worktree list --porcelain` 中每条 `worktree ` 注册路径做 `cd <路径> && pwd -P`，得到规范路径。判断某条已注册 worktree 是否等于 `$SESSION_WORKTREE` 或 `$FINISH_WORKTREE` 时，必须用规范路径全等比较，不得用 `git worktree list` 原文做子串包含。命中后把该条原始注册路径记为 `$FINISH_REMOVE_PATH`，供随后的 `worktree remove` 使用。
+
+按下列顺序确定 `$FINISH_WORKTREE` 与 `$WORKTREE_BRANCH`，只收尾这一对：
+
+1. `$SESSION_WORKTREE` 非空，且存在规范路径与它全等的已注册 worktree：`$FINISH_WORKTREE=$SESSION_WORKTREE`，`$WORKTREE_BRANCH=$SESSION_BRANCH`，`$FINISH_REMOVE_PATH` 为该条注册路径。即使当前已回到主工作区，也收尾这个未清理的会话 worktree。
+2. 否则 `$CURRENT_WORKTREE` 不等于 `$MAIN_WORKTREE`，且位于 `$MAIN_WORKTREE/.worktrees/`、`$MAIN_WORKTREE/.worktree/`、`$MAIN_WORKTREE/worktrees/` 或项目明确约定的 worktree 父目录之下：`$FINISH_WORKTREE=$CURRENT_WORKTREE`，`$WORKTREE_BRANCH=$CURRENT_BRANCH`，`$FINISH_REMOVE_PATH` 为规范路径与 `$CURRENT_WORKTREE` 全等的那条注册路径。
+3. 其它情况（主工作区且无会话 worktree、submodule、长期手工 worktree、仓库外且不是 `$SESSION_WORKTREE` 的托管 worktree）：跳过询问，不得合并或删除。
+
+满足以下任一也跳过：无法解析 `$MAIN_WORKTREE`；`SUPERPROJECT` 非空且没有 `$SESSION_WORKTREE`；`$FINISH_WORKTREE` 经 `pwd -P` 后等于 `$MAIN_WORKTREE`。
+
+不得把其它已注册路径列入清理范围，不得删除父目录。仓库外的原生 worktree 只在规范路径等于本会话 `$SESSION_WORKTREE` 时收尾。
+
+向用户说明本次 `$FINISH_WORKTREE`、`$WORKTREE_BRANCH`、主工作区、主分支（`$TARGET_BRANCH` 的实际名称），以及该 worktree 是否有未提交改动。
+
+若 `$WORKTREE_BRANCH` 或 `$TARGET_BRANCH` 为 `HEAD`、空或游离：不得提供合并选项，只在该 worktree 干净时提供 `仅清理 worktree，不合并`，并始终提供 `保留 worktree`，同时报告原因。此后清理只删除 worktree 目录，不得执行 `git branch -d HEAD` 或对其它非具名分支名执行 `-d`。
+
+### 询问选项
+
+`$FINISH_WORKTREE` 干净（`git -C "$FINISH_WORKTREE" status --porcelain=v1` 为空）且两分支都是具名分支时提供：
+
+- `合并到主分支并清理 worktree`
+- `仅清理 worktree，不合并`
+- `保留 worktree`
+
+`$FINISH_WORKTREE` 不干净时不得直接合并或删除。先列出未提交改动，提供：
+
+- `提交后合并到主分支并清理 worktree`：仅在用户明确同意本次提交后，在 `$FINISH_WORKTREE` 提交，再合并并清理
+- `保留 worktree`：不提交、不合并、不删除
+- 不提供「仅清理」：脏工作区下不得 `worktree remove`，不得暗示可以强删或丢弃未提交改动
+
+用户取消、拒绝回答、拒绝提交或未明确选择时：不得提交、不得合并、不得删除；报告尚未收尾后停止。
+
+### 合并到主分支并清理（AI_TOOLS_WORKTREE_FINISH_MERGE_CLEANUP_V1）
+
+用户明确选择合并并清理后才执行。除「提交后合并」中的提交外，所有 Git 写入必须带 `git -C "$MAIN_WORKTREE"`；提交必须 `git -C "$FINISH_WORKTREE"`。不得在切换后重新解析 `$FINISH_WORKTREE`。`worktree remove` 前必须断言 `$FINISH_WORKTREE` 不等于 `$MAIN_WORKTREE`。不得自动提交（除非用户明确选择「提交后合并」）。不得 stash、`git reset --hard`、`git worktree remove --force`、`git branch -D`，也不得 `rm -rf` 父目录或使用通配符批量删除。清理范围仅限冻结的 `$FINISH_WORKTREE` 与 `$WORKTREE_BRANCH`。
+
+1. 若用户选择了「提交后合并」：先展示 `git -C "$FINISH_WORKTREE" status`，用户明确同意后才 `git -C "$FINISH_WORKTREE" add` 与 `commit`。用户拒绝则停止，保留 worktree。提交后（含 hook 改动）若 `git -C "$FINISH_WORKTREE" status --porcelain=v1` 仍非空：立即停止，不得进入后续合并或删除。
+2. 无论是否选择过提交，只要 `$FINISH_WORKTREE` 不干净：停止，不得合并或删除。
+3. `git -C "$MAIN_WORKTREE" status --porcelain=v1` 必须为空。主工作区不干净则停止，不得合并或删除本次 worktree。
+4. 若 `$WORKTREE_BRANCH` 等于 `$TARGET_BRANCH`，或任一端为 `HEAD` / 空游离：停止，不得合并或删除。
+5. 先把本会话工作区根目录切到 `$MAIN_WORKTREE`，优先使用原生切换（例如 `EnterWorktree`）。仅 shell `cd` 不算成功。切不过去：停止。
+6. 执行：`git -C "$MAIN_WORKTREE" merge --no-edit "$WORKTREE_BRANCH"`。冲突或非零退出：停止，保留 worktree 与分支。
+7. 断言 `$FINISH_WORKTREE` 仍是询问时冻结的绝对路径且不等于 `$MAIN_WORKTREE` 后，执行：`git -C "$MAIN_WORKTREE" worktree remove "$FINISH_REMOVE_PATH"`（不得 `--force`，不得对其它路径执行 remove）。失败则停止。
+8. 仅当 `$WORKTREE_BRANCH` 是具名分支（不是 `HEAD`、空或游离）时，再执行：`git -C "$MAIN_WORKTREE" branch -d "$WORKTREE_BRANCH"`（不得 `-D`，不得批量删分支，不得对 `HEAD` 执行 `-d`）。失败则报告分支仍在。
+9. 向用户报告：已合并到主分支（名称）、本次 worktree 已删除、本次临时分支是否已删除；并确认其它 worktree 未动。
+
+### 仅清理 worktree
+
+仅当用户明确选择「仅清理」且 `$FINISH_WORKTREE` 干净时执行。先切到 `$MAIN_WORKTREE`，再只执行 `git -C "$MAIN_WORKTREE" worktree remove "$FINISH_REMOVE_PATH"`。之后仅当 `$WORKTREE_BRANCH` 是具名分支且 `git -C "$MAIN_WORKTREE" branch -d "$WORKTREE_BRANCH"` 能安全删除时才删本次分支；`$WORKTREE_BRANCH` 为 `HEAD`、空或游离时不得执行 `branch -d`。否则报告分支仍在，不得用 `-D`，也不得删其它分支。
+
+### 保留 worktree
+
+不提交、不合并、不切换、不删除。报告 `$FINISH_WORKTREE`、`$WORKTREE_BRANCH`、主分支名，以及之后可在主工作区用 `git -C "$MAIN_WORKTREE" merge <分支>` 再 `git -C "$MAIN_WORKTREE" worktree remove` 的提示。
+```
+
+首次接入、追加或替换前，以及每次 `openspec update` 或 ai-tools 自定义层升级后，在目标项目根目录运行：
+
+```bash
+command -v rg >/dev/null || {
+  echo 'ERROR: ripgrep (rg) is required'
+  exit 1
+}
+
+for file in \
+  .cursor/commands/opsx-{propose,apply,verify,sync,archive}.md \
+  .cursor/skills/openspec-propose/SKILL.md \
+  .cursor/skills/openspec-{apply-change,verify-change,sync-specs,archive-change}/SKILL.md
+do
+  if [ ! -f "$file" ]; then
+    echo "NOFILE    $file"
+    continue
+  fi
+  count="$( { rg -o --fixed-strings 'AI_TOOLS_WORKTREE_FINISH_V1' "$file" || true; } | wc -l | tr -d ' ')"
+  case "$count" in
+    0) echo "MISSING   $file" ;;
+    1)
+      required="AI_TOOLS_WORKTREE_FINISH_ASK_ALWAYS_V1 AI_TOOLS_WORKTREE_FINISH_SCOPE_V1 AI_TOOLS_WORKTREE_FINISH_MERGE_CLEANUP_V1"
+      stale_missing=""
+      for marker in $required; do
+        if ! rg -q --fixed-strings "$marker" "$file"; then
+          stale_missing="$marker"
+          break
+        fi
+      done
+      if [ -n "$stale_missing" ]; then
+        echo "STALE     $file (missing $stale_missing)"
+      else
+        echo "OK        $file"
+      fi
+      ;;
+    *) echo "DUPLICATE $file ($count markers)" ;;
+  esac
+done
+```
+
+`MISSING` 表示尚无收尾块，只向这 10 个文件追加当前 E 节完整文本。`STALE` 表示文件只有一个 `AI_TOOLS_WORKTREE_FINISH_V1` 标记，但缺少 `AI_TOOLS_WORKTREE_FINISH_ASK_ALWAYS_V1`、`AI_TOOLS_WORKTREE_FINISH_SCOPE_V1` 或 `AI_TOOLS_WORKTREE_FINISH_MERGE_CLEANUP_V1`（含缺少范围收窄、`git -C` 锚定或脏工作区提交询问的旧收尾块）；必须用当前 E 节完整注入文本替换旧收尾块，不得再次追加，也不得改写同文件中的 Verify 门禁块或 propose worktree 块。出现 `DUPLICATE` 时先清理重复收尾块，再按当前文本保留唯一一块。`NOFILE` 表示官方文件不存在，应先运行 `openspec init --tools cursor` 或 `openspec update`。内嵌标记不得把 `AI_TOOLS_WORKTREE_FINISH_V1` 的固定字符串计数抬成 `DUPLICATE`。
+
+在临时目录确认检查脚本（不要改本仓库官方忽略路径）：
+
+```bash
+tmp="$(mktemp -d)"
+mkdir -p "$tmp/.cursor/commands" "$tmp/.cursor/skills/openspec-propose"
+cd "$tmp"
+
+python3 - <<'PY'
+def check(text: str) -> str:
+    count = text.count('AI_TOOLS_WORKTREE_FINISH_V1')
+    if count == 0:
+        return 'MISSING'
+    if count != 1:
+        return f'DUPLICATE ({count})'
+    for marker in [
+        'AI_TOOLS_WORKTREE_FINISH_ASK_ALWAYS_V1',
+        'AI_TOOLS_WORKTREE_FINISH_SCOPE_V1',
+        'AI_TOOLS_WORKTREE_FINISH_MERGE_CLEANUP_V1',
+    ]:
+        if marker not in text:
+            return f'STALE (missing {marker})'
+    return 'OK'
+
+ok = '''<!-- AI_TOOLS_WORKTREE_FINISH_V1 -->
+## 隔离 worktree 收尾（AI_TOOLS_WORKTREE_FINISH_ASK_ALWAYS_V1）
+### 收尾对象（AI_TOOLS_WORKTREE_FINISH_SCOPE_V1）
+### 合并到主分支并清理（AI_TOOLS_WORKTREE_FINISH_MERGE_CLEANUP_V1）
+'''
+print(check(''))
+print(check('<!-- AI_TOOLS_WORKTREE_FINISH_V1 -->\n旧块\n'))
+print(check(ok))
+print(ok.count('AI_TOOLS_WORKTREE_FINISH_V1'))
+print(check(ok + '\n<!-- AI_TOOLS_WORKTREE_FINISH_V1 -->\n'))
+PY
+```
+
+预期：
+
+```text
+MISSING
+STALE (missing AI_TOOLS_WORKTREE_FINISH_ASK_ALWAYS_V1)
+OK
+1
+DUPLICATE (2)
+```
+
+完整块中 `AI_TOOLS_WORKTREE_FINISH_V1` 的固定字符串计数必须为 1。另需确认：`.worktrees/` 下同时有多个实例时只 `worktree remove "$FINISH_REMOVE_PATH"`；`git worktree list` 路径经 `pwd -P` 后全等匹配，不得子串包含；提交后 porcelain 仍非空必须停止；`$WORKTREE_BRANCH` 为 `HEAD` 时不得 `branch -d`。
+
+这是对官方生成物的项目级追加，不要用旧版完整文件覆盖新版官方模板。路径 A、B 均须执行本节的 A/B/C、D 与 E；路径 C 在重新生成官方层后也须执行本节的 A/B/C、D 与 E。仅复制 schema 不会自动获得 propose worktree 选择或隔离 worktree 收尾。
 
 ### 5.2 已有 active change 怎么办
 
@@ -571,7 +765,7 @@ evidence-driven: proposal → specs/design → tasks → verification → apply
 
 阶段内并行仅当运行时本会话可用 skills 列表含 `dispatching-parallel-agents` 时启用；列表中没有则与仅派发阶段子 Agent 的串行路径相同。磁盘或插件缓存中的 `SKILL.md` 不足以为可用。
 
-propose 的 worktree 选择按 5.1 节 D 段注入，发生在官方 propose 主体之前，不改变后续制品依赖。
+propose 的 worktree 选择按 5.1 节 D 段注入，发生在官方 propose 主体之前，不改变后续制品依赖。隔离 worktree 收尾按 5.1 节 E 段注入到 propose / apply / verify / sync / archive 全部 10 个文件，发生在各命令官方主体之后，不改变 Verify 门禁。
 
 ## 6. 路径 C：从旧版 ai-tools 迁移
 
@@ -584,7 +778,7 @@ propose 的 worktree 选择按 5.1 节 D 段注入，发生在官方 propose 主
 ### 6.1 迁移原则
 
 1. **官方层归还官方**：删除本地分叉的官方 skill/command，再用 `openspec update`（或 `init`）重新生成。
-2. **自定义层只留明确约定的内容**：`evidence-driven`、5.1 节的 propose worktree 选择、验证闭环与流转门禁及工作区指纹脚本、中文规则、from-code。
+2. **自定义层只留明确约定的内容**：`evidence-driven`、5.1 节的 propose worktree 选择、隔离 worktree 收尾、验证闭环与流转门禁及工作区指纹脚本、中文规则、from-code。
 3. **不要**把旧分叉文件「合并进」新官方模板；仅在官方生成物上追加带幂等标记的规则，其它旧门禁迁到项目自有 rule/skill。
 4. **先备份再删**：至少保留分支或补丁，便于对照旧门禁文案。
 
@@ -647,7 +841,7 @@ openspec schema validate evidence-driven
 openspec list --json
 ```
 
-重新生成官方层后，还必须按 5.1 节向 propose、apply、verify、sync、archive 的 command/skill 追加 propose worktree 选择以及验证闭环与流转门禁。
+重新生成官方层后，还必须按 5.1 节向 propose、apply、verify、sync、archive 的 command/skill 追加 propose worktree 选择、隔离 worktree 收尾以及验证闭环与流转门禁。
 
 ### 6.3 迁移后行为变化清单（给团队的预期管理）
 
@@ -659,7 +853,7 @@ openspec list --json
 | Code Review 作为归档硬门禁 | 不再由本仓库保证 |
 | 代码审查作为 verification 必做检查 | **保留**（未处理的 Critical/Important 会阻塞项目级 sync/archive 门禁） |
 | Superpowers brainstorming / finishing 写死在 skill | 不再由本仓库保证 |
-| propose 直接在当前工作区创建 change | 每次 propose 先询问隔离 worktree 或当前工作区；选择 worktree 时每次都新建独立 worktree（已处于 linked worktree 也不得复用；须切到新工作区根目录，切不过去则停止；原生可在仓库外，手工才锚定主工作区绝对路径），失败不得静默降级（按 5.1 节 D 段追加） |
+| propose 直接在当前工作区创建 change | 每次 propose 先询问隔离 worktree 或当前工作区；选择 worktree 时每次都新建独立 worktree（已处于 linked worktree 也不得复用；须切到新工作区根目录，切不过去则停止；原生可在仓库外，手工才锚定主工作区绝对路径），失败不得静默降级（按 5.1 节 D 段追加）。入口命令跑完后若仍在隔离 worktree，必须询问是否合并到主分支并清理（按 5.1 节 E 段追加） |
 | `verification.md` 制品 | **保留**（schema 层） |
 | 中文规则、from-code | **可保留** |
 
@@ -699,7 +893,7 @@ openspec update
 openspec schema validate evidence-driven
 ```
 
-`openspec update` 可能刷新官方 skills/commands。升级完成后必须运行 5.1 节的两套检查并处理 `MISSING`、`STALE`、`DUPLICATE` 或 `NOFILE`：apply/verify/sync/archive 仅 `MISSING` 追加；其 `STALE` 表示旧 V1 块缺少当前委派标记、`AI_TOOLS_PARALLEL_DISPATCH_V1` 或对应工作者标记，须用当前 A/B 节完整文本替换旧块。propose 仅 `MISSING` 追加；其 `STALE` 表示旧块缺少 `AI_TOOLS_PROPOSE_WORKTREE_ASK_ALWAYS_V1`、`AI_TOOLS_PROPOSE_WORKTREE_INDEPENDENT_V1`、`AI_TOOLS_PROPOSE_WORKTREE_WORKSPACE_ROOT_V1` 或 `AI_TOOLS_PROPOSE_WORKTREE_NO_DOWNGRADE_V1`（含仍只有 `AI_TOOLS_PROPOSE_WORKTREE_REUSE_V1` 的块），须用当前 D 节完整文本替换旧块。`DUPLICATE` 先清理；10 个文件最终必须全部为 `OK`。
+`openspec update` 可能刷新官方 skills/commands。升级完成后必须运行 5.1 节的三套检查并处理 `MISSING`、`STALE`、`DUPLICATE` 或 `NOFILE`：apply/verify/sync/archive 仅 `MISSING` 追加；其 `STALE` 表示旧 V1 块缺少当前委派标记、`AI_TOOLS_PARALLEL_DISPATCH_V1` 或对应工作者标记，须用当前 A/B 节完整文本替换旧块。propose 仅 `MISSING` 追加；其 `STALE` 表示旧块缺少 `AI_TOOLS_PROPOSE_WORKTREE_ASK_ALWAYS_V1`、`AI_TOOLS_PROPOSE_WORKTREE_INDEPENDENT_V1`、`AI_TOOLS_PROPOSE_WORKTREE_WORKSPACE_ROOT_V1`、`AI_TOOLS_PROPOSE_WORKTREE_NO_DOWNGRADE_V1` 或 `AI_TOOLS_PROPOSE_WORKTREE_SESSION_V1`（含仍只有 `AI_TOOLS_PROPOSE_WORKTREE_REUSE_V1`、或未冻结会话 worktree 的块），须用当前 D 节完整文本替换旧块。10 个文件的收尾块仅 `MISSING` 追加；其 `STALE` 表示旧块缺少 `AI_TOOLS_WORKTREE_FINISH_ASK_ALWAYS_V1`、`AI_TOOLS_WORKTREE_FINISH_SCOPE_V1` 或 `AI_TOOLS_WORKTREE_FINISH_MERGE_CLEANUP_V1`，须用当前 E 节完整文本替换旧收尾块。`DUPLICATE` 先清理；10 个文件的三套检查最终必须全部为 `OK`。
 
 ### 7.2 升级 ai-tools 自定义层
 
@@ -721,7 +915,7 @@ openspec schema validate evidence-driven
 
 **禁止**用本仓库完整 `openspec/config.yaml` 覆盖目标配置；只合并 `schema: evidence-driven`。
 
-ai-tools 自定义层升级后也必须运行 5.1 节两套检查脚本，识别并替换 `STALE` 的旧 V1 apply/verify 块（含缺少 `AI_TOOLS_PARALLEL_DISPATCH_V1` 或工作者标记的情况）以及 `STALE` 的旧 propose worktree 块；验收前 10 个文件都应输出 `OK`。
+ai-tools 自定义层升级后也必须运行 5.1 节三套检查脚本，识别并替换 `STALE` 的旧 V1 apply/verify 块（含缺少 `AI_TOOLS_PARALLEL_DISPATCH_V1` 或工作者标记的情况）、`STALE` 的旧 propose worktree 块以及 `STALE` 的旧 worktree 收尾块；验收前 10 个文件的三套检查都应输出 `OK`。
 
 ### 7.3 本仓库（ai-tools）自身注意事项
 
@@ -756,8 +950,9 @@ ai-tools 自定义层升级后也必须运行 5.1 节两套检查脚本，识别
 
 ## 8. 验收清单
 
-首次接入或任何升级后，必须在目标项目实际运行 5.1 节两套脚本并处理所有异常状态，直到
-apply/verify/sync/archive 8 个文件以及 propose 2 个文件全部输出 `OK`，然后确认：
+首次接入或任何升级后，必须在目标项目实际运行 5.1 节三套脚本并处理所有异常状态，直到
+apply/verify/sync/archive 8 个文件以及 propose 2 个文件的门禁/选择检查全部输出 `OK`，且
+这 10 个文件的收尾检查也全部输出 `OK`，然后确认：
 
 - [ ] `openspec --version` 为团队约定并已记录的精确稳定版（升级时用 `@$TARGET_VERSION` 固定，不要只看 `@latest`）。
 - [ ] 存在官方 `/opsx-propose`、`/opsx-apply` 等（Cursor 重启后可见）。
@@ -765,13 +960,13 @@ apply/verify/sync/archive 8 个文件以及 propose 2 个文件全部输出 `OK`
 - [ ] `openspec/config.yaml` 含 `schema: evidence-driven`，且项目原有 context/rules 未丢。
 - [ ] `openspec schema validate evidence-driven` 通过。
 - [ ] 旧分叉官方 skill/command 已从 Git 跟踪中移除（路径 C）。
-- [ ] 运行 5.1 节两套脚本，8 个 verify 门禁文件与 2 个 propose 文件均输出 `OK`，没有 `MISSING`、`STALE`、`DUPLICATE` 或 `NOFILE`；其中 apply command/skill 含 `AI_TOOLS_DELEGATED_APPLY_V1`、`AI_TOOLS_PARALLEL_DISPATCH_V1` 与 `AI_TOOLS_WORKER_APPLY_V1`，verify command/skill 含 `AI_TOOLS_DELEGATED_VERIFY_V1`、`AI_TOOLS_PARALLEL_DISPATCH_V1` 与 `AI_TOOLS_WORKER_VERIFY_V1`，propose command/skill 含 `AI_TOOLS_PROPOSE_WORKTREE_ASK_ALWAYS_V1`、`AI_TOOLS_PROPOSE_WORKTREE_INDEPENDENT_V1`、`AI_TOOLS_PROPOSE_WORKTREE_WORKSPACE_ROOT_V1` 与 `AI_TOOLS_PROPOSE_WORKTREE_NO_DOWNGRADE_V1`。
+- [ ] 运行 5.1 节三套脚本，8 个 verify 门禁文件与 2 个 propose 文件均输出 `OK`，10 个文件的收尾检查也均输出 `OK`，没有 `MISSING`、`STALE`、`DUPLICATE` 或 `NOFILE`；其中 apply command/skill 含 `AI_TOOLS_DELEGATED_APPLY_V1`、`AI_TOOLS_PARALLEL_DISPATCH_V1` 与 `AI_TOOLS_WORKER_APPLY_V1`，verify command/skill 含 `AI_TOOLS_DELEGATED_VERIFY_V1`、`AI_TOOLS_PARALLEL_DISPATCH_V1` 与 `AI_TOOLS_WORKER_VERIFY_V1`，propose command/skill 含 `AI_TOOLS_PROPOSE_WORKTREE_ASK_ALWAYS_V1`、`AI_TOOLS_PROPOSE_WORKTREE_INDEPENDENT_V1`、`AI_TOOLS_PROPOSE_WORKTREE_WORKSPACE_ROOT_V1`、`AI_TOOLS_PROPOSE_WORKTREE_NO_DOWNGRADE_V1` 与 `AI_TOOLS_PROPOSE_WORKTREE_SESSION_V1`，10 个文件均含 `AI_TOOLS_WORKTREE_FINISH_ASK_ALWAYS_V1`、`AI_TOOLS_WORKTREE_FINISH_SCOPE_V1` 与 `AI_TOOLS_WORKTREE_FINISH_MERGE_CLEANUP_V1`。
 - [ ] verify 子 Agent 最多修复复验 3 轮；每次修改代码后都对修复后的完整 diff 重新执行代码审查、更新 verification 的审查范围与结论，且未处理的 Critical/Important 会阻塞通过。
 - [ ] sync / archive command/skill 已追加入口门禁：仅 Verify 门禁为“通过、无阻塞”且验证指纹与当前工作区一致时才可继续。
 - [ ] `.cursor/scripts/openspec-verification-fingerprint.py` 存在，verify 与 sync/archive 使用同一脚本计算指纹。
-- [ ] 8 个 verify 门禁文件各自仅有一个 `AI_TOOLS_VERIFY_GATE_V1` 标记；2 个 propose 文件各自仅有一个 `AI_TOOLS_PROPOSE_WORKTREE_V1` 标记；旧块已按 `STALE` 规则替换而非重复追加。
+- [ ] 8 个 verify 门禁文件各自仅有一个 `AI_TOOLS_VERIFY_GATE_V1` 标记；2 个 propose 文件各自仅有一个 `AI_TOOLS_PROPOSE_WORKTREE_V1` 标记；10 个文件各自仅有一个 `AI_TOOLS_WORKTREE_FINISH_V1` 标记；旧块已按 `STALE` 规则替换而非重复追加。
 - [ ] 仍需要时：中文规则、`openspec-update-change-from-code` 可用。
-- [ ] 试跑：`/opsx-propose` 小 change，确认启动后先询问隔离 worktree 或当前工作区，生成 `verification.md`，且 apply 前依赖满足。
+- [ ] 试跑：`/opsx-propose` 小 change，确认启动后先询问隔离 worktree 或当前工作区；若选择隔离 worktree，官方 propose 结束后再询问是否合并到主分支并清理本次 worktree；生成 `verification.md`，且 apply 前依赖满足。
 
 冒烟命令示例：
 
@@ -800,6 +995,10 @@ verify 主体仍跟随官方生成物。OpenSpec 1.10.0 官方 verify 只在会�
 ### 每次 propose 都要选 worktree 吗？已经在 worktree 里呢？
 
 要。安装 5.1 节 D 段后，每次 `/opsx-propose` 或 `openspec-propose` skill 都必须先问，即使工作区干净或已经处于 linked worktree。选择「在当前工作区继续」则原地创建 change。选择「使用隔离 worktree」时：每次都新建独立 worktree（新路径 + 新分支），并必须先把本会话工作区根目录切到新路径；仅 shell `cd` 不算切换成功，切不过去则停止，不得在旧目录写 change。已处于 linked worktree 也不得复用。原生 worktree 可以建在仓库外，只要不嵌套、不复用；手工 `git worktree` 才锚定主工作区父目录并用绝对路径。新分支默认基于当前 `HEAD`，因此工作区独立不等于 Git 历史独立。未提交改动不会自动进入新 worktree。创建失败不得静默改在当前目录继续。未安装该增强块时，官方 propose 仍直接在当前工作区执行。
+
+### 隔离 worktree 跑完后会自动合并吗？
+
+不会。安装 5.1 节 E 段后，入口 Agent 准备结束回复时，只对本次相关 worktree 询问：本会话 `$SESSION_WORKTREE`，或主工作区下 `.worktrees/` / `.worktree/` / `worktrees/`（及项目约定父目录）里的当前路径；路径必须对 `git worktree list --porcelain` 各条做 `pwd -P` 后全等比较。长期手工 worktree 和仓库外、且不是本会话创建的托管 worktree 不问。官方主体失败但本次 worktree 已在时也要问。干净时选项为「合并到主分支并清理」「仅清理」或「保留」；有未提交改动时改为「提交后合并并清理」或「保留」，不得在脏工作区强删。提交后若仍脏必须停止。合并、remove、删分支必须 `git -C "$MAIN_WORKTREE"`；提交才用 `git -C "$FINISH_WORKTREE"`；remove 使用匹配到的注册路径 `$FINISH_REMOVE_PATH`。主工作区不干净、分支游离或未明确选择时停止；游离 HEAD 只删 worktree，不得 `branch -d HEAD`。清理只删本次路径与对应具名分支，不得删兄弟实例或父目录。已接入项目若 D 块缺少 `AI_TOOLS_PROPOSE_WORKTREE_SESSION_V1` 须整块替换，否则仓库外会话 worktree 无法收尾。实施者、调查者与阶段子 Agent 不得询问。apply 入口须等完衔接的 verify 后才问。未安装该收尾块时，跑完后不会提示合并或清理。
 
 ### 安装增强规则后还要再装 Superpowers 吗？注入要不要再替换？
 

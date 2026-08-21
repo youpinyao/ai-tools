@@ -327,9 +327,9 @@ printf '%s\n' .cursor/skills/openspec-* .cursor/commands/opsx-*
 
 预期：规则覆盖新版 OpenSpec 操作，同时保留 `/opsx-update-change-from-code`。
 
-- [ ] **5.3 复核 `AI_TOOLS_VERIFY_GATE_V1` 与 `AI_TOOLS_PROPOSE_WORKTREE_V1` 追加点**
+- [ ] **5.3 复核 `AI_TOOLS_VERIFY_GATE_V1`、`AI_TOOLS_PROPOSE_WORKTREE_V1` 与 `AI_TOOLS_WORKTREE_FINISH_V1` 追加点**
 
-阅读新版 propose、apply、verify、sync、archive 的 command 和 skill，逐项判断 `docs/ai-tools-integration.md` 第 5.1 节 A/B/C 与 D 的追加内容是否仍有有效插入点、是否与新版官方行为冲突。
+阅读新版 propose、apply、verify、sync、archive 的 command 和 skill，逐项判断 `docs/ai-tools-integration.md` 第 5.1 节 A/B/C、D 与 E 的追加内容是否仍有有效插入点、是否与新版官方行为冲突。
 
 预期：
 
@@ -338,6 +338,7 @@ printf '%s\n' .cursor/skills/openspec-* .cursor/commands/opsx-*
 - 无法由新版官方流程保证的规则不得继续宣称为硬门禁；
 - 幂等检查以新版实际文件清单为准。
 - propose 的 worktree 询问仍必须发生在官方 propose 主体与任何制品写入之前；
+- 隔离 worktree 收尾询问仍必须发生在入口准备结束回复时（含官方主体失败但本次 worktree 已在），只收尾本次相关路径，且不得自动合并或删除；
 
 ## 6. 同步当前维护文档
 
