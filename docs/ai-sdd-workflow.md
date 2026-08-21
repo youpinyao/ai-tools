@@ -103,8 +103,10 @@ flowchart TD
   `tasks.md`；`verification.md` 负责保存需求与检查的对应关系、实际证据和剩余风险。
 - 安装 `AI_TOOLS_PROPOSE_WORKTREE_V1` 后，每次 `propose` 都必须先询问使用隔离
   worktree 还是当前工作区；询问和 worktree 准备发生在创建 change 或写入制品之前。
-  已处于 linked worktree 时选择隔离工作区则复用当前目录。未安装该增强块时，
-  `propose` 仍以目标项目当前 OpenSpec 官方生成物为准。
+  选择隔离 worktree 时每次 propose 都必须新建独立 worktree，即使已处于
+  linked worktree 也不得复用当前目录；必须先把会话工作区根目录切到新路径，
+  切不过去则停止。原生 worktree 可以在仓库外；手工创建才锚定主工作区父目录，
+  禁止嵌套。未安装该增强块时，`propose` 仍以目标项目当前 OpenSpec 官方生成物为准。
 - 安装 `AI_TOOLS_VERIFY_GATE_V1` 后，入口 Agent 负责编排，不直接执行 apply 或 verify
   主体；apply 子 Agent 成功后才派发独立 verify 子 Agent；单独运行 `/opsx-verify` 时，
   入口 Agent 同样派发 verify 子 Agent。验证过程中可安全修复的阻塞由 verify 子 Agent

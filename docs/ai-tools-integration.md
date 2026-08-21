@@ -438,7 +438,7 @@ command 与 skill 使用同一规则正文；仅当官方文件标题层级会�
 
 向用户说明并提供两个选项：
 
-- `使用隔离 worktree`：基于当前 `HEAD` 准备隔离工作区后再继续官方 propose。当前工作区的未提交改动不会自动出现在新 worktree。
+- `使用隔离 worktree`：新建独立 worktree 后再继续官方 propose。每次 propose 使用尚未占用的新路径和新分支，即使当前已处于 linked worktree 也不得复用。新分支默认基于当前 `HEAD`；若当前已在某个 propose worktree 且该分支已有提交，新 change 会带上这些提交，工作区独立不等于 Git 历史独立。当前工作区的未提交改动不会自动出现在新 worktree。必须先把本会话工作区根目录切到新 worktree，切不过去则停止。
 - `在当前工作区继续`：保留当前目录和分支，继续官方 propose。
 
 用户取消、拒绝回答或未明确选择时立即停止，不得继续官方 propose。
@@ -447,27 +447,38 @@ command 与 skill 使用同一规则正文；仅当官方文件标题层级会�
 
 保留当前目录和分支，进入官方 propose。不得创建 worktree，不得切换分支。
 
-### 选择隔离 worktree（AI_TOOLS_PROPOSE_WORKTREE_REUSE_V1）
+### 选择隔离 worktree（AI_TOOLS_PROPOSE_WORKTREE_INDEPENDENT_V1）
 
 1. 先检测当前 Git 布局，且必须排除 submodule 误判。依次取：
    `GIT_DIR=$(cd "$(git rev-parse --git-dir)" && pwd -P)`；
    `GIT_COMMON=$(cd "$(git rev-parse --git-common-dir)" && pwd -P)`；
-   `SUPERPROJECT=$(git rev-parse --show-superproject-working-tree 2>/dev/null || true)`。
+   `SUPERPROJECT=$(git rev-parse --show-superproject-working-tree 2>/dev/null || true)`；
+   `CURRENT_WORKTREE=$(cd "$(git rev-parse --show-toplevel)" && pwd -P)`。
 2. 若 `SUPERPROJECT` 非空：当前是 submodule，按普通仓库处理，不得当作 linked worktree。
-3. 若 `GIT_DIR != GIT_COMMON` 且 `SUPERPROJECT` 为空：已处于 linked worktree。复用当前 worktree，报告路径与当前分支（或 detached HEAD），不得再创建嵌套 worktree，然后进入下方「准备完成后」。
-4. 否则（普通 checkout，或 submodule）：优先使用运行环境已有的原生 worktree 能力（例如 `EnterWorktree`、`WorktreeCreate`、`/worktree`）。仅当没有原生能力时才使用 `git worktree`。
-5. 手工 `git worktree` 时：
-   - 目录优先顺序：项目明确约定 > 已有 `.worktrees/` > 已有 `worktrees/` > 默认 `.worktrees/`。两者都存在时用 `.worktrees/`。
-   - 项目内目录必须先运行 `git check-ignore -q <目录>`；未忽略则立即停止并报告，不得在未忽略目录创建 worktree，不得擅自修改 `.gitignore`。
-   - 使用尚未占用的临时工作分支和路径，例如 `openspec/propose-<YYYYMMDD-HHMMSS>`。最终 change 名称仍由官方 propose 流程确定，不得预先用 change 名称命名分支。
-   - 基于当前 `HEAD` 创建：`git worktree add -b "<branch>" "<path>" HEAD`。不得把未提交改动自动搬运到新 worktree。
+3. 每次选择隔离 worktree 都必须新建独立 worktree（尚未占用的新路径 + 新分支），不得复用当前目录或任一已有 worktree，不得把本次 change 写入已有 worktree。普通 checkout、submodule、已处于 linked worktree 均适用本条。
+4. 解析主工作区路径：`MAIN_WORKTREE=$(git worktree list --porcelain | awk '/^worktree / {print substr($0,10); exit}')`。若无法解析主工作区或当前工作区，立即停止并报告，不得继续。
+5. 任何新建路径都必须是绝对路径，经 `pwd -P` 后：不得等于 `$CURRENT_WORKTREE`，也不得位于 `$CURRENT_WORKTREE/` 之下（禁止嵌套）。已处于 linked worktree（`GIT_DIR != GIT_COMMON` 且 `SUPERPROJECT` 为空）时仍须按第 3 条新建，不得因「已在 worktree 中」而跳过。
+6. 优先使用运行环境已有的原生 worktree 能力（例如 `EnterWorktree`、`WorktreeCreate`、`/worktree`）。原生能力只需满足：新路径、新分支、不复用、不嵌套（第 3、5 条）。不要求落在主工作区 `.worktrees/` 或其它项目内父目录；仓库外的托管目录可以。若没有原生能力，或原生结果不满足第 3、5 条，改用下方手工 `git worktree`，不得因此停止。
+7. 手工 `git worktree` 时：
+   - 目录锚定主工作区，不得相对当前 CWD。优先顺序（均相对 `$MAIN_WORKTREE`）：项目明确约定 > 已有 `.worktrees/` > 已有 `worktrees/` > 默认 `.worktrees/`。两者都存在时用 `.worktrees/`。
+   - 必须先运行 `git -C "$MAIN_WORKTREE" check-ignore -q <相对主工作区的目录>`；未忽略则立即停止并报告，不得在未忽略目录创建 worktree，不得擅自修改 `.gitignore`。
+   - 使用尚未占用的临时工作分支和绝对路径，例如 `NEW_PATH="$MAIN_WORKTREE/.worktrees/openspec/propose-<YYYYMMDD-HHMMSS>"`。创建前断言 `$NEW_PATH` 满足第 5 条。最终 change 名称仍由官方 propose 流程确定，不得预先用 change 名称命名分支。
+   - 基于当前 `HEAD` 创建：`git worktree add -b "<branch>" "$NEW_PATH" HEAD`。不得把未提交改动自动搬运到新 worktree。
    - 不得使用 `git reset --hard`、强制删除分支、`git worktree remove --force` 或其它破坏性清理。
-6. 进入目标 worktree 后，执行项目可识别的基础 setup：存在 `package.json` 则安装依赖；存在 `Cargo.toml` 则构建；存在 `requirements.txt` / `pyproject.toml` / `go.mod` 则按对应工具安装。没有这些文件则跳过该项。
-7. 再执行项目可识别的基线检查：仓库已有明确测试命令时才运行。没有可识别测试命令则跳过。setup 或基线检查失败时暂停并报告原因；在用户明确同意继续前，不得进入官方 propose。
+
+### 进入目标 worktree（AI_TOOLS_PROPOSE_WORKTREE_WORKSPACE_ROOT_V1）
+
+创建完成后必须把**本会话的工作区根目录**切到新 worktree，优先使用原生切换能力（例如 `EnterWorktree`）。仅在 shell 中 `cd`、但编辑器或文件工具仍写入旧根目录，视为未切换成功。
+
+进入官方 propose、执行 setup / 基线检查、或写入任何制品前，确认工作区根（当前 Cursor workspace / 打开的项目根，经 `pwd -P`）等于新 worktree 路径（经 `pwd -P`）。切不过去：立即停止并报告新旧路径，不得在旧 worktree 继续 propose，不得写入 `openspec/changes/`。
+
+切换确认后，执行项目可识别的基础 setup：存在 `package.json` 则安装依赖；存在 `Cargo.toml` 则构建；存在 `requirements.txt` / `pyproject.toml` / `go.mod` 则按对应工具安装。没有这些文件则跳过该项。
+
+再执行项目可识别的基线检查：仓库已有明确测试命令时才运行。没有可识别测试命令则跳过。setup 或基线检查失败时暂停并报告原因；在用户明确同意继续前，不得进入官方 propose。
 
 ### 失败处理（AI_TOOLS_PROPOSE_WORKTREE_NO_DOWNGRADE_V1）
 
-用户取消、worktree 创建失败、目录未被忽略、sandbox 拒绝、setup 失败或基线检查失败且用户未明确同意继续时，立即停止并报告原因；不得静默退回当前工作区继续 propose。所有阻塞必须发生在 OpenSpec change 和制品创建之前。
+用户取消、worktree 创建失败、目录未被忽略、sandbox 拒绝、会话工作区未切到新 worktree、setup 失败或基线检查失败且用户未明确同意继续时，立即停止并报告原因；不得静默退回当前工作区继续 propose。所有阻塞必须发生在 OpenSpec change 和制品创建之前。
 
 准备完成后，才进入官方 propose 主体。
 ```
@@ -492,7 +503,7 @@ do
   case "$count" in
     0) echo "MISSING   $file" ;;
     1)
-      required="AI_TOOLS_PROPOSE_WORKTREE_ASK_ALWAYS_V1 AI_TOOLS_PROPOSE_WORKTREE_REUSE_V1 AI_TOOLS_PROPOSE_WORKTREE_NO_DOWNGRADE_V1"
+      required="AI_TOOLS_PROPOSE_WORKTREE_ASK_ALWAYS_V1 AI_TOOLS_PROPOSE_WORKTREE_INDEPENDENT_V1 AI_TOOLS_PROPOSE_WORKTREE_WORKSPACE_ROOT_V1 AI_TOOLS_PROPOSE_WORKTREE_NO_DOWNGRADE_V1"
       stale_missing=""
       for marker in $required; do
         if ! rg -q --fixed-strings "$marker" "$file"; then
@@ -511,7 +522,7 @@ do
 done
 ```
 
-`MISSING` 表示尚无增强块，只向这两个文件追加当前 D 节完整文本。`STALE` 表示文件只有一个 `AI_TOOLS_PROPOSE_WORKTREE_V1` 标记，但缺少 `AI_TOOLS_PROPOSE_WORKTREE_ASK_ALWAYS_V1`、`AI_TOOLS_PROPOSE_WORKTREE_REUSE_V1` 或 `AI_TOOLS_PROPOSE_WORKTREE_NO_DOWNGRADE_V1`；必须用当前 D 节完整注入文本替换旧块，不得再次追加。出现 `DUPLICATE` 时先清理重复块，再按当前文本保留唯一一块。`NOFILE` 表示官方 propose 文件不存在，应先运行 `openspec init --tools cursor` 或 `openspec update`。不要把 propose 块写入 apply/verify/sync/archive 文件，也不要把 `AI_TOOLS_VERIFY_GATE_V1` 写入 propose 文件。
+`MISSING` 表示尚无增强块，只向这两个文件追加当前 D 节完整文本。`STALE` 表示文件只有一个 `AI_TOOLS_PROPOSE_WORKTREE_V1` 标记，但缺少 `AI_TOOLS_PROPOSE_WORKTREE_ASK_ALWAYS_V1`、`AI_TOOLS_PROPOSE_WORKTREE_INDEPENDENT_V1`、`AI_TOOLS_PROPOSE_WORKTREE_WORKSPACE_ROOT_V1` 或 `AI_TOOLS_PROPOSE_WORKTREE_NO_DOWNGRADE_V1`（含仍只有旧标记 `AI_TOOLS_PROPOSE_WORKTREE_REUSE_V1` 的块）；必须用当前 D 节完整注入文本替换旧块，不得再次追加。出现 `DUPLICATE` 时先清理重复块，再按当前文本保留唯一一块。`NOFILE` 表示官方 propose 文件不存在，应先运行 `openspec init --tools cursor` 或 `openspec update`。不要把 propose 块写入 apply/verify/sync/archive 文件，也不要把 `AI_TOOLS_VERIFY_GATE_V1` 写入 propose 文件。
 
 这是对官方生成物的项目级追加，不要用旧版完整文件覆盖新版官方模板。路径 A、B 均须执行本节的 A/B/C 与 D；路径 C 在重新生成官方层后也须执行本节的 A/B/C 与 D。仅复制 schema 不会自动获得 propose worktree 选择。
 
@@ -622,7 +633,7 @@ openspec list --json
 | Code Review 作为归档硬门禁 | 不再由本仓库保证 |
 | 代码审查作为 verification 必做检查 | **保留**（未处理的 Critical/Important 会阻塞项目级 sync/archive 门禁） |
 | Superpowers brainstorming / finishing 写死在 skill | 不再由本仓库保证 |
-| propose 直接在当前工作区创建 change | 每次 propose 先询问隔离 worktree 或当前工作区；选择 worktree 时普通 checkout 先进入新 worktree，已处于 linked worktree 则复用，失败不得静默降级（按 5.1 节 D 段追加） |
+| propose 直接在当前工作区创建 change | 每次 propose 先询问隔离 worktree 或当前工作区；选择 worktree 时每次都新建独立 worktree（已处于 linked worktree 也不得复用；须切到新工作区根目录，切不过去则停止；原生可在仓库外，手工才锚定主工作区绝对路径），失败不得静默降级（按 5.1 节 D 段追加） |
 | `verification.md` 制品 | **保留**（schema 层） |
 | 中文规则、from-code | **可保留** |
 
@@ -648,7 +659,7 @@ openspec update
 openspec schema validate evidence-driven
 ```
 
-`openspec update` 可能刷新官方 skills/commands。升级完成后必须运行 5.1 节的两套检查并处理 `MISSING`、`STALE`、`DUPLICATE` 或 `NOFILE`：apply/verify/sync/archive 仅 `MISSING` 追加；其 `STALE` 表示旧 V1 块缺少当前委派标记、`AI_TOOLS_PARALLEL_DISPATCH_V1` 或对应工作者标记，须用当前 A/B 节完整文本替换旧块。propose 仅 `MISSING` 追加；其 `STALE` 表示旧块缺少 `AI_TOOLS_PROPOSE_WORKTREE_ASK_ALWAYS_V1`、`AI_TOOLS_PROPOSE_WORKTREE_REUSE_V1` 或 `AI_TOOLS_PROPOSE_WORKTREE_NO_DOWNGRADE_V1`，须用当前 D 节完整文本替换旧块。`DUPLICATE` 先清理；10 个文件最终必须全部为 `OK`。
+`openspec update` 可能刷新官方 skills/commands。升级完成后必须运行 5.1 节的两套检查并处理 `MISSING`、`STALE`、`DUPLICATE` 或 `NOFILE`：apply/verify/sync/archive 仅 `MISSING` 追加；其 `STALE` 表示旧 V1 块缺少当前委派标记、`AI_TOOLS_PARALLEL_DISPATCH_V1` 或对应工作者标记，须用当前 A/B 节完整文本替换旧块。propose 仅 `MISSING` 追加；其 `STALE` 表示旧块缺少 `AI_TOOLS_PROPOSE_WORKTREE_ASK_ALWAYS_V1`、`AI_TOOLS_PROPOSE_WORKTREE_INDEPENDENT_V1`、`AI_TOOLS_PROPOSE_WORKTREE_WORKSPACE_ROOT_V1` 或 `AI_TOOLS_PROPOSE_WORKTREE_NO_DOWNGRADE_V1`（含仍只有 `AI_TOOLS_PROPOSE_WORKTREE_REUSE_V1` 的块），须用当前 D 节完整文本替换旧块。`DUPLICATE` 先清理；10 个文件最终必须全部为 `OK`。
 
 ### 7.2 升级 ai-tools 自定义层
 
@@ -688,7 +699,7 @@ apply/verify/sync/archive 8 个文件以及 propose 2 个文件全部输出 `OK`
 - [ ] `openspec/config.yaml` 含 `schema: evidence-driven`，且项目原有 context/rules 未丢。
 - [ ] `openspec schema validate evidence-driven` 通过。
 - [ ] 旧分叉官方 skill/command 已从 Git 跟踪中移除（路径 C）。
-- [ ] 运行 5.1 节两套脚本，8 个 verify 门禁文件与 2 个 propose 文件均输出 `OK`，没有 `MISSING`、`STALE`、`DUPLICATE` 或 `NOFILE`；其中 apply command/skill 含 `AI_TOOLS_DELEGATED_APPLY_V1`、`AI_TOOLS_PARALLEL_DISPATCH_V1` 与 `AI_TOOLS_WORKER_APPLY_V1`，verify command/skill 含 `AI_TOOLS_DELEGATED_VERIFY_V1`、`AI_TOOLS_PARALLEL_DISPATCH_V1` 与 `AI_TOOLS_WORKER_VERIFY_V1`，propose command/skill 含 `AI_TOOLS_PROPOSE_WORKTREE_ASK_ALWAYS_V1`、`AI_TOOLS_PROPOSE_WORKTREE_REUSE_V1` 与 `AI_TOOLS_PROPOSE_WORKTREE_NO_DOWNGRADE_V1`。
+- [ ] 运行 5.1 节两套脚本，8 个 verify 门禁文件与 2 个 propose 文件均输出 `OK`，没有 `MISSING`、`STALE`、`DUPLICATE` 或 `NOFILE`；其中 apply command/skill 含 `AI_TOOLS_DELEGATED_APPLY_V1`、`AI_TOOLS_PARALLEL_DISPATCH_V1` 与 `AI_TOOLS_WORKER_APPLY_V1`，verify command/skill 含 `AI_TOOLS_DELEGATED_VERIFY_V1`、`AI_TOOLS_PARALLEL_DISPATCH_V1` 与 `AI_TOOLS_WORKER_VERIFY_V1`，propose command/skill 含 `AI_TOOLS_PROPOSE_WORKTREE_ASK_ALWAYS_V1`、`AI_TOOLS_PROPOSE_WORKTREE_INDEPENDENT_V1`、`AI_TOOLS_PROPOSE_WORKTREE_WORKSPACE_ROOT_V1` 与 `AI_TOOLS_PROPOSE_WORKTREE_NO_DOWNGRADE_V1`。
 - [ ] verify 子 Agent 最多修复复验 3 轮；每次修改代码后都对修复后的完整 diff 重新执行代码审查、更新 verification 的审查范围与结论，且未处理的 Critical/Important 会阻塞通过。
 - [ ] sync / archive command/skill 已追加入口门禁：仅 Verify 门禁为“通过、无阻塞”且验证指纹与当前工作区一致时才可继续。
 - [ ] `.cursor/scripts/openspec-verification-fingerprint.py` 存在，verify 与 sync/archive 使用同一脚本计算指纹。
@@ -718,7 +729,7 @@ verify 主体仍跟随官方生成物；增强规则要求无论由 apply 衔接
 
 ### 每次 propose 都要选 worktree 吗？已经在 worktree 里呢？
 
-要。安装 5.1 节 D 段后，每次 `/opsx-propose` 或 `openspec-propose` skill 都必须先问，即使工作区干净或已经处于 linked worktree。选择「在当前工作区继续」则原地创建 change。选择「使用隔离 worktree」时：普通 checkout 先创建并进入新 worktree；已处于 linked worktree 则复用当前目录，不嵌套创建。未提交改动不会自动进入新 worktree。创建失败不得静默改在当前目录继续。未安装该增强块时，官方 propose 仍直接在当前工作区执行。
+要。安装 5.1 节 D 段后，每次 `/opsx-propose` 或 `openspec-propose` skill 都必须先问，即使工作区干净或已经处于 linked worktree。选择「在当前工作区继续」则原地创建 change。选择「使用隔离 worktree」时：每次都新建独立 worktree（新路径 + 新分支），并必须先把本会话工作区根目录切到新路径；仅 shell `cd` 不算切换成功，切不过去则停止，不得在旧目录写 change。已处于 linked worktree 也不得复用。原生 worktree 可以建在仓库外，只要不嵌套、不复用；手工 `git worktree` 才锚定主工作区父目录并用绝对路径。新分支默认基于当前 `HEAD`，因此工作区独立不等于 Git 历史独立。未提交改动不会自动进入新 worktree。创建失败不得静默改在当前目录继续。未安装该增强块时，官方 propose 仍直接在当前工作区执行。
 
 ### 安装增强规则后还要再装 Superpowers 吗？注入要不要再替换？
 

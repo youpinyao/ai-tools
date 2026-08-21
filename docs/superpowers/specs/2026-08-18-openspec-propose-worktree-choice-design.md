@@ -17,7 +17,9 @@
 - 在创建 change、分配 change 名称或写入任何制品前完成选择和工作区准备。
 - 同时覆盖 command 与 skill 入口，并保持两者语义一致。
 - OpenSpec 官方生成物升级后，可以检测增强块状态并安全地重新注入。
-- 避免创建嵌套 worktree，并让失败路径可见、可恢复。
+- 选择隔离 worktree 时，每次 propose 都必须新建独立 worktree，不得复用已有目录。
+- 进入官方 propose 前，本会话工作区根目录必须已切到新 worktree。
+- 避免在当前 worktree 内部创建嵌套 worktree，并让失败路径可见、可恢复。
 
 ## 非目标
 
@@ -51,17 +53,22 @@
    - 检测 `git rev-parse --git-dir` 与 `git rev-parse --git-common-dir`；
    - 同时检查 `git rev-parse --show-superproject-working-tree`，避免把 submodule
      误判为 linked worktree；
-   - 若当前已处于 linked worktree，复用当前 worktree，不再嵌套创建；
-   - 否则优先使用运行环境提供的原生 worktree 能力；没有原生能力时才使用
-     `git worktree`；
-   - 手工创建时遵循显式项目约定，其次复用 `.worktrees/` 或 `worktrees/`，
-     都不存在时默认 `.worktrees/`；
-   - 项目内 worktree 目录必须先确认被 Git 忽略；
-   - 使用尚未占用的临时工作分支和路径。最终 change 名称仍由官方 propose 流程确定，
-     不要求预先用 change 名称命名分支。
-5. worktree 准备完成后，执行项目可识别的基础 setup 与基线检查，再继续官方 propose。
-6. 用户取消选择、worktree 创建失败、setup 失败或基线检查失败时暂停并报告原因；
-   不得静默退回当前工作区。
+   - 无论普通 checkout、submodule 还是已处于 linked worktree，都必须新建
+     独立 worktree（新路径 + 新分支），不得复用当前目录或任一已有 worktree；
+   - 新建路径必须是绝对路径，且不得位于当前 worktree 目录内部；
+   - 优先使用运行环境提供的原生 worktree 能力。原生能力只需新建、不复用、
+     不嵌套，可以落在仓库外；不满足时回退手工 `git worktree`，不得因此停止；
+   - 手工创建时锚定主工作区并用绝对路径：遵循显式项目约定，其次使用主工作区
+     下已有 `.worktrees/` 或 `worktrees/`，都不存在时默认 `.worktrees/`；
+   - 项目内 worktree 目录必须先用 `git -C "$MAIN_WORKTREE" check-ignore` 确认
+     被 Git 忽略；
+   - 使用尚未占用的临时工作分支和绝对路径。最终 change 名称仍由官方 propose
+     流程确定，不要求预先用 change 名称命名分支；
+   - 创建后必须把本会话工作区根目录切到新 worktree；仅 shell `cd` 不算成功。
+5. 确认工作区根已切换后，执行项目可识别的基础 setup 与基线检查，再继续官方
+   propose。
+6. 用户取消选择、worktree 创建失败、会话工作区未切换、setup 失败或基线检查
+   失败时暂停并报告原因；不得静默退回当前工作区。
 
 ## 状态检测与升级
 
@@ -70,7 +77,10 @@
 - `OK`：目标文件恰有一个当前版本标记块。
 - `MISSING`：目标文件存在但没有标记块，可以追加。
 - `DUPLICATE`：存在多个标记块，必须先清理。
-- `STALE`：存在旧版块但内容与当前 V1 定义不一致，必须整体替换。
+- `STALE`：存在旧版块但内容与当前 V1 定义不一致（含仍使用
+  `AI_TOOLS_PROPOSE_WORKTREE_REUSE_V1`，或缺少
+  `AI_TOOLS_PROPOSE_WORKTREE_INDEPENDENT_V1` /
+  `AI_TOOLS_PROPOSE_WORKTREE_WORKSPACE_ROOT_V1` 的块），必须整体替换。
 - `NOFILE`：官方生成文件不存在，应先运行 `openspec init/update`。
 
 `openspec update` 可能覆盖官方文件，因此日常升级流程必须重新检查这两个 propose 文件，
@@ -79,10 +89,13 @@
 
 ## 错误处理与安全边界
 
-- 不在已识别的 linked worktree 中再次创建 worktree。
-- 不在未被 Git 忽略的项目内目录创建 worktree。
+- 不在当前 worktree 目录内部创建嵌套 worktree；已处于 linked worktree 时
+  仍须新建独立 worktree。手工创建锚定主工作区父目录；原生创建可以在仓库外。
+- 不在未被 Git 忽略的项目内目录用手工 `git worktree` 创建 worktree。
 - 不使用 `git reset --hard`、强制删除分支或其它破坏性清理命令。
-- 不把未提交改动自动搬运到新 worktree；隔离 worktree 基于当前 `HEAD`。
+- 不把未提交改动自动搬运到新 worktree；隔离 worktree 默认基于当前 `HEAD`，
+  工作区独立不等于 Git 历史独立。
+- 仅 shell `cd` 而会话工作区根仍指向旧目录时，不得继续 propose。
 - 当前工作区存在未提交改动时仍允许用户选择原地继续，但选择 worktree 后这些改动不会
   自动出现于新 worktree，应在询问说明中明确这一点。
 - 所有阻塞都发生在 OpenSpec change 和制品创建前，避免半成品 change。
@@ -95,8 +108,12 @@
 2. 每次 propose 都先询问，即使工作区干净或已经处于 worktree。
 3. 选择当前工作区时，官方 propose 在原目录继续。
 4. 选择 worktree 时，普通 checkout 会进入新 worktree 后再创建 change。
-5. 已处于 linked worktree 时选择 worktree 会复用当前目录，不创建嵌套 worktree。
+5. 已处于 linked worktree 时选择 worktree 会新建独立 worktree，不复用当前目录，
+   也不创建嵌套 worktree；手工路径为锚定主工作区的绝对路径。
 6. submodule 不会被误判为 linked worktree。
-7. worktree 目录未被忽略、创建失败或基线检查失败时，流程在写入 change 前停止。
-8. 重复运行注入流程不会产生重复块；模拟旧块时状态为 `STALE` 并可整体替换。
+7. worktree 目录未被忽略、创建失败、会话工作区未切换或基线检查失败时，流程在
+   写入 change 前停止。
+8. 重复运行注入流程不会产生重复块；完整旧版复用块与缺少
+   `AI_TOOLS_PROPOSE_WORKTREE_WORKSPACE_ROOT_V1` 的块均为 `STALE` 并可整体替换。
 9. 运行 `openspec update` 后重新注入，两个文件恢复为 `OK`。
+10. 原生 worktree 建在仓库外且不嵌套时可以接受；仅 shell `cd` 不得视为已进入。
