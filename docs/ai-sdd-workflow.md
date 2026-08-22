@@ -115,11 +115,11 @@ flowchart TD
   切不过去则停止。原生 worktree 可以在仓库外；手工创建才锚定主工作区父目录，
   禁止嵌套。未安装 `AI_TOOLS_PROPOSE_WORKTREE_V1` 时，`propose` 仍以目标项目
   当前 OpenSpec 官方生成物为准。安装 `AI_TOOLS_WORKTREE_FINISH_V1` 后，入口
-  Agent 准备结束回复时，只对本次相关隔离 worktree 询问是否合并到主分支并
-  清理：本会话创建的路径，或主工作区下项目 worktree 父目录中的当前路径。
-  官方主体失败但本次 worktree 已在时也要问。有未提交改动须先经用户明确同意
-  提交。不得自动合并或删除，也不得清理兄弟 worktree。主分支指主工作区当前
-  检出分支。未安装收尾块时，跑完后不会询问合并或清理。
+  Agent 准备结束回复时不得询问隔离 worktree 怎么处理；默认留下本会话创建的
+  路径，或主工作区下项目 worktree 父目录中的当前路径。仅当本轮用户明确要求
+  合并或清理时才执行收尾。有未提交改动须先经用户明确同意提交。不得自动合并
+  或删除，也不得清理兄弟 worktree。主分支指主工作区当前检出分支。未安装收尾
+  块时，用户明确要求也没有这套安全步骤。
 - 安装 `AI_TOOLS_VERIFY_GATE_V1` 后，入口 Agent 负责编排，不直接执行 apply 或 verify
   主体；apply 子 Agent 成功后才派发独立 verify 子 Agent；单独运行 `/opsx-verify` 时，
   入口 Agent 同样派发 verify 子 Agent。验证过程中可安全修复的阻塞由 verify 子 Agent
@@ -146,8 +146,8 @@ flowchart TD
 当需求目标、范围或实现方向尚不明确时，先通过 `explore` 梳理问题、约束和可选方案。
 结论明确后使用 `propose` 建立 change，再依次完成实现与验证。
 `propose` 开始时若已安装 worktree 选择规则，应先选择隔离 worktree 或当前工作区。
-若选择隔离 worktree，该会话在 propose / apply / verify / archive 跑完后应询问
-是否合并到主分支并清理本次 worktree。
+若选择隔离 worktree，后续命令跑完后默认留下本次 worktree，不得主动询问怎么处理；
+仅当用户明确要求时才合并或清理。
 
 推荐路径：`explore → propose → apply → verify → archive`。
 
@@ -219,8 +219,8 @@ delta specs 合并到 main specs）。不要把错误实现写进规范：代码
 change 再调用 `/opsx-update-change-from-code`：该命令只更新已有 change 制品或
 已有 main spec，不负责创建缺失制品。
 `propose` 开始时若已安装 worktree 选择规则，应先选择隔离 worktree 或当前工作区。
-若选择隔离 worktree，该会话在后续命令跑完后应询问是否合并到主分支并清理本次
-worktree。
+若选择隔离 worktree，该会话在后续命令跑完后默认留下本次 worktree，不得主动询问
+怎么处理；仅当用户明确要求时才合并或清理。
 
 推荐路径：`propose（基于代码事实）→ apply → verify → archive`。
 
@@ -232,7 +232,7 @@ worktree。
 需要将 active change 内的 delta specs 合并到 main specs、但暂不归档时，可独立使用
 官方 `/opsx-sync`。该命令只同步规格，不会结束 change；是否需要先执行 `verify`，
 以及后续何时归档，遵循目标项目当前官方生成物。若 sync 发生在隔离 worktree 中，
-跑完后仍须询问是否合并到主分支并清理本次 worktree。
+跑完后默认留下本次 worktree，不得主动询问怎么处理；仅当用户明确要求时才合并或清理。
 
 ## 使用原则
 
@@ -254,6 +254,6 @@ worktree。
   约束 sync/archive；未安装增强规则时，`verify`、`sync`、`archive` 的具体条件与行为
   遵循目标项目当前 OpenSpec 官方生成物（1.10.0 官方 verify 仅为会话记分卡，官方
   archive 允许确认绕过）。
-- 隔离 worktree 跑完后不得默认留下现场。安装 `AI_TOOLS_WORKTREE_FINISH_V1` 后，
-  入口 Agent 必须询问是否合并到主分支并清理本次相关 worktree；未明确选择或
+- 隔离 worktree 跑完后默认留下现场。安装 `AI_TOOLS_WORKTREE_FINISH_V1` 后，
+  入口 Agent 不得主动询问是否合并到主分支并清理；仅当用户明确要求时才执行。
   未同意提交时不得合并或删除。长期手工 worktree 不在收尾范围。

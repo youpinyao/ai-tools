@@ -1,5 +1,7 @@
 # OpenSpec 隔离 worktree 收尾设计
 
+> **触发条件已被取代（2026-08-22）：** 「入口结束时必须询问」改为「禁止主动询问、仅按需执行」。见 [openspec-worktree-finish-no-ask-design.md](2026-08-22-openspec-worktree-finish-no-ask-design.md)。合并/清理安全步骤与收尾范围仍可参考本文；触发条件、询问菜单与验收中的「必须先问」以 2026-08-22 为准。
+
 ## 背景
 
 `AI_TOOLS_PROPOSE_WORKTREE_V1` 已要求每次 propose 先询问是否使用隔离

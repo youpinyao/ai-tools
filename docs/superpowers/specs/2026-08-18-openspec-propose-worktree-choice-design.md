@@ -27,10 +27,9 @@
 - 不修改 OpenSpec CLI 或 `evidence-driven` schema。
 - 不自动替用户选择 worktree，也不根据工作区是否干净跳过询问。
 - 不改变 apply、verify、sync、archive 的既有门禁语义。
-- 不自动提交、合并或删除 worktree 中的变更。2026-08-21 起，入口命令结束后的
-  询问式合并与清理见
-  [隔离 worktree 收尾设计](2026-08-21-openspec-worktree-finish-design.md)；
-  仍不自动执行，仅在用户明确选择后合并或删除。
+- 不自动提交、合并或删除 worktree 中的变更。2026-08-22 起，各入口结束时
+  不得主动询问收尾；仅在用户明确要求后合并或删除，见
+  [禁止主动收尾询问设计](2026-08-22-openspec-worktree-finish-no-ask-design.md)。
 
 ## 方案选择
 

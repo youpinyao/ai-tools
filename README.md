@@ -143,8 +143,8 @@ TARGET_PROJECT="/absolute/path/to/target-project"
    后续安装该 skill 无需再次替换注入。未安装增强规则时，这些派发行为不成立。仅复制
    schema 不会自动获得这些流转门禁与子 Agent 编排。
    也必须注入 propose worktree 选择，否则 `/opsx-propose` 会跳过起始询问，直接在当前
-   工作区创建 change。也必须注入隔离 worktree 收尾，否则隔离会话跑完后不会询问是否
-   合并到主分支并清理本次 worktree。
+   工作区创建 change。也必须注入隔离 worktree 按需收尾，否则用户事后明确要求合并或
+   清理时没有同一套安全步骤；注入后各阶段结束时不得主动询问怎么处理。
 
 官方 `/opsx-*` 命令及对应 skills 归 OpenSpec 管理；升级后的具体行为应以目标项目
 中当前 OpenSpec 官方生成物为准，不要从本仓库寻找或复制官方模板。当前 CLI 1.10.0
@@ -178,7 +178,7 @@ TARGET_PROJECT="/absolute/path/to/target-project"
   → apply 子 Agent（实施并记录真实结果）
   → 独立 verify 子 Agent
   → 官方 archive
-  → 若仍在隔离 worktree：询问是否合并到主分支并清理
+  → 隔离 worktree 默认留下；仅当用户明确要求时才合并或清理
 ```
 
 apply 与 verify 两个阶段始终串行。阶段内并行不是接入时开关：仅当本会话可用
@@ -186,7 +186,7 @@ skills 列表含 `dispatching-parallel-agents` 时，阶段子 Agent 才按该 s
 带独立身份标记的工作者；否则与现网串行路径相同。
 
 单独运行 `/opsx-verify` 时，入口 Agent 也按同一规则派发独立 verify 子 Agent 执行验证
-闭环。未安装增强规则时，propose 起始 worktree 询问、隔离 worktree 收尾、apply/verify 子 Agent 派发及 sync/archive 门禁均不成立；
+闭环。未安装增强规则时，propose 起始 worktree 询问、隔离 worktree 按需收尾、apply/verify 子 Agent 派发及 sync/archive 门禁均不成立；
 具体行为仍以目标项目当前 OpenSpec 官方生成物为准。
 
 常见旁路：
