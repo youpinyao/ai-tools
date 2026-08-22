@@ -15,7 +15,7 @@ OpenSpec 官方 Cursor skills 与 `/opsx-*` commands 由 OpenSpec 在目标项�
 | Schema | `openspec/schemas/evidence-driven/` | 官方 `spec-driven` 的中文派生，增加 `verification` 制品 |
 | 配置 | `openspec/config.yaml` | 默认使用 `schema: evidence-driven` |
 | 中文规则 | `.cursor/rules/openspec-chinese.mdc` | OpenSpec 相关输出强制简体中文 |
-| 可选 Skill | `.cursor/skills/openspec-update-change-from-code/` | 非官方的从代码回写 active change 旁路 |
+| 可选 Skill | `.cursor/skills/openspec-update-change-from-code/` | 非官方的从代码回写旁路：优先 active change，否则回写已有 main spec |
 | 可选 Command | `.cursor/commands/opsx-update-change-from-code.md` | 在 Cursor 中暴露 `/opsx-update-change-from-code` |
 | 工作流文档 | [docs/ai-sdd-workflow.md](docs/ai-sdd-workflow.md) | 官方命令场景选择与推荐路径 |
 | 接入与迁移 | [docs/ai-tools-integration.md](docs/ai-tools-integration.md) | 其它项目从官方 OpenSpec 或旧版 ai-tools 接入/升级 |
@@ -154,13 +154,16 @@ TARGET_PROJECT="/absolute/path/to/target-project"
 - 已初始化：`openspec update`（`--force` 可在工具已是最新时仍刷新）
 - 校验 schema：`openspec schema validate evidence-driven`（schema 子命令仍标为 experimental）
 - 新建 change：`openspec new change "<name>" --schema evidence-driven`
-- JSON：`openspec list --json`、`openspec status --change "<name>" --json`、
+- JSON：`openspec list --json`、`openspec list --specs --json`、
+  `openspec status --change "<name>" --json`、`openspec context --json`、
   `openspec validate "<name>" --type change --strict --json`、
+  `openspec validate "<id>" --type spec --strict --json`、
   `openspec instructions apply --change "<name>" --json`
 
-主规范位于 `<planningHome.root>/openspec/specs/<capability-path>/spec.md`，
-`planningHome.root` 来自 `openspec instructions apply --change "<name>" --json` 或
-`openspec status --change "<name>" --json`。
+主规范位于 `<root>/openspec/specs/<capability-path>/spec.md`。有 change 时
+`root` 来自 `planningHome.root`（`openspec instructions apply --change "<name>" --json`
+或 `openspec status --change "<name>" --json`）；无 change 时来自
+`openspec list --specs --json` 或 `openspec context --json` 的 `root.path`。
 归档目录为 `<planningHome.changesDir>/archive/`（仓库内通常是 `openspec/changes/archive/`）。
 
 ## 标准主线
@@ -189,7 +192,8 @@ skills 列表含 `dispatching-parallel-agents` 时，阶段子 Agent 才按该 s
 常见旁路：
 
 - 已有 change，只调整规划不改代码 → 使用官方 `/opsx-update`。
-- 代码已先于规划变化 → `/opsx-update-change-from-code`。
+- 代码已先于规划变化 → `/opsx-update-change-from-code`（有唯一匹配的 active
+  change 回写 change；无 change 且只有一份对应 spec 则回写该 spec；有歧义先问）。
 - 只合并 delta specs 到 main specs、不归档 → 使用官方 `/opsx-sync`。
 - 无规范层行为变化 → 在 change 的 `.openspec.yaml` 设置 `skip_specs: true`，不要
   捏造空 capability。

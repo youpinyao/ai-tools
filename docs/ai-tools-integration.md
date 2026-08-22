@@ -933,8 +933,10 @@ ai-tools 自定义层升级后也必须运行 5.1 节三套检查脚本，识别
 | schema 校验 | `openspec schema validate evidence-driven` | schema 子命令仍标为 experimental；`--json` 返回 `name` / `path` / `valid` / `issues`。 |
 | 新建 change | `openspec new change "<name>" --schema evidence-driven` | `--schema` 覆盖默认 schema。 |
 | 列出 change | `openspec list --json` | 顶层含 `changes`、`root`。`openspec change list` 已弃用。 |
+| 列出 spec | `openspec list --specs --json` | 顶层含 `specs`（`id`、`requirementCount`）、`root`。`openspec spec list` 已弃用。 |
 | 制品状态 | `openspec status --change "<name>" --json` | 顶层含 `changeRoot`、`artifactPaths`、`actionContext`、`schemaName`、`planningHome`。 |
 | 严格校验 | `openspec validate "<name>" --type change --strict --json` | 未填制品时会失败但返回可解析 JSON。 |
+| 校验 spec | `openspec validate "<id>" --type spec --strict --json` | from-code 无 change 回写 main spec 时使用。 |
 | apply 指令 | `openspec instructions apply --change "<name>" --json` | 顶层含 `state`、`missingArtifacts`、`contextFiles`。`evidence-driven` 在缺少 `verification` 时 `state` 可为 `blocked`。 |
 | archive 指令 | `openspec instructions archive --change "<name>" --json` | 官方标明为 advisory，不得当作硬门禁。 |
 
@@ -942,7 +944,9 @@ ai-tools 自定义层升级后也必须运行 5.1 节三套检查脚本，识别
 
 目录（用 JSON 里的 store-aware 路径，不要写死仓库相对路径）：
 
-- 主规范：`<planningHome.root>/openspec/specs/<capability-path>/spec.md`
+- 主规范：`<planningHome.root>/openspec/specs/<capability-path>/spec.md`；无 change 时
+  `planningHome.root` 换成 `openspec list --specs --json` 或 `openspec context --json`
+  的 `root.path`
 - active change：`openspec/changes/<name>/`
 - 归档：`<planningHome.changesDir>/archive/`（仓库内通常是 `openspec/changes/archive/`）
 
@@ -1016,7 +1020,7 @@ verify 主体仍跟随官方生成物。OpenSpec 1.10.0 官方 verify 只在会�
 
 | 命令 | 真源 | 写入范围 |
 |------|------|----------|
-| `/opsx-update-change-from-code` | 已实现代码 + 用户决策 | active change（及允许的相关文档），**不改** main specs |
+| `/opsx-update-change-from-code` | 已实现代码 + 用户决策 | 优先唯一匹配的 active change（及 `actionContext` 文档）；无 change 且唯一匹配已有 spec 时只改该 main spec；目标有歧义时先请用户选择；不创建 change/spec |
 | 官方 `/opsx-sync` | change 内 delta specs | main specs |
 
 ## 10. 相关文档

@@ -274,12 +274,25 @@ openspec new change "upgrade-contract-smoke" --schema evidence-driven
 ```bash
 openspec store list --json
 openspec list --json
+openspec list --specs --json
 openspec status --change "upgrade-contract-smoke" --json
 openspec context --json
 openspec validate "upgrade-contract-smoke" --type change --strict --json
+openspec validate --specs --strict --json
 ```
 
-预期：命令可执行；严格校验可因尚未填写制品而失败，但必须仍支持 `--json` 并返回可解释的结构化结果。
+```bash
+openspec list --specs --json | jq -e 'has("specs") and has("root") and (.root | has("path"))'
+openspec context --json | jq -e '.root | has("path")'
+```
+
+若临时项目里已有样例 spec，再跑 skill 实际使用的那条（把 `<spec-id>` 换成列出的 `id`）：
+
+```bash
+openspec validate "<spec-id>" --type spec --strict --json
+```
+
+预期：命令可执行；change 严格校验可因尚未填写制品而失败，但必须仍支持 `--json` 并返回可解释的结构化结果。`list --specs --json` 顶层含 `specs` 与带 `path` 的 `root`；无 spec 时 `specs` 可为 `[]`。有样例 spec 时，每项含 `id`，且 `--type spec` 可解析。
 
 - [ ] **4.3 核对 `status --json` 字段**
 
