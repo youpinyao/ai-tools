@@ -1,5 +1,7 @@
 from pathlib import Path
+import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -59,6 +61,14 @@ def gate_block(*markers: str, body: str = "") -> str:
 
 def section(text: str, start: str, end: str) -> str:
     return text.split(start, 1)[1].split(end, 1)[0]
+
+
+def fenced_bash(text: str, start: str, end: str) -> str:
+    body = section(text, start, end)
+    match = re.search(r"(?ms)^```bash\n(.*?)^```$", body)
+    if match is None:
+        raise AssertionError("expected one bash block")
+    return match.group(1)
 
 
 class VerificationContractTest(unittest.TestCase):
@@ -152,9 +162,10 @@ class VerificationContractTest(unittest.TestCase):
             'BASELINE="$(git -C "$SCOPED_SMOKE" rev-parse HEAD)"',
             "AI_TOOLS_VERIFICATION_SCOPE_V2_START",
             "AI_TOOLS_VERIFICATION_RESULT_V2_START",
-            'openspec-verification-fingerprint.py" "$VERIFICATION"',
+            'python3 "$FINGERPRINT_SCRIPT" "$VERIFICATION"',
             'test "$outside_scope_digest" = "$scope_digest"',
             'test "$outside_content_digest" = "$content_digest"',
+            'test -n "$inside_content_digest"',
             'test "$inside_content_digest" != "$content_digest"',
             'test "$outside_exit" -eq 0',
             'test "$inside_exit" -ne 0',
@@ -165,6 +176,109 @@ class VerificationContractTest(unittest.TestCase):
                 self.assertIn(command, text)
         self.assertRegex(text, re.compile(r"V2 完整块.{0,40}替换"))
         self.assertRegex(text, re.compile(r"(?:禁止|不得).{0,20}追加"))
+
+    def test_upgrade_plan_v1_detector_matches_real_marker_sample(self) -> None:
+        text = (ROOT / "docs/openspec-upgrade-plan.md").read_text()
+        match = re.search(r"^V1_ACTIVE_PATTERN='([^']+)'$", text, re.MULTILINE)
+        self.assertIsNotNone(match)
+        assert match is not None
+        pattern = match.group(1)
+        self.assertNotIn("[[]1[]]", pattern)
+        with tempfile.TemporaryDirectory() as directory:
+            sample = Path(directory) / "verification.md"
+            marker = "AI_TOOLS_VERIFICATION_SCOPE_" + "V1_START"
+            sample.write_text("<!-- {} -->\n".format(marker))
+            result = subprocess.run(
+                ["rg", "-q", pattern, str(sample)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_upgrade_plan_smoke_executes_and_restores_fail_fast(self) -> None:
+        text = (ROOT / "docs/openspec-upgrade-plan.md").read_text()
+        smoke = fenced_bash(
+            text,
+            "然后执行以下可重复的范围指纹冒烟",
+            "预期：初始化、baseline commit",
+        )
+        self.assertTrue(smoke.startswith("set -euo pipefail\n"))
+        required_input = smoke.index(': "${REPRESENTATIVE_TARGET_PROJECT:?')
+        absolute_check = smoke.index('case "$REPRESENTATIVE_TARGET_PROJECT" in')
+        definition = smoke.index('TARGET_PROJECT="$REPRESENTATIVE_TARGET_PROJECT"')
+        script_check = smoke.index('test -f "$FINGERPRINT_SCRIPT"')
+        first_use = smoke.index('SCOPED_SMOKE="$(mktemp -d')
+        self.assertLess(required_input, absolute_check)
+        self.assertLess(absolute_check, definition)
+        self.assertLess(definition, script_check)
+        self.assertLess(script_check, first_use)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "target"
+            script = target / ".cursor/scripts/openspec-verification-fingerprint.py"
+            script.parent.mkdir(parents=True)
+            shutil.copy2(
+                ROOT / ".cursor/scripts/openspec-verification-fingerprint.py",
+                script,
+            )
+            environment = os.environ.copy()
+            environment.update({
+                "AI_TOOLS_DIR": str(ROOT),
+                "REPRESENTATIVE_TARGET_PROJECT": str(target),
+            })
+            success = subprocess.run(
+                ["bash", "-c", smoke],
+                cwd=ROOT,
+                env=environment,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(success.returncode, 0, success.stderr)
+
+            missing_script = root / "missing-script-target"
+            missing_script.mkdir()
+            invalid_environment = dict(environment)
+            invalid_environment["REPRESENTATIVE_TARGET_PROJECT"] = str(
+                missing_script
+            )
+            failure = subprocess.run(
+                ["bash", "-c", smoke],
+                cwd=ROOT,
+                env=invalid_environment,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(failure.returncode, 0)
+
+            relative_environment = dict(environment)
+            relative_environment["REPRESENTATIVE_TARGET_PROJECT"] = "relative"
+            relative = subprocess.run(
+                ["bash", "-c", smoke],
+                cwd=ROOT,
+                env=relative_environment,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(relative.returncode, 0)
+
+            poisoned = smoke.replace(
+                '\nrm -rf "$SCOPED_SMOKE"\ntrap - EXIT',
+                '\nfalse\nrm -rf "$SCOPED_SMOKE"\ntrap - EXIT',
+            )
+            restored = subprocess.run(
+                ["bash", "-c", poisoned],
+                cwd=ROOT,
+                env=environment,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(restored.returncode, 0)
 
     def test_template_is_compact_and_uses_v2_blocks(self) -> None:
         text = TEMPLATE.read_text()

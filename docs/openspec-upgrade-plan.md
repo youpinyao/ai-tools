@@ -525,10 +525,11 @@ for name in sys.argv[1:]:
 PY
 
 V1_ACTIVE_REPORT="$RUN_DIR/v1-active-changes.txt"
+V1_ACTIVE_PATTERN='AI_TOOLS_VERIFICATION_(SCOPE|RESULT)_V[1]_(START|END)'
 : > "$V1_ACTIVE_REPORT"
 for verification in openspec/changes/*/verification.md; do
   test -f "$verification" || continue
-  if rg -q 'AI_TOOLS_VERIFICATION_(SCOPE|RESULT)_V[[]1[]]_' "$verification"; then
+  if rg -q "$V1_ACTIVE_PATTERN" "$verification"; then
     printf '%s\n' "$verification" >> "$V1_ACTIVE_REPORT"
   fi
 done
@@ -567,9 +568,33 @@ openspec validate "openspec-upgrade-smoke" --type change --strict
 8.3 已复制的版本，结束时由 `trap` 清理：
 
 ```bash
+set -euo pipefail
+
+: "${AI_TOOLS_DIR:?先执行“每次运行的输入与记录”初始化}"
+: "${REPRESENTATIVE_TARGET_PROJECT:?设置为 8.1 已选代表性目标项目的绝对路径}"
+case "$AI_TOOLS_DIR" in
+  /*) ;;
+  *) echo "AI_TOOLS_DIR 必须是绝对路径" >&2; exit 1 ;;
+esac
+case "$REPRESENTATIVE_TARGET_PROJECT" in
+  /*) ;;
+  *) echo "REPRESENTATIVE_TARGET_PROJECT 必须是绝对路径" >&2; exit 1 ;;
+esac
+AI_TOOLS_DIR="$(cd "$AI_TOOLS_DIR" && pwd -P)"
+TARGET_PROJECT="$REPRESENTATIVE_TARGET_PROJECT"
+TARGET_PROJECT="$(cd "$TARGET_PROJECT" && pwd -P)"
+FINGERPRINT_SCRIPT="$TARGET_PROJECT/.cursor/scripts/openspec-verification-fingerprint.py"
+test -f "$FINGERPRINT_SCRIPT"
+
 SCOPED_SMOKE="$(mktemp -d "${TMPDIR:-/tmp}/ai-tools-scoped-smoke.XXXXXX")"
 trap 'rm -rf "$SCOPED_SMOKE"' EXIT
-test "${SCOPED_SMOKE#"$AI_TOOLS_DIR"/}" = "$SCOPED_SMOKE"
+SCOPED_SMOKE="$(cd "$SCOPED_SMOKE" && pwd -P)"
+case "$SCOPED_SMOKE" in
+  "$AI_TOOLS_DIR"|"$AI_TOOLS_DIR"/*|"$TARGET_PROJECT"|"$TARGET_PROJECT"/*)
+    echo "临时项目必须位于 ai-tools 和目标项目之外" >&2
+    exit 1
+    ;;
+esac
 
 git -C "$SCOPED_SMOKE" init -q
 mkdir -p \
@@ -615,7 +640,7 @@ EOF
 run_fingerprint() {
   (
     cd "$SCOPED_SMOKE"
-    python3 "$TARGET_PROJECT/.cursor/scripts/openspec-verification-fingerprint.py" "$VERIFICATION"
+    python3 "$FINGERPRINT_SCRIPT" "$VERIFICATION"
   )
 }
 value_of() {
@@ -651,10 +676,8 @@ check_gate() {
 }
 
 printf 'outside\n' >> "$SCOPED_SMOKE/notes.md"
-set +e
 outside_output="$(check_gate 2>&1)"
 outside_exit=$?
-set -e
 test "$outside_exit" -eq 0
 outside_scope_digest="$(value_of "$outside_output" scope_digest)"
 outside_content_digest="$(value_of "$outside_output" content_digest)"
@@ -668,7 +691,11 @@ set +e
 inside_output="$(check_gate 2>&1)"
 inside_exit=$?
 set -e
+inside_scope_digest="$(value_of "$inside_output" scope_digest)"
 inside_content_digest="$(value_of "$inside_output" content_digest)"
+test -n "$inside_scope_digest"
+test -n "$inside_content_digest"
+test "$inside_scope_digest" = "$scope_digest"
 test "$inside_content_digest" != "$content_digest"
 test "$inside_exit" -ne 0
 
@@ -679,7 +706,9 @@ trap - EXIT
 预期：初始化、baseline commit 和首次脚本调用均退出 0。只修改 `notes.md` 时
 `outside_exit=0`，范围摘要与内容指纹均不变，并输出一个 `outside_path=notes.md`
 告警；修改 `src/app.py` 后内容指纹变化，`check_gate` 因摘要不匹配而使
-`inside_exit` 非 0，表示范围内阻断。最后只删除本步骤创建的仓库外临时目录。
+`inside_exit` 非 0，表示范围内阻断。除该预期失败调用外，`set -euo pipefail`
+保持启用，任一变量、目录边界、Git commit、首次指纹或摘要断言失败都会立即停止。
+最后只删除本步骤创建的仓库外临时目录。
 
 - [ ] **8.5 清理冒烟 change**
 
