@@ -51,6 +51,10 @@ def gate_block(*markers: str, body: str = "") -> str:
     return "\n".join(line for line in lines if line) + "\n"
 
 
+def section(text: str, start: str, end: str) -> str:
+    return text.split(start, 1)[1].split(end, 1)[0]
+
+
 class VerificationContractTest(unittest.TestCase):
     def test_template_is_compact_and_uses_v2_blocks(self) -> None:
         text = TEMPLATE.read_text()
@@ -79,17 +83,33 @@ class VerificationContractTest(unittest.TestCase):
         self.assertIn("AI_TOOLS_VERIFY_GATE_V2", text)
         self.assertIn("AI_TOOLS_VERIFICATION_SCOPE_V2_START", text)
         self.assertIn("AI_TOOLS_VERIFICATION_RESULT_V2_START", text)
-        self.assertRegex(
-            text,
+        complete_install = (
             r'mkdir -p "\$TARGET_PROJECT/\.cursor/scripts"\n'
             r'cp "\$AI_TOOLS_DIR/\.cursor/scripts/'
             r'openspec-verification-fingerprint\.py" \\\n'
             r'  "\$TARGET_PROJECT/\.cursor/scripts/'
-            r'openspec-verification-fingerprint\.py"',
+            r'openspec-verification-fingerprint\.py".*?'
+            r"ast\.parse.*?\n"
+            r'  "\$TARGET_PROJECT/\.cursor/scripts/'
+            r'openspec-verification-fingerprint\.py"'
         )
-        self.assertIn("ast.parse", text)
-        self.assertIn("不会生成 __pycache__", text)
-        self.assertIn("必须同次升级", text)
+        install_sections = {
+            "首次接入": section(
+                text,
+                "#### V2 范围指纹脚本",
+                "#### A. Apply",
+            ),
+            "日常升级": section(
+                text,
+                "### 7.2 升级 ai-tools 自定义层",
+                "### 7.3 本仓库",
+            ),
+        }
+        for name, install in install_sections.items():
+            with self.subTest(name=name):
+                self.assertRegex(install, re.compile(complete_install, re.DOTALL))
+                self.assertIn("不会生成 __pycache__", install)
+        self.assertIn("必须同次升级", install_sections["首次接入"])
         self.assertNotIn("AI_TOOLS_VERIFY_GATE_V1", text)
         self.assertNotIn("AI_TOOLS_VERIFICATION_RESULT_V1_START", text)
 
@@ -171,10 +191,13 @@ class VerificationContractTest(unittest.TestCase):
         for kind, markers in samples.items():
             with self.subTest(kind=kind):
                 self.assertEqual(classify_gate(kind, gate_block(*markers)), "OK")
-                incomplete = gate_block(*markers[:-1]) + markers[-1] + "\n"
-                self.assertTrue(
-                    classify_gate(kind, incomplete).startswith("STALE"),
-                )
+            for missing in markers:
+                with self.subTest(kind=kind, missing=missing):
+                    present = tuple(marker for marker in markers if marker != missing)
+                    incomplete = gate_block(*present) + missing + "\n"
+                    self.assertTrue(
+                        classify_gate(kind, incomplete).startswith("STALE"),
+                    )
 
     def test_gate_checker_classifies_invalid_gate_shapes(self) -> None:
         required = (
@@ -196,6 +219,7 @@ class VerificationContractTest(unittest.TestCase):
                 "<!-- AI_TOOLS_VERIFY_GATE_V2_END -->\n",
                 "",
             ),
+            "STALE-isolated-end": "<!-- AI_TOOLS_VERIFY_GATE_V2_END -->\n",
             "STALE-conflict": gate_block(
                 *required,
                 body="入口结束时必须询问 worktree 收尾。",
@@ -205,6 +229,16 @@ class VerificationContractTest(unittest.TestCase):
                 body="准备结束回复时必须询问本次隔离 worktree 如何处理。",
             ),
             "DUPLICATE": valid + valid,
+            "DUPLICATE-two-starts": valid.replace(
+                "<!-- AI_TOOLS_VERIFY_GATE_V2 -->\n",
+                "<!-- AI_TOOLS_VERIFY_GATE_V2 -->\n"
+                "<!-- AI_TOOLS_VERIFY_GATE_V2 -->\n",
+            ),
+            "DUPLICATE-two-ends": valid.replace(
+                "<!-- AI_TOOLS_VERIFY_GATE_V2_END -->\n",
+                "<!-- AI_TOOLS_VERIFY_GATE_V2_END -->\n"
+                "<!-- AI_TOOLS_VERIFY_GATE_V2_END -->\n",
+            ),
         }
         for expected, sample in cases.items():
             with self.subTest(expected=expected):

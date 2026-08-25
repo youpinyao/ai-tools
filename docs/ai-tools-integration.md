@@ -381,7 +381,9 @@ ends = list(end_pattern.finditer(text))
 old_count = len(old_pattern.findall(text))
 
 if not starts:
-    if old_count:
+    if ends:
+        print("STALE (malformed V2 block boundary)")
+    elif old_count:
         print("STALE (V1-only gate)")
     else:
         print("MISSING")
@@ -433,7 +435,7 @@ PY
 done
 ```
 
-每个 V2 注入必须以独立注释行 `<!-- AI_TOOLS_VERIFY_GATE_V2 -->` 开始，以独立注释行 `<!-- AI_TOOLS_VERIFY_GATE_V2_END -->` 结束；检查器只读取这两个边界之间的正文，不接受行内伪标记，也不允许文档其它位置代打 required。`MISSING` 表示没有 V2 或 V1 独立起始标记；`DUPLICATE` 表示 V2 起止标记重复；`STALE` 包括 V1-only、V1/V2 混写、边界不完整、块内 required 缺失，以及块内仍有“结束时必须询问 worktree 收尾”等与 no-finish-ask 冲突的旧文案。出现 V1 时标为 `STALE`，必须以 V2 完整块替换，不得再次追加。
+每个 V2 注入必须以独立注释行 `<!-- AI_TOOLS_VERIFY_GATE_V2 -->` 开始，以独立注释行 `<!-- AI_TOOLS_VERIFY_GATE_V2_END -->` 结束；检查器只读取这两个边界之间的正文，不接受行内伪标记，也不允许文档其它位置代打 required。`MISSING` 表示既没有 V2/V1 独立起始标记，也没有孤立 V2 结束标记；`DUPLICATE` 表示 V2 起止标记重复；`STALE` 包括 V1-only、V1/V2 混写、孤立 start 或 end 等边界不完整、块内 required 缺失，以及块内仍有“结束时必须询问 worktree 收尾”等与 no-finish-ask 冲突的旧文案。出现 V1 时标为 `STALE`，必须以 V2 完整块替换，不得再次追加。
 
 apply 块内必须同时包含当前 APPLY delegated、parallel、worker 与 no-finish-ask 标记；verify 块内必须同时包含 VERIFY delegated、parallel、worker 与 no-finish-ask 标记；sync/archive 块内必须包含 no-finish-ask 标记。缺少 Superpowers 或缺少 `dispatching-parallel-agents` 不得标为 `STALE`。`NOFILE` 表示官方文件不存在，应先恢复官方生成层。若官方模板升级后结构发生变化，应先人工确认追加位置是否仍适用。
 
@@ -900,6 +902,10 @@ cp \
 
 mkdir -p "$TARGET_PROJECT/.cursor/scripts"
 cp "$AI_TOOLS_DIR/.cursor/scripts/openspec-verification-fingerprint.py" \
+  "$TARGET_PROJECT/.cursor/scripts/openspec-verification-fingerprint.py"
+
+# 无副作用语法解析检查；不会生成 __pycache__
+python3 -c 'import ast, pathlib, sys; ast.parse(pathlib.Path(sys.argv[1]).read_text())' \
   "$TARGET_PROJECT/.cursor/scripts/openspec-verification-fingerprint.py"
 
 cd "$TARGET_PROJECT"
