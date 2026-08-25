@@ -55,7 +55,7 @@ flowchart TD
 
 上一张图用于选择官方命令场景和推荐路径。目标项目使用本仓库
 `evidence-driven` schema，并按[接入文档](ai-tools-integration.md#51-补充-verify-修复闭环与流转门禁)
-安装 `AI_TOOLS_VERIFY_GATE_V1` 增强规则后，可形成下面的规格驱动、证据验证和反馈
+安装 `AI_TOOLS_VERIFY_GATE_V2` 增强规则后，可形成下面的规格驱动、证据验证和反馈
 回流闭环；该增强闭环不改变 OpenSpec 官方命令的默认语义。
 
 ```mermaid
@@ -107,7 +107,8 @@ flowchart TD
 
 - `evidence-driven` schema 建立 `proposal / specs / design / tasks / verification`
   之间的制品依赖，要求 `apply` 在 `verification.md` 已存在后实施，并跟踪
-  `tasks.md`；`verification.md` 负责保存需求与检查的对应关系、实际证据和剩余风险。
+  `tasks.md`；紧凑的 `verification.md` 负责保存范围、需求与检查的对应关系、代码
+  审查和剩余风险。每轮复验更新原检查行，只保留当前权威证据，不追加完整历史。
 - 安装 `AI_TOOLS_PROPOSE_WORKTREE_V1` 后，每次 `propose` 都必须先询问使用隔离
   worktree 还是当前工作区；询问和 worktree 准备发生在创建 change 或写入制品之前。
   选择隔离 worktree 时每次 propose 都必须新建独立 worktree，即使已处于
@@ -120,17 +121,19 @@ flowchart TD
   合并或清理时才执行收尾。有未提交改动须先经用户明确同意提交。不得自动合并
   或删除，也不得清理兄弟 worktree。主分支指主工作区当前检出分支。未安装收尾
   块时，用户明确要求也没有这套安全步骤。
-- 安装 `AI_TOOLS_VERIFY_GATE_V1` 后，入口 Agent 负责编排，不直接执行 apply 或 verify
+- 安装 `AI_TOOLS_VERIFY_GATE_V2` 后，入口 Agent 负责编排，不直接执行 apply 或 verify
   主体；apply 子 Agent 成功后才派发独立 verify 子 Agent；单独运行 `/opsx-verify` 时，
-  入口 Agent 同样派发 verify 子 Agent。验证过程中可安全修复的阻塞由 verify 子 Agent
+  入口 Agent 同样派发 verify 子 Agent。verify 先确认可解析的 baseline 与 change
+  范围，再执行检查。验证过程中可安全修复的阻塞由 verify 子 Agent
   在最多三轮“验证—修复—重新验证”内直接处理；每次修改代码后都针对修复后的完整
   diff 重新执行代码审查并更新 verification。仍未解决的问题再按类型回到 `apply`、
   `update` 或补充检查。阶段内是否并行由每次运行时本会话可用 skills 列表是否含
   `dispatching-parallel-agents` 决定；缺 skill 时与仅派发阶段子 Agent 的串行行为相同，
   后续安装无需再替换注入。磁盘上能读到 `SKILL.md` 不足以为可用。
-- `sync` 或 `archive` 入口会检查验证状态为通过、阻塞项为无，并确认记录的工作区
-  指纹仍与当前状态一致。验证后的代码或制品变化会使旧门禁失效；`sync` 更新
-  main specs 后如果还要归档，也必须先重新验证并刷新门禁。
+- `sync` 或 `archive` 入口会检查验证状态为通过、阻塞项为无，并复核范围摘要与内容
+  指纹。范围内变化会使旧门禁失效并阻断流转；范围外变化只告警。若范围外路径属于
+  当前 change，必须扩展范围并复验。正常 sync 生成的 main spec 未纳入声明范围时，
+  不使 implementation verification 失效，也不强制在 archive 前重复实现验证。
 - 未安装增强规则时，以上子 Agent 派发、门禁与隔离 worktree 收尾均不成立；`verify`、`sync`、`archive`
   的具体条件与行为仍以目标项目当前 OpenSpec 官方生成物为准。OpenSpec 1.10.0 官方
   `/opsx-verify` 只输出会话记分卡（Completeness / Correctness / Coherence），不写
@@ -233,6 +236,8 @@ change 再调用 `/opsx-update-change-from-code`：该命令只更新已有 chan
 官方 `/opsx-sync`。该命令只同步规格，不会结束 change；是否需要先执行 `verify`，
 以及后续何时归档，遵循目标项目当前官方生成物。若 sync 发生在隔离 worktree 中，
 跑完后默认留下本次 worktree，不得主动询问怎么处理；仅当用户明确要求时才合并或清理。
+安装 V2 门禁后，sync 会复核范围摘要与内容指纹；同步生成的 main spec 若未纳入声明
+范围，只产生范围外告警，不要求重复实现验证。
 
 ## 使用原则
 
@@ -248,10 +253,11 @@ change 再调用 `/opsx-update-change-from-code`：该命令只更新已有 chan
   或 `openspec status --change "<name>" --json` 中的 `planningHome.root`；无 change 的
   spec 回写使用 `openspec list --specs --json` 或 `openspec context --json` 的
   `root.path`。路径为 `<root>/openspec/specs/<capability-path>/spec.md`，不要假设仓库相对路径。
-- 实现完成后建议核验。安装 `AI_TOOLS_VERIFY_GATE_V1` 后，apply 与单独
+- 实现完成后建议核验。安装 `AI_TOOLS_VERIFY_GATE_V2` 后，apply 与单独
   `/opsx-verify` 均由入口 Agent 派发子 Agent 执行，阶段内并行仅当运行时会话 skills
-  列表含 `dispatching-parallel-agents` 时启用，并通过 Verify 门禁与工作区指纹
-  约束 sync/archive；未安装增强规则时，`verify`、`sync`、`archive` 的具体条件与行为
+  列表含 `dispatching-parallel-agents` 时启用，并通过 Verify 门禁、范围摘要与内容
+  指纹约束 sync/archive；范围内变化阻断，范围外变化告警。未安装增强规则时，
+  `verify`、`sync`、`archive` 的具体条件与行为
   遵循目标项目当前 OpenSpec 官方生成物（1.10.0 官方 verify 仅为会话记分卡，官方
   archive 允许确认绕过）。
 - 隔离 worktree 跑完后默认留下现场。安装 `AI_TOOLS_WORKTREE_FINISH_V1` 后，

@@ -231,7 +231,9 @@ apply:
 - 命令必须来自真实仓库配置；
 - 代码审查必须读取明确范围的完整 diff；
 - 未处理的 Critical 或 Important 不得记为通过；
-- 失败、不适用和未执行项必须记录原因与剩余风险。
+- 失败、不适用和未执行项必须记录原因与剩余风险；
+- `verification.md` 只保留“范围、检查、代码审查、风险与回滚”四个二级章节，
+  总行数不超过 30 行；复验更新原检查行，不追加完整历史。
 
 预期：不增加新版 OpenSpec 无法强制执行的声明。
 
@@ -340,7 +342,7 @@ printf '%s\n' .cursor/skills/openspec-* .cursor/commands/opsx-*
 
 预期：规则覆盖新版 OpenSpec 操作，同时保留 `/opsx-update-change-from-code`。
 
-- [ ] **5.3 复核 `AI_TOOLS_VERIFY_GATE_V1`、`AI_TOOLS_PROPOSE_WORKTREE_V1` 与 `AI_TOOLS_WORKTREE_FINISH_V1` 追加点**
+- [ ] **5.3 复核 `AI_TOOLS_VERIFY_GATE_V2`、`AI_TOOLS_PROPOSE_WORKTREE_V1` 与 `AI_TOOLS_WORKTREE_FINISH_V1` 追加点**
 
 阅读新版 propose、apply、verify、sync、archive 的 command 和 skill，逐项判断 `docs/ai-tools-integration.md` 第 5.1 节 A/B/C、D 与 E 的追加内容是否仍有有效插入点、是否与新版官方行为冲突。
 
@@ -352,6 +354,9 @@ printf '%s\n' .cursor/skills/openspec-* .cursor/commands/opsx-*
 - 幂等检查以新版实际文件清单为准。
 - propose 的 worktree 询问仍必须发生在官方 propose 主体与任何制品写入之前；
 - 隔离 worktree 按需收尾仍不得在入口准备结束回复时主动询问（含官方主体失败但本次 worktree 已在）；只在用户明确要求时收尾本次相关路径，且不得自动合并或删除；
+- V2 范围指纹脚本的命令行接口、输出字段和单元测试仍与注入块一致；
+- 目标项目中旧 V1 Verify 块必须标为 `STALE` 并由唯一 V2 完整块替换，不得在旧块后重复追加；
+- V1-only active change 不得自动迁移结果，必须先执行一次 verify，生成新的范围块、结果块与指纹。
 
 ## 6. 同步当前维护文档
 
@@ -382,7 +387,15 @@ test "$(openspec --version)" = "$TARGET_VERSION"
 
 以新版 CLI help、官方 schema 和临时生成物为证据更新 init/update、propose/apply/verify/sync/archive、schema validate 和 JSON 示例。删除新版不再支持的参数或行为。
 
-- [ ] **6.4 更新架构规格验收基线**
+- [ ] **6.4 同步范围验证语言**
+
+当前维护文档必须统一使用“V2 范围指纹”“范围内阻断”“范围外告警”，并说明正常
+sync 生成的 main spec 未纳入声明范围时不强制重复实现验证。搜索
+`README.md`、`docs/ai-sdd-workflow.md`、`docs/ai-tools-integration.md` 与本计划，
+不得残留旧版 Verify 门禁标记或全工作区指纹表述；`docs/superpowers/plans/` 和
+`docs/superpowers/specs/` 是历史记录，允许保留当时的 V1 事实，不做批量改写。
+
+- [ ] **6.5 更新架构规格验收基线**
 
 若架构规格存在且属于当前维护范围，更新其验收基线；若不存在，搜索已跟踪路径确认无等价规格，并将缺口记入当次 `$RUN_LOG`，不得在计划模板中写入某次运行的检查结论。
 
@@ -406,8 +419,29 @@ openspec schema validate evidence-driven
 ```bash
 rg -n 'id: verification|requires: \[verification\]|tracks: tasks\.md' \
   openspec/schemas/evidence-driven/schema.yaml
-rg -n '^## 代码审查$|^## 实际执行结果$|^## 未执行项与剩余风险$' \
-  openspec/schemas/evidence-driven/templates/verification.md
+python3 -m unittest tests.test_openspec_verification_fingerprint -v
+python3 -m unittest tests.test_openspec_verification_contract -v
+python3 - <<'PY'
+from pathlib import Path
+
+text = Path("openspec/schemas/evidence-driven/templates/verification.md").read_text()
+headings = [line for line in text.splitlines() if line.startswith("## ")]
+assert headings == ["## 范围", "## 检查", "## 代码审查", "## 风险与回滚"]
+assert len(text.splitlines()) <= 30
+PY
+python3 - <<'PY'
+from pathlib import Path
+
+paths = [
+    Path("README.md"),
+    Path("docs/ai-sdd-workflow.md"),
+    Path("docs/ai-tools-integration.md"),
+    Path("docs/openspec-upgrade-plan.md"),
+]
+text = "\n".join(path.read_text() for path in paths)
+assert "AI_TOOLS_VERIFY_GATE_" + "V1" not in text
+assert "统一" + "工作区指纹" not in text
+PY
 if [ "$SOURCE_VERSION" != "$TARGET_VERSION" ]; then
   if rg -n -F "OpenSpec $SOURCE_VERSION" \
     README.md docs/ai-sdd-workflow.md docs/ai-tools-integration.md; then
@@ -423,7 +457,11 @@ else
 fi
 ```
 
-预期：前两组检查命中所需契约；若 `SOURCE_VERSION` 与 `TARGET_VERSION` 不同，最后一组在当前维护文档中无命中。若版本相同，则人工核对命中上下文是否准确。
+预期：schema、V2 脚本接口与契约测试全部通过；紧凑模板严格为四个章节且不超过
+30 行；当前维护文档无旧版 Verify 门禁标记或全工作区指纹表述。历史
+`docs/superpowers/` 文档不在该静态搜索范围内。若 `SOURCE_VERSION` 与
+`TARGET_VERSION` 不同，最后一组在当前维护文档中无命中；若版本相同，则人工核对
+命中上下文是否准确。
 
 - [ ] **7.3 验证官方生成物所有权边界**
 
@@ -475,7 +513,10 @@ openspec update
 
 只覆盖目标项目的 `openspec/schemas/evidence-driven/`，合并 `openspec/config.yaml` 中的 `schema: evidence-driven`，再按更新后的接入文档补齐缺失的规则。
 
-预期：目标项目自有配置未被整文件覆盖，`AI_TOOLS_VERIFY_GATE_V1` 等仍适用内容各出现一次。
+预期：目标项目自有配置未被整文件覆盖；V2 范围指纹脚本已复制并通过语法检查；
+每个目标文件中 `AI_TOOLS_VERIFY_GATE_V2` 完整块恰好一个。旧 V1 块必须替换而不是
+重复追加；若 active change 只有 V1 结果，先执行一次 verify 迁移到 V2，不得自动
+沿用旧通过状态。
 
 - [ ] **8.4 运行目标项目 schema 和 change 冒烟测试**
 
@@ -494,6 +535,11 @@ openspec validate "openspec-upgrade-smoke" --type change --strict
 - change 可创建并产生新版预期的制品图；
 - status 和 apply instructions 能解析；
 - 未填写制品时 strict validate 应返回明确的未完成错误，而不是崩溃或 schema 解析错误。
+
+另在仓库外临时 Git 项目中创建一个最小 V2 `verification.md`，记录 baseline、include
+与 exclude：先确认范围内文件变化会导致内容指纹变化并阻断，再确认仅范围外文件变化
+时两个摘要保持一致且输出 `outside_path` 告警。冒烟测试必须调用目标项目已复制的
+脚本，不得以内嵌替代实现。
 
 - [ ] **8.5 清理冒烟 change**
 
@@ -546,7 +592,8 @@ git diff -- README.md docs/ openspec/ .cursor/ spec/
 - [ ] `openspec schema validate evidence-driven` 通过。
 - [ ] from-code skill 依赖的 CLI 命令、JSON 字段和 archive 定位已验证或完成适配。
 - [ ] `.gitignore`、中文规则和接入门禁与新版官方生成物一致。
-- [ ] 当前维护文档已更新，历史计划仍保留其原始版本事实。
-- [ ] 至少一个隔离的目标项目完成 update、schema 校验和 change 冒烟测试。
+- [ ] V2 范围指纹脚本接口、单元测试及紧凑模板四章节/30 行预算全部通过。
+- [ ] 当前维护文档已统一为范围内阻断、范围外告警且无 V1 Verify 门禁；历史计划仍保留其原始版本事实。
+- [ ] 至少一个隔离的目标项目完成 update、schema 校验、V1 → V2 替换及范围内/范围外冒烟测试。
 - [ ] 完整 diff 已审查，未处理的 Critical 或 Important 为零。
 - [ ] `$RUN_LOG` 包含真实执行证据、未执行项和剩余风险。

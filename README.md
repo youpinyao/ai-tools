@@ -29,14 +29,14 @@ OpenSpec 官方 Cursor skills 与 `/opsx-*` commands 由 OpenSpec 在目标项�
 schema 与可选旁路的基础安装；完整的 propose worktree 选择、隔离 worktree 收尾、verify 修复闭环及
 sync/archive 流转门禁还须按
 [接入文档 5.1 节](docs/ai-tools-integration.md#51-补充-verify-修复闭环与流转门禁)
-安装 `AI_TOOLS_VERIFY_GATE_V1`、`AI_TOOLS_PROPOSE_WORKTREE_V1` 与
+安装 `AI_TOOLS_VERIFY_GATE_V2`、`AI_TOOLS_PROPOSE_WORKTREE_V1` 与
 `AI_TOOLS_WORKTREE_FINISH_V1` 增强规则。
 
 前置条件：
 
 - Node.js ≥ 20.19.0，并可使用 npm 安装 OpenSpec CLI。
 - 支持 [Agent Skills](https://agentskills.io) 的 AI 编程助手（本仓库以 Cursor 为主）。
-- 若安装完整验证闭环，还需 Python 3.8+ 计算确定性工作区指纹。
+- 若安装完整验证闭环，还需 Python 3.8+ 计算确定性 V2 范围指纹。
 
 以下命令中的 `AI_TOOLS_DIR` 是本仓库的绝对路径，`TARGET_PROJECT` 是目标项目的
 绝对路径：
@@ -129,8 +129,9 @@ TARGET_PROJECT="/absolute/path/to/target-project"
 
 5. 要完成当前 ai-tools 接入，必须继续执行
    [接入文档 5.1 节](docs/ai-tools-integration.md#51-补充-verify-修复闭环与流转门禁)：
-   创建统一工作区指纹脚本，向 apply、verify、sync、archive 的 8 个官方
-   command/skill 文件幂等追加 `AI_TOOLS_VERIFY_GATE_V1` 规则，并向 propose 的 2 个
+   从本仓库复制 `.cursor/scripts/openspec-verification-fingerprint.py`，向 apply、
+   verify、sync、archive 的 8 个官方 command/skill 文件幂等追加
+   `AI_TOOLS_VERIFY_GATE_V2` 规则，并向 propose 的 2 个
    官方 command/skill 文件幂等追加 `AI_TOOLS_PROPOSE_WORKTREE_V1` 规则，并向上述 10 个
    官方 command/skill 文件幂等追加 `AI_TOOLS_WORKTREE_FINISH_V1` 收尾规则。增强规则同时提供
    apply 子 Agent 派发、独立 verify 子 Agent 派发、防递归标记（
@@ -168,7 +169,7 @@ TARGET_PROJECT="/absolute/path/to/target-project"
 
 ## 标准主线
 
-安装 `AI_TOOLS_VERIFY_GATE_V1`、`AI_TOOLS_PROPOSE_WORKTREE_V1` 与
+安装 `AI_TOOLS_VERIFY_GATE_V2`、`AI_TOOLS_PROPOSE_WORKTREE_V1` 与
 `AI_TOOLS_WORKTREE_FINISH_V1` 后的增强主线：
 
 ```text
@@ -206,7 +207,8 @@ verify、archive 与 sync 的具体行为以当前 OpenSpec 官方生成物为�
 `evidence-driven` 以 OpenSpec 1.10.0 官方 `spec-driven` 为本次语义基线：
 
 - `proposal`、`specs`、`design`、`tasks` 是官方语义的简体中文派生。
-- 新增 `verification.md`，用于规划验证并记录实际执行结果与剩余风险。
+- 新增紧凑的 `verification.md` 账本，以范围、检查、代码审查、风险与回滚四节保存
+  当前权威验证状态；复验更新原检查行，不追加完整历史。
 - `verification` 依赖 `tasks`，`apply` 依赖 `verification` 并跟踪 `tasks.md`。
 - apply 应执行 `verification.md` 中适用的检查，包括必做的代码审查，如实记录命令、
   结果、失败原因和未执行项；schema 不把这些记录扩展成额外的官方 verify 或
@@ -225,7 +227,10 @@ verify、archive 与 sync 的具体行为以当前 OpenSpec 官方生成物为�
   `#### Scenario`。
 - 官方 `/opsx-verify` 只在会话中输出 Completeness / Correctness / Coherence
   记分卡，不写 `verification.md`。官方 `/opsx-archive` 对未完成制品或任务仅警告
-  并允许确认继续。项目级 `AI_TOOLS_VERIFY_GATE_V1` 是额外门禁，不是官方硬门禁。
+  并允许确认继续。项目级 `AI_TOOLS_VERIFY_GATE_V2` 是额外门禁，不是 OpenSpec
+  官方行为。V2 以声明范围计算摘要与内容指纹：范围内变化使门禁失效并阻断流转，
+  范围外变化只告警；若范围外路径实际属于 change，必须扩展范围并复验。正常
+  `/opsx-sync` 生成的 main spec 未纳入声明范围时，不强制重复实现验证。
 
 后续升级 OpenSpec 时，应从当前官方 `spec-driven` 基线重新核对这些语义，而不是
 永久假定 1.10.0 的实现细节。

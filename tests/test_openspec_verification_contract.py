@@ -10,6 +10,12 @@ ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = ROOT / "openspec/schemas/evidence-driven/templates/verification.md"
 SCHEMA = ROOT / "openspec/schemas/evidence-driven/schema.yaml"
 INTEGRATION = ROOT / "docs/ai-tools-integration.md"
+CURRENT_DOCS = [
+    ROOT / "README.md",
+    ROOT / "docs/ai-sdd-workflow.md",
+    ROOT / "docs/ai-tools-integration.md",
+    ROOT / "docs/openspec-upgrade-plan.md",
+]
 
 
 def integration_text() -> str:
@@ -56,6 +62,13 @@ def section(text: str, start: str, end: str) -> str:
 
 
 class VerificationContractTest(unittest.TestCase):
+    def test_current_docs_use_scoped_v2_language(self) -> None:
+        combined = "\n".join(path.read_text() for path in CURRENT_DOCS)
+        self.assertIn("AI_TOOLS_VERIFY_GATE_V2", combined)
+        self.assertIn("范围外", combined)
+        self.assertNotIn("AI_TOOLS_VERIFY_GATE_V1", combined)
+        self.assertNotIn("统一工作区指纹", combined)
+
     def test_template_is_compact_and_uses_v2_blocks(self) -> None:
         text = TEMPLATE.read_text()
         headings = [line for line in text.splitlines() if line.startswith("## ")]
