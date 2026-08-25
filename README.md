@@ -136,13 +136,14 @@ TARGET_PROJECT="/absolute/path/to/target-project"
    官方 command/skill 文件幂等追加 `AI_TOOLS_WORKTREE_FINISH_V1` 收尾规则。增强规则同时提供
    apply 子 Agent 派发、独立 verify 子 Agent 派发、防递归标记（
    `AI_TOOLS_DELEGATED_APPLY_V1`、`AI_TOOLS_DELEGATED_VERIFY_V1`）与阶段内并行开关
-   （`AI_TOOLS_PARALLEL_DISPATCH_V1`）：apply 时入口 Agent 先派发 apply 子 Agent，
-   成功后再派发 verify 子 Agent；用户单独运行 `/opsx-verify` 时，入口 Agent 同样
-   派发 verify 子 Agent。阶段子 Agent 每次运行时仅当本会话可用 skills 列表含
-   `dispatching-parallel-agents` 时，才对独立域并行派发带工作者身份标记的实施者 /
-   调查者；列表中没有则按官方默认串行。不得因磁盘上能读到 `SKILL.md` 而启用并行。
-   后续安装该 skill 无需再次替换注入。未安装增强规则时，这些派发行为不成立。仅复制
-   schema 不会自动获得这些流转门禁与子 Agent 编排。
+   （`AI_TOOLS_PARALLEL_DISPATCH_V1`、`AI_TOOLS_PARALLEL_HANDOFF_V1`）：apply 时入口
+   Agent 先派发 apply 子 Agent，成功后再派发 verify 子 Agent；用户单独运行
+   `/opsx-verify` 时，入口 Agent 同样派发 verify 子 Agent。入口在自己的会话 skills
+   目录中查找 `dispatching-parallel-agents`，通过唯一有边界的交接块传递 AVAILABLE
+   与绝对 Path，找不到则传递 UNAVAILABLE 并串行；交接或读取失败会阻塞，不得静默
+   降级。子 Agent 必须回报「阶段内并行：」行，入口须转述。不得靠扫描磁盘启用并行。
+   后续安装该 skill 无需再次替换注入。未安装增强规则时，这些
+   派发行为不成立。仅复制 schema 不会自动获得这些流转门禁与子 Agent 编排。
    也必须注入 propose worktree 选择，否则 `/opsx-propose` 会跳过起始询问，直接在当前
    工作区创建 change。也必须注入隔离 worktree 按需收尾，否则用户事后明确要求合并或
    清理时没有同一套安全步骤；注入后各阶段结束时不得主动询问怎么处理。
@@ -182,9 +183,10 @@ TARGET_PROJECT="/absolute/path/to/target-project"
   → 隔离 worktree 默认留下；仅当用户明确要求时才合并或清理
 ```
 
-apply 与 verify 两个阶段始终串行。阶段内并行不是接入时开关：仅当本会话可用
-skills 列表含 `dispatching-parallel-agents` 时，阶段子 Agent 才按该 skill 派发
-带独立身份标记的工作者；否则与现网串行路径相同。
+apply 与 verify 两个阶段始终串行。阶段内并行不是接入时开关：入口按本会话 skills
+目录用唯一有边界的块交接 `dispatching-parallel-agents` 的绝对 Path，阶段子 Agent
+读取后才对独立域派发带身份标记的工作者；目录中没有则显式串行，交接或读取失败则
+阻塞，并回报「阶段内并行：」行。
 
 单独运行 `/opsx-verify` 时，入口 Agent 也按同一规则派发独立 verify 子 Agent 执行验证
 闭环。未安装增强规则时，propose 起始 worktree 询问、隔离 worktree 按需收尾、apply/verify 子 Agent 派发及 sync/archive 门禁均不成立；

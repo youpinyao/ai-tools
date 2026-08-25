@@ -150,9 +150,11 @@ flowchart TD
   且不涉及用户决策、权限或凭据、外部服务故障、破坏性操作或范围外修改。满足条件的
   阻塞由 verify 子 Agent 直接修复并完整复验；每次修改代码后都针对修复后的完整
   diff 重新执行代码审查并更新 verification。不能继续修复的问题再按类型回到
-  `apply`、`update` 或补充检查。阶段内是否并行由每次运行时本会话可用 skills 列表是否含
-  `dispatching-parallel-agents` 决定；缺 skill 时与仅派发阶段子 Agent 的串行行为相同，
-  后续安装无需再替换注入。磁盘上能读到 `SKILL.md` 不足以为可用。
+  `apply`、`update` 或补充检查。阶段内并行由入口按会话 skills 目录交接
+  `dispatching-parallel-agents`：使用唯一有边界的块传递 AVAILABLE 与绝对 Path，
+  或传递 UNAVAILABLE 并串行；交接畸形或读取失败会阻塞，不得静默降级。子 Agent
+  回报「阶段内并行：」行。后续安装无需再替换注入。自行扫描磁盘上的 `SKILL.md`
+  不足以为可用。
 - `sync` 或 `archive` 入口会检查验证状态为通过、阻塞项为无，并复核范围摘要与内容
   指纹。范围内变化会使旧门禁失效并阻断流转；范围外变化只告警。若范围外路径属于
   当前 change，必须扩展范围并复验。正常 sync 生成的 main spec 未纳入声明范围时，
@@ -281,9 +283,9 @@ change 再调用 `/opsx-update-change-from-code`：该命令只更新已有 chan
   spec 回写使用 `openspec list --specs --json` 或 `openspec context --json` 的
   `root.path`。路径为 `<root>/openspec/specs/<capability-path>/spec.md`，不要假设仓库相对路径。
 - 实现完成后建议核验。安装 `AI_TOOLS_VERIFY_GATE_V2` 后，apply 与单独
-  `/opsx-verify` 均由入口 Agent 派发子 Agent 执行，阶段内并行仅当运行时会话 skills
-  列表含 `dispatching-parallel-agents` 时启用，并通过 Verify 门禁、范围摘要与内容
-  指纹约束 sync/archive；范围内变化阻断，范围外变化告警。未安装增强规则时，
+  `/opsx-verify` 均由入口 Agent 派发子 Agent 执行，阶段内并行由入口按会话 skills
+  目录以唯一有边界的块交接 `dispatching-parallel-agents`，并通过 Verify 门禁、
+  范围摘要与内容指纹约束 sync/archive；范围内变化阻断，范围外变化告警。未安装增强规则时，
   `verify`、`sync`、`archive` 的具体条件与行为
   遵循目标项目当前 OpenSpec 官方生成物（1.10.0 官方 verify 仅为会话记分卡，官方
   archive 允许确认绕过）。

@@ -71,6 +71,30 @@ def fenced_bash(text: str, start: str, end: str) -> str:
     return match.group(1)
 
 
+APPLY_PARALLEL_MARKERS = (
+    "AI_TOOLS_DELEGATED_APPLY_V1",
+    "AI_TOOLS_PARALLEL_DISPATCH_V1",
+    "AI_TOOLS_PARALLEL_HANDOFF_V1_START",
+    "AI_TOOLS_PARALLEL_HANDOFF_V1_END",
+    "AI_TOOLS_PARALLEL_SKILL_AVAILABLE_V1",
+    "AI_TOOLS_PARALLEL_SKILL_UNAVAILABLE_V1",
+    "AI_TOOLS_PARALLEL_SKILL_READ_FAILED_V1",
+    "AI_TOOLS_WORKER_APPLY_V1",
+    "AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1",
+)
+VERIFY_PARALLEL_MARKERS = (
+    "AI_TOOLS_DELEGATED_VERIFY_V1",
+    "AI_TOOLS_PARALLEL_DISPATCH_V1",
+    "AI_TOOLS_PARALLEL_HANDOFF_V1_START",
+    "AI_TOOLS_PARALLEL_HANDOFF_V1_END",
+    "AI_TOOLS_PARALLEL_SKILL_AVAILABLE_V1",
+    "AI_TOOLS_PARALLEL_SKILL_UNAVAILABLE_V1",
+    "AI_TOOLS_PARALLEL_SKILL_READ_FAILED_V1",
+    "AI_TOOLS_WORKER_VERIFY_V1",
+    "AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1",
+)
+
+
 class VerificationContractTest(unittest.TestCase):
     def test_current_docs_each_define_scoped_v2_responsibilities(self) -> None:
         required_by_doc = {
@@ -483,20 +507,68 @@ class VerificationContractTest(unittest.TestCase):
         self.assertEqual(classify_gate("verify", blocks[1]), "OK")
         self.assertEqual(classify_gate("flow", blocks[2]), "OK")
 
+    def test_apply_and_verify_blocks_require_parallel_skill_handoff(self) -> None:
+        text = integration_text()
+        blocks = re.findall(
+            r"(?ms)^<!-- AI_TOOLS_VERIFY_GATE_V2 -->\n"
+            r".*?"
+            r"^<!-- AI_TOOLS_VERIFY_GATE_V2_END -->$",
+            text,
+        )
+        self.assertEqual(len(blocks), 3)
+        apply_block, verify_block, flow_block = blocks
+        for required in (
+            "AI_TOOLS_PARALLEL_HANDOFF_V1",
+            "AI_TOOLS_PARALLEL_SKILL_AVAILABLE_V1",
+            "AI_TOOLS_PARALLEL_SKILL_UNAVAILABLE_V1",
+            "会话 skills 目录",
+            "原样",
+            "阶段内并行：",
+            "不得静默省略",
+        ):
+            with self.subTest(block="apply", required=required):
+                self.assertIn(required, apply_block)
+            with self.subTest(block="verify", required=required):
+                self.assertIn(required, verify_block)
+        self.assertNotIn("静默串行", apply_block)
+        self.assertNotIn("静默串行", verify_block)
+        self.assertNotIn("AI_TOOLS_PARALLEL_HANDOFF_V1", flow_block)
+        self.assertIn("转述", apply_block)
+        self.assertIn("转述", verify_block)
+
+    def test_parallel_handoff_contract_is_bounded_exclusive_and_fail_closed(
+        self,
+    ) -> None:
+        text = integration_text()
+        blocks = re.findall(
+            r"(?ms)^<!-- AI_TOOLS_VERIFY_GATE_V2 -->\n"
+            r".*?"
+            r"^<!-- AI_TOOLS_VERIFY_GATE_V2_END -->$",
+            text,
+        )
+        self.assertEqual(len(blocks), 3)
+        for kind, block in (("apply", blocks[0]), ("verify", blocks[1])):
+            for required in (
+                "恰好一个 `AI_TOOLS_PARALLEL_HANDOFF_V1_START`",
+                "恰好一个 `AI_TOOLS_PARALLEL_HANDOFF_V1_END`",
+                "status:",
+                "name: dispatching-parallel-agents",
+                "path: none",
+                "非空绝对路径",
+                "同时出现",
+                "交接无效",
+                "AI_TOOLS_PARALLEL_SKILL_READ_FAILED_V1",
+                "skill 读取失败",
+                "不得降级串行",
+            ):
+                with self.subTest(kind=kind, required=required):
+                    self.assertIn(required, block)
+            self.assertNotIn("且含 `Path:`", block)
+
     def test_gate_checker_validates_required_markers_inside_each_block(self) -> None:
         samples = {
-            "apply": (
-                "AI_TOOLS_DELEGATED_APPLY_V1",
-                "AI_TOOLS_PARALLEL_DISPATCH_V1",
-                "AI_TOOLS_WORKER_APPLY_V1",
-                "AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1",
-            ),
-            "verify": (
-                "AI_TOOLS_DELEGATED_VERIFY_V1",
-                "AI_TOOLS_PARALLEL_DISPATCH_V1",
-                "AI_TOOLS_WORKER_VERIFY_V1",
-                "AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1",
-            ),
+            "apply": APPLY_PARALLEL_MARKERS,
+            "verify": VERIFY_PARALLEL_MARKERS,
             "flow": ("AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1",),
         }
         for kind, markers in samples.items():
@@ -511,12 +583,7 @@ class VerificationContractTest(unittest.TestCase):
                     )
 
     def test_gate_checker_classifies_invalid_gate_shapes(self) -> None:
-        required = (
-            "AI_TOOLS_DELEGATED_APPLY_V1",
-            "AI_TOOLS_PARALLEL_DISPATCH_V1",
-            "AI_TOOLS_WORKER_APPLY_V1",
-            "AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1",
-        )
+        required = APPLY_PARALLEL_MARKERS
         valid = gate_block(*required)
         old_gate = "<!-- AI_TOOLS_VERIFY_GATE_" + "V1 -->\n"
         cases = {
