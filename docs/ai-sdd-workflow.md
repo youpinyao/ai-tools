@@ -9,7 +9,8 @@
 下图展示七类场景的推荐路径。其中 `explore` 用于澄清问题，`propose` 用于建立
 change，`update` 用于调整已有规划，`apply` 用于实施任务，`verify` 用于核验实现，
 `archive` 用于结束 change，`sync` 用于在不归档的情况下将 delta specs 合并到
-main specs；图中的 `from-code` 是本仓库
+main specs。手动执行 `sync` 是可选步骤；若归档前尚未同步，`archive` 会提示先同步
+delta specs，再完成归档。图中的 `from-code` 是本仓库
 `/opsx-update-change-from-code` 命令的简称，用于从代码回写已有 active change，
 或在没有 active change 且只有一份对应 main spec 时回写该 spec；目标有歧义时先请用户选择。
 
@@ -48,20 +49,33 @@ flowchart TD
     Update --> Apply
     Apply --> Verify[verify]
     Verify -->|通过后建议归档| Archive[archive]
-    Archive --> Done([change 已结束])
+    Archive --> SyncCheck{delta specs<br/>是否已同步?}
+    SyncCheck -->|否：archive 提示同步| ArchiveSync[归档前同步<br/>delta specs]
+    SyncCheck -->|是| Done([change 已结束])
+    ArchiveSync --> Done
 ```
 
 ## SDD 增强闭环
 
-上一张图用于选择官方命令场景和推荐路径。目标项目使用本仓库
+上一张图用于选择命令场景和推荐路径；下图复用其中的入口，并展开进入 active change
+后的增强闭环。目标项目使用本仓库
 `evidence-driven` schema，并按[接入文档](ai-tools-integration.md#51-补充-verify-修复闭环与流转门禁)
 安装 `AI_TOOLS_VERIFY_GATE_V2` 增强规则后，可形成下面的规格驱动、证据验证和反馈
-回流闭环；该增强闭环不改变 OpenSpec 官方命令的默认语义。
+回流闭环；若同时安装 `/opsx-update-change-from-code`，已有代码也可从对应入口接入。
+这些增强不改变 OpenSpec 官方命令的默认语义。
 
 ```mermaid
 flowchart TD
-    Baseline[main specs 与当前代码事实] --> Plan[propose 或 update]
+    Baseline[main specs 与当前代码事实] --> Entry{当前场景}
+    Entry -->|需求或方案不明确| Explore[explore]
+    Explore --> Plan[propose 或 update]
+    Entry -->|新需求或更新已有规划| Plan
+    Entry -->|已有代码且存在 active change| FromCodeChange[from-code 回写 change]
+    Entry -->|已有代码、无 active change<br/>但存在唯一 main spec| FromCodeSpec[from-code 回写 spec]
+    Entry -->|已有代码且无对应 main spec| ProposeFromCode[propose 基于代码事实]
+
     Plan --> Proposal[proposal]
+    ProposeFromCode --> Proposal
     Proposal --> Specs[specs]
     Proposal --> Design[design]
     Specs --> Tasks[tasks]
@@ -69,42 +83,50 @@ flowchart TD
     Tasks --> VerificationPlan[verification 计划]
     VerificationPlan --> ApplyLoop[apply 子 Agent]
     ApplyLoop --> VerifyLoop[独立 verify 子 Agent]
-    VerifyLoop --> Repairable{存在可安全修复的阻塞?}
-    Repairable -->|是| RepairInVerify[verify 子 Agent 直接修复并复验]
+    FromCodeChange --> VerifyLoop
+    FromCodeSpec --> SpecDone([main spec 已按代码回写])
+    VerifyLoop --> Repairable{阻塞可安全修复且<br/>仍可继续尝试?}
+    Repairable -->|是| RepairInVerify[verify 子 Agent 修复并完整复验]
     RepairInVerify --> VerifyLoop
     Repairable -->|否| VerifyResult{最终验证结果}
 
-    VerifyResult -->|仍有实现缺陷| ApplyLoop
-    VerifyResult -->|规划偏差或制品矛盾| UpdateArtifacts[update 制品]
+    VerifyResult -->|实现缺陷| ApplyLoop
+    VerifyResult -->|规划偏差或制品矛盾| UpdateArtifacts[update 受影响制品]
     UpdateArtifacts --> Proposal
     VerifyResult -->|证据不足| AddChecks[补充并执行检查]
     AddChecks --> VerifyLoop
 
-    VerifyResult -->|通过| Gate{Verify 门禁}
+    VerifyResult -->|通过| Gate{Verify 门禁通过}
+    Gate -->|暂不流转| Active[change 保持 active]
     Gate -->|sync| Synced[delta specs 已同步<br/>change 保持 active]
-    Synced --> ActiveNext{active change 后续}
-    ActiveNext -->|继续实施| ApplyLoop
-    ActiveNext -->|发布后发现问题| ActiveProblem{问题类型}
-    ActiveProblem -->|实现缺陷| ApplyLoop
-    ActiveProblem -->|规划偏差| UpdateArtifacts
-    ActiveProblem -->|证据不足| AddChecks
-    ActiveNext -->|无后续变化，准备结束| VerifyLoop
-    Gate -->|archive| ArchiveLoop
+    Gate -->|archive| ArchiveLoop[archive]
 
-    ArchiveLoop[archive]
-    ArchiveLoop --> WorktreeFinish{本轮用户明确要求<br/>收尾 worktree?}
+    Active --> ActiveNext{active change 后续}
+    Synced --> ActiveNext
+    ActiveNext -->|继续实施或范围变化| UpdateArtifacts
+    ActiveNext -->|发现实现缺陷| ApplyLoop
+    ActiveNext -->|证据不足| AddChecks
+    ActiveNext -->|无新增变化，准备结束| Gate
+
+    ArchiveLoop --> SyncCheck{delta specs<br/>是否已同步?}
+    SyncCheck -->|否：archive 提示同步| ArchiveSync[归档前同步<br/>delta specs]
+    SyncCheck -->|是| WorktreeFinish{本轮用户明确要求<br/>收尾 worktree?}
+    ArchiveSync --> WorktreeFinish
     WorktreeFinish -->|是：按需合并或清理| Closed
     WorktreeFinish -->|否：默认保留| Closed
     Closed[change 已结束<br/>适用的规格变化已沉淀]
     Closed --> PostRelease{发布后验证是否发现问题?}
-    PostRelease -->|否| NewBaseline([形成下一轮基线])
-    NewBaseline --> Baseline
+    PostRelease -->|否| NewBaseline([形成下一轮基线，等待后续需求])
     PostRelease -->|是| NewChange[建立新 change]
     NewChange --> Proposal
 ```
 
-闭环中的约束分为两层：
+场景入口与增强约束说明如下：
 
+- `explore` 只负责澄清需求与方案，不创建 change 制品；结论明确后，根据是否已有
+  active change 进入 `propose` 或 `update`。安装 from-code 后，场景 5 回写 active
+  change 并进入 verify，场景 7 从 `propose` 进入完整闭环；场景 6 只回写唯一对应的
+  main spec，因此在图中直接结束，不进入 active change 闭环。
 - `evidence-driven` schema 建立 `proposal / specs / design / tasks / verification`
   之间的制品依赖，要求 `apply` 在 `verification.md` 已存在后实施，并跟踪
   `tasks.md`；紧凑的 `verification.md` 负责保存范围、需求与检查的对应关系、代码
@@ -124,16 +146,19 @@ flowchart TD
 - 安装 `AI_TOOLS_VERIFY_GATE_V2` 后，入口 Agent 负责编排，不直接执行 apply 或 verify
   主体；apply 子 Agent 成功后才派发独立 verify 子 Agent；单独运行 `/opsx-verify` 时，
   入口 Agent 同样派发 verify 子 Agent。verify 先确认可解析的 baseline 与 change
-  范围，再执行检查。验证过程中可安全修复的阻塞由 verify 子 Agent
-  在最多三轮“验证—修复—重新验证”内直接处理；每次修改代码后都针对修复后的完整
-  diff 重新执行代码审查并更新 verification。仍未解决的问题再按类型回到 `apply`、
-  `update` 或补充检查。阶段内是否并行由每次运行时本会话可用 skills 列表是否含
+  范围，再执行检查。图中的“仍可继续尝试”表示未达到三轮上限、未连续两轮无进展，
+  且不涉及用户决策、权限或凭据、外部服务故障、破坏性操作或范围外修改。满足条件的
+  阻塞由 verify 子 Agent 直接修复并完整复验；每次修改代码后都针对修复后的完整
+  diff 重新执行代码审查并更新 verification。不能继续修复的问题再按类型回到
+  `apply`、`update` 或补充检查。阶段内是否并行由每次运行时本会话可用 skills 列表是否含
   `dispatching-parallel-agents` 决定；缺 skill 时与仅派发阶段子 Agent 的串行行为相同，
   后续安装无需再替换注入。磁盘上能读到 `SKILL.md` 不足以为可用。
 - `sync` 或 `archive` 入口会检查验证状态为通过、阻塞项为无，并复核范围摘要与内容
   指纹。范围内变化会使旧门禁失效并阻断流转；范围外变化只告警。若范围外路径属于
   当前 change，必须扩展范围并复验。正常 sync 生成的 main spec 未纳入声明范围时，
-  不使 implementation verification 失效，也不强制在 archive 前重复实现验证。
+  不使 implementation verification 失效；后续没有新增变化时，archive 入口直接复核
+  已有门禁与指纹，不重复实现验证。若要继续实施或改变范围，先通过 `update` 调整
+  受影响制品，再进入 apply。
 - 未安装增强规则时，以上子 Agent 派发、门禁与隔离 worktree 收尾均不成立；`verify`、`sync`、`archive`
   的具体条件与行为仍以目标项目当前 OpenSpec 官方生成物为准。OpenSpec 1.10.0 官方
   `/opsx-verify` 只输出会话记分卡（Completeness / Correctness / Coherence），不写
@@ -233,8 +258,10 @@ change 再调用 `/opsx-update-change-from-code`：该命令只更新已有 chan
 ## 独立旁路：同步 delta specs
 
 需要将 active change 内的 delta specs 合并到 main specs、但暂不归档时，可独立使用
-官方 `/opsx-sync`。该命令只同步规格，不会结束 change；是否需要先执行 `verify`，
-以及后续何时归档，遵循目标项目当前官方生成物。若 sync 发生在隔离 worktree 中，
+官方 `/opsx-sync`。该命令只同步规格，不会结束 change。手动执行 sync 是可选步骤；
+若直接运行 `/opsx-archive`，archive 会在发现 delta specs 尚未同步时提示先同步，
+然后再完成归档。是否需要先执行 `verify`，以及后续何时归档，遵循目标项目当前官方
+生成物。若 sync 发生在隔离 worktree 中，
 跑完后默认留下本次 worktree，不得主动询问怎么处理；仅当用户明确要求时才合并或清理。
 安装 V2 门禁后，sync 会复核范围摘要与内容指纹；同步生成的 main spec 若未纳入声明
 范围，只产生范围外告警，不要求重复实现验证。
