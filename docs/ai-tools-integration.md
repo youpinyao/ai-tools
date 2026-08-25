@@ -242,6 +242,7 @@ python3 -c 'import ast, pathlib, sys; ast.parse(pathlib.Path(sys.argv[1]).read_t
 5. 仅当状态为“通过”、阻塞项为“无”、两个摘要一致且脚本成功时，入口 Agent 才可结束 apply 并建议 sync 或 archive。范围内变化、状态阻塞、摘要不匹配、脚本失败或 verify 子 Agent 失败均阻止完成；change 保持 active，必须报告具体原因，且不得建议 sync 或 archive。
 6. `outside_changes` 大于 0 时逐项汇报 `outside_path`，但范围外变化只告警，不改变通过状态；若入口判断某路径属于当前 change，则停止完成、扩展范围并复验。
 7. 入口 Agent 准备结束本命令（含成功后的 verify、apply/verify 失败停止，或会话 worktree 已创建但官方主体未完成）时，不得询问隔离 worktree 如何处理（AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1）。默认留下本次 worktree；可以简短报告路径与分支仍在，不得弹出合并 / 清理 / 保留菜单。仅当本轮用户明确要求合并或清理时，才按同文件「隔离 worktree 按需收尾」节执行。实施者与 apply 子 Agent 不得询问、不得合并或删除 worktree。
+<!-- AI_TOOLS_VERIFY_GATE_V2_END -->
 ```
 
 #### B. Verify：修复、复验并持久化结论
@@ -309,6 +310,7 @@ python3 -c 'import ast, pathlib, sys; ast.parse(pathlib.Path(sys.argv[1]).read_t
 单独运行 `/opsx-verify` 时也执行以上步骤；其两个摘要仍由后续 sync/archive 入口重新计算并复核。
 
 入口 Agent 准备结束本命令（含验证失败停止）时，不得询问隔离 worktree 如何处理（AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1）。默认留下本次 worktree；仅当本轮用户明确要求合并或清理时，才按同文件「隔离 worktree 按需收尾」节执行。调查者与 verify 子 Agent 不得询问、不得合并或删除 worktree。
+<!-- AI_TOOLS_VERIFY_GATE_V2_END -->
 ```
 
 #### C. Sync / Archive：入口处强制检查
@@ -335,17 +337,12 @@ V1-only active change 必须先执行一次 verify，不得自动转换。V2 块
 正常 sync 更新未纳入范围的 main spec 时只产生范围外告警，不强制复验；sync 完成后再次运行脚本并汇报 `outside_path`，只要两个摘要仍匹配即可结束。archive 同样汇报范围外路径但 archive 前不重复实现验证。若范围外路径应属于当前 change，则扩展范围并复验。官方 spec validate 失败仍按官方主体处理，不能由 V2 告警改写成成功。
 
 官方 sync / archive 主体结束后，或门禁拦住导致官方主体未开始时，入口 Agent 不得询问隔离 worktree 如何处理（AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1）。默认留下本次 worktree；仅当本轮用户明确要求合并或清理时，才按同文件「隔离 worktree 按需收尾」节执行。
+<!-- AI_TOOLS_VERIFY_GATE_V2_END -->
 ```
 
 首次接入、追加或替换前，以及每次 `openspec update` 或 ai-tools 自定义层升级后，在目标项目根目录运行：
 
 ```bash
-command -v rg >/dev/null || {
-  echo 'ERROR: ripgrep (rg) is required'
-  exit 1
-}
-
-old_gate='AI_TOOLS_VERIFY_GATE_''V1'
 for file in \
   .cursor/commands/opsx-{apply,verify,sync,archive}.md \
   .cursor/skills/openspec-{apply-change,verify-change,sync-specs,archive-change}/SKILL.md
@@ -354,44 +351,91 @@ do
     echo "NOFILE    $file"
     continue
   fi
-  count="$( { rg -o --fixed-strings 'AI_TOOLS_VERIFY_GATE_V2' "$file" || true; } | wc -l | tr -d ' ')"
-  old_count="$( { rg -o --fixed-strings "$old_gate" "$file" || true; } | wc -l | tr -d ' ')"
-  case "$count:$old_count" in
-    0:0) echo "MISSING   $file" ;;
-    0:*) echo "STALE     $file (V1 gate)" ;;
-    1:0)
-      required=""
-      case "$file" in
-        *opsx-apply.md|*openspec-apply-change/SKILL.md)
-          required="AI_TOOLS_DELEGATED_APPLY_V1 AI_TOOLS_PARALLEL_DISPATCH_V1 AI_TOOLS_WORKER_APPLY_V1 AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1"
-          ;;
-        *opsx-verify.md|*openspec-verify-change/SKILL.md)
-          required="AI_TOOLS_DELEGATED_VERIFY_V1 AI_TOOLS_PARALLEL_DISPATCH_V1 AI_TOOLS_WORKER_VERIFY_V1 AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1"
-          ;;
-        *opsx-sync.md|*openspec-sync-specs/SKILL.md|*opsx-archive.md|*openspec-archive-change/SKILL.md)
-          required="AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1"
-          ;;
-      esac
-      stale_missing=""
-      for marker in $required; do
-        if ! rg -q --fixed-strings "$marker" "$file"; then
-          stale_missing="$marker"
-          break
-        fi
-      done
-      if [ -n "$stale_missing" ]; then
-        echo "STALE     $file (missing $stale_missing)"
-      else
-        echo "OK        $file"
-      fi
-      ;;
-    1:*) echo "STALE     $file (mixed V1/V2 gates)" ;;
-    *) echo "DUPLICATE $file ($count V2 markers, $old_count V1 markers)" ;;
+
+  case "$file" in
+    *opsx-apply.md|*openspec-apply-change/SKILL.md) kind="apply" ;;
+    *opsx-verify.md|*openspec-verify-change/SKILL.md) kind="verify" ;;
+    *) kind="flow" ;;
   esac
+
+  status="$(python3 - "$kind" "$file" <<'PY'
+# AI_TOOLS_VERIFY_GATE_CHECKER_V2_START
+from pathlib import Path
+import re
+import sys
+
+
+kind, path = sys.argv[1:]
+text = Path(path).read_text()
+start_pattern = re.compile(
+    r"(?m)^<!-- AI_TOOLS_VERIFY_GATE_V2 -->[ \t]*$"
+)
+end_pattern = re.compile(
+    r"(?m)^<!-- AI_TOOLS_VERIFY_GATE_V2_END -->[ \t]*$"
+)
+old_gate = "<!-- AI_TOOLS_VERIFY_GATE_" + "V1 -->"
+old_pattern = re.compile(r"(?m)^" + re.escape(old_gate) + r"[ \t]*$")
+
+starts = list(start_pattern.finditer(text))
+ends = list(end_pattern.finditer(text))
+old_count = len(old_pattern.findall(text))
+
+if not starts:
+    if old_count:
+        print("STALE (V1-only gate)")
+    else:
+        print("MISSING")
+    raise SystemExit(0)
+if len(starts) > 1 or len(ends) > 1:
+    print("DUPLICATE ({} starts, {} ends)".format(len(starts), len(ends)))
+    raise SystemExit(0)
+if old_count:
+    print("STALE (mixed V1/V2 gates)")
+    raise SystemExit(0)
+if len(ends) != 1 or ends[0].start() < starts[0].end():
+    print("STALE (malformed V2 block boundary)")
+    raise SystemExit(0)
+
+block = text[starts[0].end():ends[0].start()]
+required_by_kind = {
+    "apply": (
+        "AI_TOOLS_DELEGATED_APPLY_V1",
+        "AI_TOOLS_PARALLEL_DISPATCH_V1",
+        "AI_TOOLS_WORKER_APPLY_V1",
+        "AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1",
+    ),
+    "verify": (
+        "AI_TOOLS_DELEGATED_VERIFY_V1",
+        "AI_TOOLS_PARALLEL_DISPATCH_V1",
+        "AI_TOOLS_WORKER_VERIFY_V1",
+        "AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1",
+    ),
+    "flow": ("AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1",),
+}
+missing = [marker for marker in required_by_kind[kind] if marker not in block]
+if missing:
+    print("STALE (missing in V2 block: {})".format(missing[0]))
+    raise SystemExit(0)
+
+conflict_pattern = re.compile(
+    r"必须询问[^\n]{0,40}(?:worktree|收尾)",
+    re.IGNORECASE,
+)
+conflict = conflict_pattern.search(block)
+if conflict:
+    print("STALE (conflicting finish prompt: {})".format(conflict.group(0)))
+else:
+    print("OK")
+# AI_TOOLS_VERIFY_GATE_CHECKER_V2_END
+PY
+)"
+  echo "$status $file"
 done
 ```
 
-`MISSING` 表示尚无增强块，只向这些文件追加当前 A/B/C 节的对应完整文本。出现 V1 时标为 `STALE`，必须以 V2 完整块替换，不得再次追加；混写 V1/V2 也为 `STALE`。只有唯一 V2 块时继续检查 required：apply/verify 须保留当前委派标记、`AI_TOOLS_PARALLEL_DISPATCH_V1`、对应工作者标记（apply 为 `AI_TOOLS_WORKER_APPLY_V1`，verify 为 `AI_TOOLS_WORKER_VERIFY_V1`）以及 `AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1`；sync/archive 须保留 `AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1`。仍写「结束时必须询问 worktree 收尾」的旧块也为 `STALE`。缺少 Superpowers 或缺少 `dispatching-parallel-agents` 不得标为 `STALE`。出现 `DUPLICATE` 时先清理重复块，再按当前文本保留唯一一块。`NOFILE` 表示官方文件不存在，应先恢复官方生成层。若官方模板升级后结构发生变化，应先人工确认追加位置是否仍适用。上述检查继续验收 apply/verify 的 delegated、parallel、worker 与 no-finish-ask 语义，以及 sync/archive 的 no-finish-ask 语义。
+每个 V2 注入必须以独立注释行 `<!-- AI_TOOLS_VERIFY_GATE_V2 -->` 开始，以独立注释行 `<!-- AI_TOOLS_VERIFY_GATE_V2_END -->` 结束；检查器只读取这两个边界之间的正文，不接受行内伪标记，也不允许文档其它位置代打 required。`MISSING` 表示没有 V2 或 V1 独立起始标记；`DUPLICATE` 表示 V2 起止标记重复；`STALE` 包括 V1-only、V1/V2 混写、边界不完整、块内 required 缺失，以及块内仍有“结束时必须询问 worktree 收尾”等与 no-finish-ask 冲突的旧文案。出现 V1 时标为 `STALE`，必须以 V2 完整块替换，不得再次追加。
+
+apply 块内必须同时包含当前 APPLY delegated、parallel、worker 与 no-finish-ask 标记；verify 块内必须同时包含 VERIFY delegated、parallel、worker 与 no-finish-ask 标记；sync/archive 块内必须包含 no-finish-ask 标记。缺少 Superpowers 或缺少 `dispatching-parallel-agents` 不得标为 `STALE`。`NOFILE` 表示官方文件不存在，应先恢复官方生成层。若官方模板升级后结构发生变化，应先人工确认追加位置是否仍适用。
 
 #### D. Propose：起始 worktree 选择
 
@@ -917,7 +961,7 @@ apply/verify/sync/archive 8 个文件以及 propose 2 个文件的门禁/选择�
 - [ ] verify 子 Agent 最多修复复验 3 轮；每次修改代码后都对修复后的完整 diff 重新执行代码审查、更新 verification 的审查范围与结论，且未处理的 Critical/Important 会阻塞通过。
 - [ ] sync / archive command/skill 已追加入口门禁：仅 Verify 门禁为“通过、无阻塞”且范围摘要、内容指纹与脚本当前输出一致时才可继续。
 - [ ] `.cursor/scripts/openspec-verification-fingerprint.py` 存在，verify 与 sync/archive 使用同一脚本计算指纹。
-- [ ] 8 个 verify 门禁文件各自仅有一个 `AI_TOOLS_VERIFY_GATE_V2` 标记；2 个 propose 文件各自仅有一个 `AI_TOOLS_PROPOSE_WORKTREE_V1` 标记；10 个文件各自仅有一个 `AI_TOOLS_WORKTREE_FINISH_V1` 标记；旧块已按 `STALE` 规则替换而非重复追加。
+- [ ] 8 个 verify 门禁文件各自恰有一个独立的 `AI_TOOLS_VERIFY_GATE_V2` 起始标记和一个对应结束标记；2 个 propose 文件各自仅有一个 `AI_TOOLS_PROPOSE_WORKTREE_V1` 标记；10 个文件各自仅有一个 `AI_TOOLS_WORKTREE_FINISH_V1` 标记；旧块已按 `STALE` 规则替换而非重复追加。
 - [ ] 仍需要时：中文规则、`openspec-update-change-from-code` 可用。
 - [ ] 试跑：`/opsx-propose` 小 change，确认启动后先询问隔离 worktree 或当前工作区；若选择隔离 worktree，官方 propose 结束后不得询问怎么处理本次 worktree（可报告路径仍在）；生成 `verification.md`，且 apply 前依赖满足。
 
