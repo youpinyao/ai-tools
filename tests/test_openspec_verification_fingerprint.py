@@ -217,6 +217,26 @@ class FingerprintTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("verification change directory must be included", result.stderr)
 
+    def test_rejects_exact_exclude_of_verification_file(self) -> None:
+        self.write_verification()
+        text = self.verification.read_text().replace(
+            "- none", "- openspec/changes/scoped/verification.md"
+        )
+        self.verification.write_text(text)
+        result = self.invoke(check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("verification file must remain in scope after excludes", result.stderr)
+
+    def test_rejects_prefix_exclude_of_change_directory(self) -> None:
+        self.write_verification()
+        text = self.verification.read_text().replace(
+            "- none", "- openspec/changes/scoped/"
+        )
+        self.verification.write_text(text)
+        result = self.invoke(check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("verification file must remain in scope after excludes", result.stderr)
+
     def test_symlink_target_changes_content_digest(self) -> None:
         (self.repo / "src/link").symlink_to("app.py")
         self.write_verification()

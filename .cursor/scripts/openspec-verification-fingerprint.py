@@ -108,6 +108,11 @@ def parse_scope(document: bytes, verification_relative: str) -> Scope:
     change_prefix = verification_path.parent.as_posix().rstrip("/") + "/"
     if not any(_rule_matches(rule, change_prefix) for rule in include):
         raise ValueError("verification change directory must be included")
+    if (
+        not any(_rule_matches(rule, verification_relative) for rule in include)
+        or any(_rule_matches(rule, verification_relative) for rule in exclude)
+    ):
+        raise ValueError("verification file must remain in scope after excludes")
 
     assert baseline is not None
     try:
