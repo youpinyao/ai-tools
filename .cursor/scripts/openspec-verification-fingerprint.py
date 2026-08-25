@@ -190,6 +190,31 @@ def _index_entry(root: Path, relative: str) -> Tuple[str, str]:
 
 def _entry_data(root: Path, relative: str, verification_relative: str) -> Tuple[bytes, bytes, bytes]:
     path = root / relative
+    index_mode, index_oid = _index_entry(root, relative)
+    if index_mode == "160000":
+        if path.exists() and (path / ".git").exists():
+            try:
+                path.resolve().relative_to(root.resolve())
+            except ValueError as error:
+                raise ValueError(
+                    "scope path resolves outside the repository: {}".format(relative)
+                ) from error
+            head = subprocess.run(
+                ["git", "-C", os.fspath(path), "rev-parse", "HEAD"],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            ).stdout.strip()
+            dirty = subprocess.run(
+                ["git", "-C", os.fspath(path), "status", "--porcelain"],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            ).stdout
+            if dirty or head.decode("ascii") != index_oid:
+                raise ValueError("scoped submodule is dirty: {}".format(relative))
+        return b"SUBMODULE", b"0", index_oid.encode("ascii")
+
     if not path.exists() and not path.is_symlink():
         return b"MISSING", b"0", b"<MISSING>"
     if not path.is_symlink():
@@ -199,24 +224,6 @@ def _entry_data(root: Path, relative: str, verification_relative: str) -> Tuple[
             raise ValueError(
                 "scope path resolves outside the repository: {}".format(relative)
             ) from error
-
-    index_mode, index_oid = _index_entry(root, relative)
-    if index_mode == "160000":
-        head = subprocess.run(
-            ["git", "-C", os.fspath(path), "rev-parse", "HEAD"],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        ).stdout.strip()
-        dirty = subprocess.run(
-            ["git", "-C", os.fspath(path), "status", "--porcelain"],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        ).stdout
-        if dirty or head.decode("ascii") != index_oid:
-            raise ValueError("scoped submodule is dirty: {}".format(relative))
-        return b"SUBMODULE", b"0", head
 
     metadata = path.lstat()
     if stat.S_ISLNK(metadata.st_mode):

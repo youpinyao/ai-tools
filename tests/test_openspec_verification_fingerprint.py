@@ -283,3 +283,50 @@ class FingerprintTest(unittest.TestCase):
             self.assertIn("scoped submodule is dirty", result.stderr)
         finally:
             shutil.rmtree(child)
+
+    def test_uninitialized_submodule_gitlink_change_changes_content_digest(self) -> None:
+        child = self.repo.parent / (self.repo.name + "-child")
+        child.mkdir()
+        try:
+            run("git", "init", "-q", cwd=child)
+            run("git", "config", "user.name", "Test User", cwd=child)
+            run("git", "config", "user.email", "test@example.com", cwd=child)
+            (child / "module.py").write_text("VALUE = 1\n")
+            run("git", "add", ".", cwd=child)
+            run("git", "commit", "-qm", "module baseline", cwd=child)
+            run(
+                "git",
+                "-c",
+                "protocol.file.allow=always",
+                "submodule",
+                "add",
+                "-q",
+                os.fspath(child),
+                "modules/child",
+                cwd=self.repo,
+            )
+            run("git", "commit", "-qam", "add submodule", cwd=self.repo)
+            self.baseline = run("git", "rev-parse", "HEAD", cwd=self.repo).stdout.strip()
+            self.write_verification(include="modules/child")
+
+            (child / "module.py").write_text("VALUE = 2\n")
+            run("git", "commit", "-qam", "advance module", cwd=child)
+            next_oid = run("git", "rev-parse", "HEAD", cwd=child).stdout.strip()
+
+            run("git", "submodule", "deinit", "-f", "--", "modules/child", cwd=self.repo)
+            module_path = self.repo / "modules/child"
+            if module_path.exists():
+                shutil.rmtree(module_path)
+            first = parse_output(self.invoke().stdout)
+
+            run(
+                "git",
+                "update-index",
+                "--cacheinfo",
+                "160000,{},modules/child".format(next_oid),
+                cwd=self.repo,
+            )
+            second = parse_output(self.invoke().stdout)
+            self.assertNotEqual(first["content_digest"], second["content_digest"])
+        finally:
+            shutil.rmtree(child)
