@@ -429,19 +429,6 @@ headings = [line for line in text.splitlines() if line.startswith("## ")]
 assert headings == ["## 范围", "## 检查", "## 代码审查", "## 风险与回滚"]
 assert len(text.splitlines()) <= 30
 PY
-python3 - <<'PY'
-from pathlib import Path
-
-paths = [
-    Path("README.md"),
-    Path("docs/ai-sdd-workflow.md"),
-    Path("docs/ai-tools-integration.md"),
-    Path("docs/openspec-upgrade-plan.md"),
-]
-text = "\n".join(path.read_text() for path in paths)
-assert "AI_TOOLS_VERIFY_GATE_" + "V1" not in text
-assert "统一" + "工作区指纹" not in text
-PY
 if [ "$SOURCE_VERSION" != "$TARGET_VERSION" ]; then
   if rg -n -F "OpenSpec $SOURCE_VERSION" \
     README.md docs/ai-sdd-workflow.md docs/ai-tools-integration.md; then
@@ -511,12 +498,52 @@ openspec update
 
 - [ ] **8.3 安装升级后的自定义层**
 
-只覆盖目标项目的 `openspec/schemas/evidence-driven/`，合并 `openspec/config.yaml` 中的 `schema: evidence-driven`，再按更新后的接入文档补齐缺失的规则。
+只覆盖目标项目的 `openspec/schemas/evidence-driven/`，合并 `openspec/config.yaml`
+中的 `schema: evidence-driven`，再按更新后的接入文档补齐缺失的规则。先运行接入文档
+5.1 节检查器；对报告为 `STALE (V1-only gate)` 的文件，用对应 A/B/C 节的 V2 完整块
+原位替换旧块，禁止在旧块后追加。替换后直接运行以下断言：
+
+```bash
+GATE_FILES=(
+  .cursor/commands/opsx-{apply,verify,sync,archive}.md
+  .cursor/skills/openspec-{apply-change,verify-change,sync-specs,archive-change}/SKILL.md
+)
+
+python3 - "${GATE_FILES[@]}" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+legacy = re.compile(r"(?m)^<!-- AI_TOOLS_VERIFY_GATE_V[01] -->[ \t]*$")
+start = "<!-- AI_TOOLS_VERIFY_GATE_V2 -->"
+end = "<!-- AI_TOOLS_VERIFY_GATE_V2_END -->"
+for name in sys.argv[1:]:
+    text = Path(name).read_text()
+    assert not legacy.search(text), "{} still contains a legacy gate".format(name)
+    assert text.count(start) == 1, "{} must contain one V2 start".format(name)
+    assert text.count(end) == 1, "{} must contain one V2 end".format(name)
+PY
+
+V1_ACTIVE_REPORT="$RUN_DIR/v1-active-changes.txt"
+: > "$V1_ACTIVE_REPORT"
+for verification in openspec/changes/*/verification.md; do
+  test -f "$verification" || continue
+  if rg -q 'AI_TOOLS_VERIFICATION_(SCOPE|RESULT)_V[[]1[]]_' "$verification"; then
+    printf '%s\n' "$verification" >> "$V1_ACTIVE_REPORT"
+  fi
+done
+test ! -s "$V1_ACTIVE_REPORT" || {
+  echo "以下 active change 必须逐个运行 /opsx-verify 后才能继续："
+  command cat "$V1_ACTIVE_REPORT"
+  exit 1
+}
+```
 
 预期：目标项目自有配置未被整文件覆盖；V2 范围指纹脚本已复制并通过语法检查；
 每个目标文件中 `AI_TOOLS_VERIFY_GATE_V2` 完整块恰好一个。旧 V1 块必须替换而不是
 重复追加；若 active change 只有 V1 结果，先执行一次 verify 迁移到 V2，不得自动
-沿用旧通过状态。
+沿用旧通过状态。第一次运行可能因 `$V1_ACTIVE_REPORT` 非空而退出 1；逐个完成 verify
+后重跑必须退出 0，报告为空。
 
 - [ ] **8.4 运行目标项目 schema 和 change 冒烟测试**
 
@@ -536,10 +563,123 @@ openspec validate "openspec-upgrade-smoke" --type change --strict
 - status 和 apply instructions 能解析；
 - 未填写制品时 strict validate 应返回明确的未完成错误，而不是崩溃或 schema 解析错误。
 
-另在仓库外临时 Git 项目中创建一个最小 V2 `verification.md`，记录 baseline、include
-与 exclude：先确认范围内文件变化会导致内容指纹变化并阻断，再确认仅范围外文件变化
-时两个摘要保持一致且输出 `outside_path` 告警。冒烟测试必须调用目标项目已复制的
-脚本，不得以内嵌替代实现。
+然后执行以下可重复的范围指纹冒烟。目录由 `mktemp` 建在仓库外；脚本使用目标项目
+8.3 已复制的版本，结束时由 `trap` 清理：
+
+```bash
+SCOPED_SMOKE="$(mktemp -d "${TMPDIR:-/tmp}/ai-tools-scoped-smoke.XXXXXX")"
+trap 'rm -rf "$SCOPED_SMOKE"' EXIT
+test "${SCOPED_SMOKE#"$AI_TOOLS_DIR"/}" = "$SCOPED_SMOKE"
+
+git -C "$SCOPED_SMOKE" init -q
+mkdir -p \
+  "$SCOPED_SMOKE/src" \
+  "$SCOPED_SMOKE/openspec/changes/scoped-smoke"
+printf 'VALUE = 1\n' > "$SCOPED_SMOKE/src/app.py"
+printf 'baseline\n' > "$SCOPED_SMOKE/notes.md"
+git -C "$SCOPED_SMOKE" add src/app.py notes.md
+git -C "$SCOPED_SMOKE" \
+  -c user.name='OpenSpec Smoke' \
+  -c user.email='openspec-smoke@example.invalid' \
+  commit -qm 'baseline'
+BASELINE="$(git -C "$SCOPED_SMOKE" rev-parse HEAD)"
+VERIFICATION="$SCOPED_SMOKE/openspec/changes/scoped-smoke/verification.md"
+
+cat > "$VERIFICATION" <<EOF
+## 范围
+<!-- AI_TOOLS_VERIFICATION_SCOPE_V2_START -->
+baseline: $BASELINE
+include:
+- src/
+- openspec/changes/scoped-smoke/
+exclude:
+- none
+<!-- AI_TOOLS_VERIFICATION_SCOPE_V2_END -->
+## 检查
+- smoke | command | PASS | 初始范围指纹
+## 代码审查
+- 范围：src/ 与当前 change
+- 结论：PASS
+## 风险与回滚
+- 风险：无
+- 回滚：删除临时目录
+<!-- AI_TOOLS_VERIFICATION_RESULT_V2_START -->
+## Verify 门禁
+- 状态：通过
+- 阻塞项：无
+- 范围摘要：PENDING_SCOPE
+- 内容指纹：PENDING_CONTENT
+<!-- AI_TOOLS_VERIFICATION_RESULT_V2_END -->
+EOF
+
+run_fingerprint() {
+  (
+    cd "$SCOPED_SMOKE"
+    python3 "$TARGET_PROJECT/.cursor/scripts/openspec-verification-fingerprint.py" "$VERIFICATION"
+  )
+}
+value_of() {
+  printf '%s\n' "$1" | awk -F= -v key="$2" '$1 == key {print $2; exit}'
+}
+
+baseline_output="$(run_fingerprint)"
+baseline_exit=$?
+test "$baseline_exit" -eq 0
+scope_digest="$(value_of "$baseline_output" scope_digest)"
+content_digest="$(value_of "$baseline_output" content_digest)"
+test -n "$scope_digest"
+test -n "$content_digest"
+
+python3 - "$VERIFICATION" "$scope_digest" "$content_digest" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+text = path.read_text()
+text = text.replace("PENDING_SCOPE", sys.argv[2])
+text = text.replace("PENDING_CONTENT", sys.argv[3])
+path.write_text(text)
+PY
+
+check_gate() {
+  output="$(run_fingerprint)" || return
+  printf '%s\n' "$output"
+  actual_scope="$(value_of "$output" scope_digest)"
+  actual_content="$(value_of "$output" content_digest)"
+  test "$actual_scope" = "$scope_digest"
+  test "$actual_content" = "$content_digest"
+}
+
+printf 'outside\n' >> "$SCOPED_SMOKE/notes.md"
+set +e
+outside_output="$(check_gate 2>&1)"
+outside_exit=$?
+set -e
+test "$outside_exit" -eq 0
+outside_scope_digest="$(value_of "$outside_output" scope_digest)"
+outside_content_digest="$(value_of "$outside_output" content_digest)"
+test "$outside_scope_digest" = "$scope_digest"
+test "$outside_content_digest" = "$content_digest"
+test "$(value_of "$outside_output" outside_changes)" -eq 1
+test "$(value_of "$outside_output" outside_path)" = "notes.md"
+
+printf 'VALUE = 2\n' > "$SCOPED_SMOKE/src/app.py"
+set +e
+inside_output="$(check_gate 2>&1)"
+inside_exit=$?
+set -e
+inside_content_digest="$(value_of "$inside_output" content_digest)"
+test "$inside_content_digest" != "$content_digest"
+test "$inside_exit" -ne 0
+
+rm -rf "$SCOPED_SMOKE"
+trap - EXIT
+```
+
+预期：初始化、baseline commit 和首次脚本调用均退出 0。只修改 `notes.md` 时
+`outside_exit=0`，范围摘要与内容指纹均不变，并输出一个 `outside_path=notes.md`
+告警；修改 `src/app.py` 后内容指纹变化，`check_gate` 因摘要不匹配而使
+`inside_exit` 非 0，表示范围内阻断。最后只删除本步骤创建的仓库外临时目录。
 
 - [ ] **8.5 清理冒烟 change**
 

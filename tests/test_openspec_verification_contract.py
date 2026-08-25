@@ -62,12 +62,109 @@ def section(text: str, start: str, end: str) -> str:
 
 
 class VerificationContractTest(unittest.TestCase):
-    def test_current_docs_use_scoped_v2_language(self) -> None:
-        combined = "\n".join(path.read_text() for path in CURRENT_DOCS)
-        self.assertIn("AI_TOOLS_VERIFY_GATE_V2", combined)
-        self.assertIn("范围外", combined)
-        self.assertNotIn("AI_TOOLS_VERIFY_GATE_V1", combined)
-        self.assertNotIn("统一工作区指纹", combined)
+    def test_current_docs_each_define_scoped_v2_responsibilities(self) -> None:
+        required_by_doc = {
+            "README.md": (
+                r"AI_TOOLS_VERIFY_GATE_V2",
+                r"V2 范围指纹",
+                r"范围内变化.{0,40}阻断",
+                r"范围外变化.{0,40}告警",
+                r"sync.{0,80}main spec.{0,40}不强制重复实现验证",
+            ),
+            "ai-sdd-workflow.md": (
+                r"AI_TOOLS_VERIFY_GATE_V2",
+                r"范围摘要与内容\s*指纹",
+                r"范围内变化.{0,40}阻断",
+                r"范围外变化.{0,40}告警",
+                r"sync.{0,100}main spec.{0,60}不.{0,20}重复实现验证",
+            ),
+            "ai-tools-integration.md": (
+                r"AI_TOOLS_VERIFY_GATE_V2",
+                r"V2 范围指纹",
+                r"范围内变化.{0,40}阻断",
+                r"范围外变化.{0,40}告警",
+                r"正常 sync.{0,100}main spec.{0,60}不强制复验",
+            ),
+            "openspec-upgrade-plan.md": (
+                r"AI_TOOLS_VERIFY_GATE_V2",
+                r"V2 范围指纹",
+                r"范围内阻断",
+                r"范围外告警",
+                r"sync.{0,100}main spec.{0,60}不强制重复实现验证",
+            ),
+        }
+        for path in CURRENT_DOCS:
+            text = path.read_text()
+            for pattern in required_by_doc[path.name]:
+                with self.subTest(path=path.name, pattern=pattern):
+                    self.assertRegex(text, re.compile(pattern, re.DOTALL))
+
+    def test_current_docs_reject_legacy_workspace_and_finish_prompt_semantics(
+        self,
+    ) -> None:
+        for path in CURRENT_DOCS:
+            text = path.read_text()
+            if path == INTEGRATION:
+                text = re.sub(
+                    r"(?ms)^# AI_TOOLS_VERIFY_GATE_CHECKER_V2_START$.*?"
+                    r"^# AI_TOOLS_VERIFY_GATE_CHECKER_V2_END$",
+                    "",
+                    text,
+                )
+            compact = re.sub(r"""[`'"\s+]""", "", text)
+            with self.subTest(path=path.name, contract="legacy gate"):
+                self.assertNotIn("AI_TOOLS_VERIFY_GATE_V1", compact)
+            legacy_workspace = re.compile(
+                r"(?:统一|确定性|记录的|整个|完整|全)(?:的)?工作区(?:内容)?指纹"
+            )
+            for match in legacy_workspace.finditer(compact):
+                context = compact[max(0, match.start() - 40):match.start()]
+                with self.subTest(path=path.name, phrase=match.group(0)):
+                    self.assertRegex(
+                        context,
+                        re.compile(r"(?:不回退|不再|不得|禁止|删除|移除|旧).{0,40}$"),
+                    )
+
+        workflow = (ROOT / "docs/ai-sdd-workflow.md").read_text()
+        self.assertIn("本轮用户明确要求", workflow)
+        self.assertIn("默认保留", workflow)
+        self.assertNotRegex(
+            workflow,
+            re.compile(
+                r"WorktreeFinish[^\n]*\|[^|\n]*询问[^|\n]*(?:合并|清理)",
+            ),
+        )
+        self.assertNotRegex(
+            workflow,
+            re.compile(r"(?<!不得)(?<!不应)主动询问.{0,40}(?:合并|清理|收尾)"),
+        )
+
+    def test_upgrade_plan_has_executable_v1_migration_and_scoped_smoke(
+        self,
+    ) -> None:
+        text = (ROOT / "docs/openspec-upgrade-plan.md").read_text()
+        required_commands = (
+            'SCOPED_SMOKE="$(mktemp -d',
+            "trap 'rm -rf \"$SCOPED_SMOKE\"' EXIT",
+            'git -C "$SCOPED_SMOKE" init',
+            'git -C "$SCOPED_SMOKE" add',
+            "commit -qm 'baseline'",
+            'BASELINE="$(git -C "$SCOPED_SMOKE" rev-parse HEAD)"',
+            "AI_TOOLS_VERIFICATION_SCOPE_V2_START",
+            "AI_TOOLS_VERIFICATION_RESULT_V2_START",
+            'openspec-verification-fingerprint.py" "$VERIFICATION"',
+            'test "$outside_scope_digest" = "$scope_digest"',
+            'test "$outside_content_digest" = "$content_digest"',
+            'test "$inside_content_digest" != "$content_digest"',
+            'test "$outside_exit" -eq 0',
+            'test "$inside_exit" -ne 0',
+            "V1-only active change",
+        )
+        for command in required_commands:
+            with self.subTest(command=command):
+                self.assertIn(command, text)
+        self.assertRegex(text, re.compile(r"V2 完整块.{0,40}替换"))
+        self.assertRegex(text, re.compile(r"(?:禁止|不得).{0,20}追加"))
 
     def test_template_is_compact_and_uses_v2_blocks(self) -> None:
         text = TEMPLATE.read_text()

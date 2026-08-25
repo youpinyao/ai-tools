@@ -92,9 +92,9 @@ flowchart TD
     Gate -->|archive| ArchiveLoop
 
     ArchiveLoop[archive]
-    ArchiveLoop --> WorktreeFinish{仍在隔离 worktree?}
-    WorktreeFinish -->|是：询问合并并清理| Closed
-    WorktreeFinish -->|否| Closed
+    ArchiveLoop --> WorktreeFinish{本轮用户明确要求<br/>收尾 worktree?}
+    WorktreeFinish -->|是：按需合并或清理| Closed
+    WorktreeFinish -->|否：默认保留| Closed
     Closed[change 已结束<br/>适用的规格变化已沉淀]
     Closed --> PostRelease{发布后验证是否发现问题?}
     PostRelease -->|否| NewBaseline([形成下一轮基线])
