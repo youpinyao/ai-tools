@@ -235,12 +235,14 @@ class VerificationContractTest(unittest.TestCase):
                     path.parent.mkdir(parents=True, exist_ok=True)
                     path.write_text(valid_gate)
 
-            def invoke() -> subprocess.CompletedProcess:
+            def invoke(*, optimize: bool = False) -> subprocess.CompletedProcess:
                 environment = os.environ.copy()
                 environment.update({
                     "REPRESENTATIVE_TARGET_PROJECT": str(target),
                     "RUN_DIR": str(run_dir),
                 })
+                if optimize:
+                    environment["PYTHONOPTIMIZE"] = "1"
                 return subprocess.run(
                     ["bash", "-c", migration],
                     cwd=ROOT,
@@ -257,6 +259,7 @@ class VerificationContractTest(unittest.TestCase):
             legacy = "<!-- AI_TOOLS_VERIFY_GATE_" + "V1 -->\n"
             (target / gate_paths[0]).write_text(valid_gate + legacy)
             self.assertNotEqual(invoke().returncode, 0)
+            self.assertNotEqual(invoke(optimize=True).returncode, 0)
 
             reset_target()
             (target / gate_paths[0]).write_text(valid_gate + valid_gate)

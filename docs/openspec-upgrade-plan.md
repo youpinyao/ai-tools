@@ -426,8 +426,11 @@ from pathlib import Path
 
 text = Path("openspec/schemas/evidence-driven/templates/verification.md").read_text()
 headings = [line for line in text.splitlines() if line.startswith("## ")]
-assert headings == ["## 范围", "## 检查", "## 代码审查", "## 风险与回滚"]
-assert len(text.splitlines()) <= 30
+expected = ["## 范围", "## 检查", "## 代码审查", "## 风险与回滚"]
+if headings != expected:
+    raise SystemExit("verification.md headings must be exactly: {}".format(expected))
+if len(text.splitlines()) > 30:
+    raise SystemExit("verification.md must not exceed 30 lines")
 PY
 if [ "$SOURCE_VERSION" != "$TARGET_VERSION" ]; then
   if rg -n -F "OpenSpec $SOURCE_VERSION" \
@@ -536,9 +539,12 @@ start = "<!-- AI_TOOLS_VERIFY_GATE_V2 -->"
 end = "<!-- AI_TOOLS_VERIFY_GATE_V2_END -->"
 for name in sys.argv[1:]:
     text = Path(name).read_text()
-    assert not legacy.search(text), "{} still contains a legacy gate".format(name)
-    assert text.count(start) == 1, "{} must contain one V2 start".format(name)
-    assert text.count(end) == 1, "{} must contain one V2 end".format(name)
+    if legacy.search(text):
+        raise SystemExit("{} still contains a legacy gate".format(name))
+    if text.count(start) != 1:
+        raise SystemExit("{} must contain one V2 start".format(name))
+    if text.count(end) != 1:
+        raise SystemExit("{} must contain one V2 end".format(name))
 PY
 
 V1_ACTIVE_REPORT="$RUN_DIR/v1-active-changes.txt"
