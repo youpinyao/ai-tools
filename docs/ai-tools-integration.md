@@ -26,7 +26,7 @@
 | 层级 | 谁维护 | 内容 |
 |------|--------|------|
 | 官方生成层 | OpenSpec CLI 为基线，项目补充 propose worktree 选择、隔离 worktree 收尾、验证闭环与流转门禁 | explore / propose / update / apply / verify / archive / sync |
-| 自定义层 | ai-tools | `evidence-driven` schema（含 `verification`）、propose worktree 选择、隔离 worktree 收尾、验证闭环与流转门禁、工作区指纹脚本、中文规则、from-code 旁路 |
+| 自定义层 | ai-tools | `evidence-driven` schema（含 `verification`）、propose worktree 选择、隔离 worktree 收尾、验证闭环与流转门禁、范围指纹脚本、中文规则、from-code 旁路 |
 
 **不要**再把本仓库里的官方 skill/command 副本拷进业务仓覆盖官方文件。应先由 `openspec init` / `openspec update` 生成官方层，再按本文向 propose、apply、verify、sync、archive 的 command/skill 追加项目规则。本仓库 `.gitignore` 已忽略那 7 组官方路径。
 
@@ -53,7 +53,7 @@
 ## 2. 前置条件
 
 - Node.js 满足 OpenSpec CLI 要求（官方要求 Node.js ≥ 20.19.0）。
-- Python 3.8+（用于计算 verify、sync、archive 共用的确定性工作区指纹）。
+- Python 3.8+（用于计算 verify、sync、archive 共用的确定性范围指纹）。
 - 支持 [Agent Skills](https://agentskills.io) 的助手（本文以 Cursor 为主）。
 - 能在目标项目根目录执行 shell。
 
@@ -182,100 +182,25 @@ openspec schema validate evidence-driven
 
 ### 5.1 补充 verify 修复闭环与流转门禁
 
-安装或更新 OpenSpec 官方 command/skills 后，必须确保 propose、apply、verify、sync、archive 都含当前规则。apply、verify、sync、archive 每个文件只保留一个 `AI_TOOLS_VERIFY_GATE_V1` 增强块；propose command/skill 每个文件只保留一个 `AI_TOOLS_PROPOSE_WORKTREE_V1` 增强块；上述 10 个文件每个还只保留一个 `AI_TOOLS_WORKTREE_FINISH_V1` 收尾块。三套标记不得混写：Verify 门禁不得写入 propose，propose worktree 选择不得写入 apply/verify/sync/archive，收尾块必须同时出现在全部 10 个文件且不得并入另外两套块的正文。
+安装或更新 OpenSpec 官方 command/skills 后，必须确保 propose、apply、verify、sync、archive 都含当前规则。apply、verify、sync、archive 每个文件只保留一个 `AI_TOOLS_VERIFY_GATE_V2` 增强块；propose command/skill 每个文件只保留一个 `AI_TOOLS_PROPOSE_WORKTREE_V1` 增强块；上述 10 个文件每个还只保留一个 `AI_TOOLS_WORKTREE_FINISH_V1` 收尾块。三套标记不得混写：Verify 门禁不得写入 propose，propose worktree 选择不得写入 apply/verify/sync/archive，收尾块必须同时出现在全部 10 个文件且不得并入另外两套块的正文。
 
-插入位置：YAML frontmatter 之后、官方正文（含 Store selection 与 **Steps**）之前，使 Agent 先读到项目规则。1.10.0 的 `openspec init --tools cursor` 仍生成下列 10 个目标文件；官方 apply 在制品缺失时可能提示未随 init 生成的 `/opsx-continue`，不要把它纳入本仓库 `.gitignore` 或本节幂等清单。官方流程本身不提供 worktree 选择、隔离 worktree 收尾、子 Agent 编排、`verification.md` 持久化门禁或工作区指纹；下列 A/B/C/D/E 仍是项目级追加，不是官方已实现能力。
+插入位置：YAML frontmatter 之后、官方正文（含 Store selection 与 **Steps**）之前，使 Agent 先读到项目规则。1.10.0 的 `openspec init --tools cursor` 仍生成下列 10 个目标文件；官方 apply 在制品缺失时可能提示未随 init 生成的 `/opsx-continue`，不要把它纳入本仓库 `.gitignore` 或本节幂等清单。官方流程本身不提供 worktree 选择、隔离 worktree 收尾、子 Agent 编排、`verification.md` 持久化门禁或范围指纹；下列 A/B/C/D/E 仍是项目级追加，不是官方已实现能力。
 
-#### 统一工作区指纹
+#### V2 范围指纹脚本
 
-先创建 `.cursor/scripts/openspec-verification-fingerprint.py`：
+从 ai-tools 同次复制脚本与升级注入块，不再把脚本源码内嵌到业务仓文档：
 
-```python
-#!/usr/bin/env python3
-import hashlib
-import os
-from pathlib import Path
-import re
-import subprocess
-import sys
+```bash
+mkdir -p "$TARGET_PROJECT/.cursor/scripts"
+cp "$AI_TOOLS_DIR/.cursor/scripts/openspec-verification-fingerprint.py" \
+  "$TARGET_PROJECT/.cursor/scripts/openspec-verification-fingerprint.py"
 
-START = b"<!-- AI_TOOLS_VERIFICATION_RESULT_V1_START -->"
-END = b"<!-- AI_TOOLS_VERIFICATION_RESULT_V1_END -->"
-GATE_PATTERN = re.compile(
-    rb"(?ms)^[ \t]*" + re.escape(START) + rb".*?^[ \t]*"
-    + re.escape(END) + rb"[ \t]*\r?\n?"
-)
-
-
-def git(root: Path, *args: str) -> bytes:
-    return subprocess.check_output(["git", *args], cwd=root)
-
-
-def add_frame(digest: "hashlib._Hash", label: bytes, data: bytes) -> None:
-    digest.update(len(label).to_bytes(8, "big"))
-    digest.update(label)
-    digest.update(len(data).to_bytes(8, "big"))
-    digest.update(data)
-
-
-def main() -> None:
-    if len(sys.argv) != 2:
-        raise SystemExit("usage: openspec-verification-fingerprint.py <verification.md>")
-
-    root = Path(os.fsdecode(git(Path.cwd(), "rev-parse", "--show-toplevel").strip())).resolve()
-    verification = Path(sys.argv[1]).resolve()
-    try:
-        verification_relative = verification.relative_to(root)
-    except ValueError as error:
-        raise SystemExit("verification.md must be inside the Git repository") from error
-
-    raw_paths = git(root, "ls-files", "-co", "--exclude-standard", "-z").split(b"\0")
-    digest = hashlib.sha256()
-    add_frame(digest, b"HEAD", git(root, "rev-parse", "HEAD").strip())
-    add_frame(
-        digest,
-        b"STATUS",
-        git(root, "status", "--porcelain=v1", "-z", "--untracked-files=all"),
-    )
-    add_frame(digest, b"INDEX", git(root, "ls-files", "--stage", "-z"))
-
-    verification_key = os.fsencode(verification_relative.as_posix())
-    for raw_path in sorted(path for path in raw_paths if path):
-        path = root / os.fsdecode(raw_path)
-        if path.is_symlink():
-            data = b"<SYMLINK>" + os.fsencode(os.readlink(path))
-        elif path.is_dir():
-            relative = os.fsdecode(raw_path)
-            submodule_status = git(root, "submodule", "status", "--", relative)
-            nested_status = git(
-                path,
-                "status",
-                "--porcelain=v1",
-                "-z",
-                "--untracked-files=all",
-            )
-            if not submodule_status.startswith(b" ") or nested_status:
-                raise SystemExit(
-                    f"submodule must be initialized and clean before verify: {relative}"
-                )
-            data = b"<SUBMODULE>" + submodule_status
-        elif path.exists():
-            data = path.read_bytes()
-        else:
-            data = b"<MISSING>"
-        if raw_path == verification_key:
-            data = GATE_PATTERN.sub(b"", data)
-        add_frame(digest, b"PATH", raw_path)
-        add_frame(digest, b"CONTENT", data)
-
-    print(digest.hexdigest())
-
-
-if __name__ == "__main__":
-    main()
+# 无副作用语法解析检查；不会生成 __pycache__
+python3 -c 'import ast, pathlib, sys; ast.parse(pathlib.Path(sys.argv[1]).read_text())' \
+  "$TARGET_PROJECT/.cursor/scripts/openspec-verification-fingerprint.py"
 ```
 
-该脚本对 `HEAD`、索引元数据、工作区状态及所有 tracked/untracked 非忽略文件进行确定性计算。对于当前 `verification.md`，仅排除 `AI_TOOLS_VERIFICATION_RESULT_V1` 门禁块自身；验证证据、失败记录或剩余风险的任何变化仍会改变指纹。Git submodule 必须已初始化且工作区干净，脚本会将其固定提交纳入指纹，否则直接阻塞流转。
+脚本版本与 `AI_TOOLS_VERIFY_GATE_V2` 注入块必须同次升级。V2 只对范围块声明的路径计算内容指纹；范围内变化会使旧结果失效并阻断流转，范围外变化由 `outside_path` 输出为告警，不会自动扩大指纹到整个工作区。若范围外路径实际属于当前 change，必须扩展范围并复验。
 
 #### A. Apply：派发实施与独立验证
 
@@ -287,10 +212,10 @@ if __name__ == "__main__":
 插入位置：YAML frontmatter 之后、官方 **Steps** 第 1 步（Select the change）之前。1.10.0 官方 apply 是串行任务循环，不含子 Agent；在 `state: "all_done"` 与完成输出中会建议 `/opsx-archive`。以本块第 4–5 条为准，门禁通过前不得按官方文案建议 sync 或 archive。
 
 ```markdown
-<!-- AI_TOOLS_VERIFY_GATE_V1 -->
+<!-- AI_TOOLS_VERIFY_GATE_V2 -->
 ## Apply 子 Agent 实施与强制验证
 
-若当前会话已按本节派发过 apply 子 Agent，本节视为已执行，不得因 command 与 skill 同处一个上下文而重复派发。入口 Agent 仍负责等待 apply 子 Agent、在其成功后派发并等待 verify 子 Agent，以及检查 Verify 门禁和工作区指纹，但不得执行官方 apply 主体。官方 apply 在 `state: "all_done"` 或任务全部完成后会建议 `/opsx-archive`；在 Verify 门禁通过前，不得按该官方文案建议 sync 或 archive。
+若当前会话已按本节派发过 apply 子 Agent，本节视为已执行，不得因 command 与 skill 同处一个上下文而重复派发。入口 Agent 仍负责等待 apply 子 Agent、在其成功后派发并等待 verify 子 Agent，以及检查 Verify 门禁和范围指纹，但不得执行官方 apply 主体。官方 apply 在 `state: "all_done"` 或任务全部完成后会建议 `/opsx-archive`；在 Verify 门禁通过前，不得按该官方文案建议 sync 或 archive。
 
 在执行任何 apply 主体步骤前，只检查父 Agent 或用户下发给本次任务的提示文本；本规则正文中出现的标记字符串不计入判定。按下列顺序判定，命中即停：
 
@@ -305,7 +230,7 @@ if __name__ == "__main__":
    - 派发一个子 Agent，在任务中加入 `AI_TOOLS_DELEGATED_APPLY_V1`，要求其使用 `openspec-apply-change` skill 实施当前 change，且不得派发 apply 或 verify 阶段子 Agent；
    - 等待 apply 子 Agent 返回；失败或阻塞时立即停止，不得启动 verify；
    - apply 成功后派发另一个独立子 Agent，在任务中加入 `AI_TOOLS_DELEGATED_VERIFY_V1`，要求其使用 `openspec-verify-change` skill 执行 verify；
-   - 等待 verify 子 Agent 返回，再检查唯一 Verify 门禁及当前工作区指纹。
+   - 等待 verify 子 Agent 返回，再检查唯一 V2 范围块、结果块及当前范围指纹。
 3. 若提示文本显式包含 `AI_TOOLS_DELEGATED_APPLY_V1`，当前 Agent 是 apply 子 Agent，不得再次派发 apply 或 verify 阶段子 Agent。apply 与 verify 两个阶段必须串行，不得对开。执行官方 apply 主体前，仅当本会话可用 skills 列表中存在名为 `dispatching-parallel-agents` 的 skill 时，才读取并遵循该 skill；不得因本规则正文出现该 skill 名、也不得因磁盘或插件缓存中能读到 `SKILL.md` 而判定为可用。阶段内并行（AI_TOOLS_PARALLEL_DISPATCH_V1）：
    - skill 在会话列表中：仅对无共享状态、不会改同一相对路径或同一制品、互不依赖的独立 task 域，在同一轮派发实施者。每个实施者任务必须包含 `AI_TOOLS_WORKER_APPLY_V1`，且不得包含 `AI_TOOLS_DELEGATED_APPLY_V1` 或 `AI_TOOLS_DELEGATED_VERIFY_V1`。实施者返回后，以本阶段开始时的路径集合为基线，若两名及以上实施者改动了同一相对路径，则视为重叠，由 apply 子 Agent 串行重做冲突项。无法还原该基线或无法分离已混写内容时，停止并把阻塞返回入口 Agent，不得勾选冲突项。只有 apply 子 Agent 勾选 `tasks.md`。全部 task 结束后仍由 apply 子 Agent 对完整实现 diff 做首次代码审查。
    - skill 不在会话列表中：按官方逐项循环由 apply 子 Agent 自己实施；不得为并行派发实施者；静默串行，不向用户报错，不得猜测、不得联网安装该 skill。
@@ -313,9 +238,10 @@ if __name__ == "__main__":
    - 共享状态、会改同一路径或同一制品、修 A 可能带上 B、或拿不准时：不并行。
    - 实施者缺少必要上下文：由 apply 子 Agent 补齐后重派或改串行，不得让实施者猜测 change。
    完成后把结果或阻塞返回入口 Agent。
-4. 仅当 Verify 门禁为“状态：通过、阻塞项：无”且指纹匹配时，入口 Agent 才可结束 apply 并建议 sync 或 archive。
-5. Verify 门禁缺失、状态未通过、存在阻塞、指纹不匹配或 verify 子 Agent 失败时，入口 Agent 不得宣告 apply 完成；change 保持 active，必须报告具体阻塞原因，且不得建议 sync 或 archive。
-6. 入口 Agent 准备结束本命令（含成功后的 verify、apply/verify 失败停止，或会话 worktree 已创建但官方主体未完成）时，不得询问隔离 worktree 如何处理（AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1）。默认留下本次 worktree；可以简短报告路径与分支仍在，不得弹出合并 / 清理 / 保留菜单。仅当本轮用户明确要求合并或清理时，才按同文件「隔离 worktree 按需收尾」节执行。实施者与 apply 子 Agent 不得询问、不得合并或删除 worktree。
+4. apply 子 Agent 不计算摘要；它仍须对完整实现 diff 做首次代码审查。verify 返回后，入口 Agent 读取恰好一个 `AI_TOOLS_VERIFICATION_SCOPE_V2_START` 范围块和一个 `AI_TOOLS_VERIFICATION_RESULT_V2_START` 结果块，运行 `python3 .cursor/scripts/openspec-verification-fingerprint.py "<当前 change 的 verification.md 路径>"`，并将输出的 `scope_digest`、`content_digest` 分别与“范围摘要”“内容指纹”比较。
+5. 仅当状态为“通过”、阻塞项为“无”、两个摘要一致且脚本成功时，入口 Agent 才可结束 apply 并建议 sync 或 archive。范围内变化、状态阻塞、摘要不匹配、脚本失败或 verify 子 Agent 失败均阻止完成；change 保持 active，必须报告具体原因，且不得建议 sync 或 archive。
+6. `outside_changes` 大于 0 时逐项汇报 `outside_path`，但范围外变化只告警，不改变通过状态；若入口判断某路径属于当前 change，则停止完成、扩展范围并复验。
+7. 入口 Agent 准备结束本命令（含成功后的 verify、apply/verify 失败停止，或会话 worktree 已创建但官方主体未完成）时，不得询问隔离 worktree 如何处理（AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1）。默认留下本次 worktree；可以简短报告路径与分支仍在，不得弹出合并 / 清理 / 保留菜单。仅当本轮用户明确要求合并或清理时，才按同文件「隔离 worktree 按需收尾」节执行。实施者与 apply 子 Agent 不得询问、不得合并或删除 worktree。
 ```
 
 #### B. Verify：修复、复验并持久化结论
@@ -328,7 +254,7 @@ if __name__ == "__main__":
 插入位置：YAML frontmatter 之后、官方 **Steps** 第 1 步（Select the change）之前。1.10.0 官方 verify 只在会话中输出 Completeness / Correctness / Coherence 记分卡，不写 `verification.md`、不修复、不算指纹；官方「Ready for archive」不是项目硬门禁，不得替代下方闭环。
 
 ```markdown
-<!-- AI_TOOLS_VERIFY_GATE_V1 -->
+<!-- AI_TOOLS_VERIFY_GATE_V2 -->
 ## Verify 入口编排与验证阻塞修复闭环
 
 若当前会话已派发过 verify 子 Agent（无论由本节还是 Apply 节触发），本节视为已执行，不得因 command 与 skill 同处一个上下文而重复派发。入口 Agent 只等待该子 Agent 并读取、汇报最终门禁，不得执行官方 verify 主体。官方 verify 的会话记分卡（CRITICAL / WARNING / SUGGESTION）和「Ready for archive」文案不是本项目硬门禁，不得替代下方闭环；必须写入 `verification.md` 并计算指纹。
@@ -356,20 +282,31 @@ if __name__ == "__main__":
 1. 实际执行验证并检查代码、测试及 change 制品。发现可安全修复的阻塞项时，按第 3 步已判定的方式修复（verify 子 Agent 串行修复，或对独立修复域派带 `AI_TOOLS_WORKER_VERIFY_V1` 的调查者），并重新运行受影响的检查和完整 verify。
 2. 最多执行 3 轮“验证—修复—重新验证”。同一轮内并行修复只计 1 轮。同一阻塞连续两轮无进展时提前停止。
 3. 遇到需要用户决策、缺少权限或凭据、外部服务故障、破坏性操作，或超出当前 change 范围的修改时，不得自行处理，停止并报告。
-4. 将每轮实际命令、结果、修复内容和剩余风险写回当前 change 的 `verification.md`。verify 子 Agent 每次修改代码后，必须针对修复后的完整 diff 重新执行代码审查，并更新 `verification.md` 中的审查范围与结论；存在未处理的 Critical/Important 时不得通过。
-5. 全部适用检查已执行、无失败或待执行项，且无未处理的 Critical/Important 与其它阻塞项时，在 `verification.md` 末尾新增或替换以下唯一门禁块，先将验证指纹写为 `PENDING`：
+4. 根据当前 change 的实现 baseline 与完整 diff 生成候选 include/exclude。基线提交（`baseline`）必须解析为提交；包含路径（`include`）至少覆盖当前 change 目录和全部属于该 change 的代码、测试与制品路径，目录前缀以 `/` 结尾；排除路径（`exclude`）只排除 include 下明确无关的路径，没有排除项时写 `none`。无法区分当前 change 与既有无关改动时停止并询问，不回退全工作区指纹。
+5. 将实际检查写回 `verification.md` 的统一检查表；复验时只更新统一表中的原行，不追加每轮历史。结果证据只保留退出码、摘要和报告路径。verify 子 Agent 每次修改代码后，必须针对修复后的完整 diff 重新执行代码审查并更新原审查行；存在未处理的 Critical/Important 时不得通过。
+6. 最终写入恰好一个范围块和一个结果块。先写 `PENDING`，并删除旧 V1 结果块：
 
-   <!-- AI_TOOLS_VERIFICATION_RESULT_V1_START -->
+   <!-- AI_TOOLS_VERIFICATION_SCOPE_V2_START -->
+   baseline: <完整提交 SHA>
+   include:
+   - openspec/changes/<change-name>/
+   - <属于当前 change 的代码或测试路径>
+   exclude:
+   - none
+   <!-- AI_TOOLS_VERIFICATION_SCOPE_V2_END -->
+
+   <!-- AI_TOOLS_VERIFICATION_RESULT_V2_START -->
    ## Verify 门禁
    - 状态：通过
    - 阻塞项：无
-   - 验证指纹：PENDING
-   <!-- AI_TOOLS_VERIFICATION_RESULT_V1_END -->
+   - 范围摘要：PENDING
+   - 内容指纹：PENDING
+   <!-- AI_TOOLS_VERIFICATION_RESULT_V2_END -->
 
-6. 运行 `python3 .cursor/scripts/openspec-verification-fingerprint.py "<当前 change 的 verification.md 路径>"`，将 `PENDING` 替换为命令输出的完整 SHA-256。替换后再次运行该命令，输出必须与记录值一致。
-7. 未通过时同样新增或替换该门禁块，将状态写为 `阻塞`，在“阻塞项”中列出具体问题，并将验证指纹写为 `无效`；不得保留旧的“通过”结果。
+7. 运行 `python3 .cursor/scripts/openspec-verification-fingerprint.py "<当前 change 的 verification.md 路径>"`，将 `scope_digest` 和 `content_digest` 分别回填为“范围摘要”和“内容指纹”；再次运行后两个输出必须与记录值一致。V2 结果字段为“状态、阻塞项、范围摘要、内容指纹”。
+8. 未通过时仍保留唯一 V2 范围块，将结果状态写为“阻塞”、列出具体阻塞项，并把两个摘要写为“无效”；不得保留旧“通过”结果。范围外变化写入汇报，不将状态改为阻塞；若判断属于 change，则扩展范围并复验。
 
-单独运行 `/opsx-verify` 时也执行以上步骤；其最终指纹一致性仍由后续 sync/archive 入口强制重新计算并复核。
+单独运行 `/opsx-verify` 时也执行以上步骤；其两个摘要仍由后续 sync/archive 入口重新计算并复核。
 
 入口 Agent 准备结束本命令（含验证失败停止）时，不得询问隔离 worktree 如何处理（AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1）。默认留下本次 worktree；仅当本轮用户明确要求合并或清理时，才按同文件「隔离 worktree 按需收尾」节执行。调查者与 verify 子 Agent 不得询问、不得合并或删除 worktree。
 ```
@@ -386,14 +323,16 @@ if __name__ == "__main__":
 插入位置：YAML frontmatter 之后、官方 **Steps** 第 1 步（Select the change，含 archive 的 advisory `openspec instructions archive`）之前。1.10.0 官方 archive 对未完成制品或任务仅警告并允许用户确认继续，且 `openspec instructions archive --json` 被标明为不得阻断归档的 advisory 输入；这些官方行为不得用来绕过本项目 Verify 门禁。
 
 ```markdown
-<!-- AI_TOOLS_VERIFY_GATE_V1 -->
+<!-- AI_TOOLS_VERIFY_GATE_V2 -->
 ## Verification 流转门禁
 
-执行任何 sync 或 archive 操作前，必须读取当前 change 的 `verification.md`，并检查唯一的 `AI_TOOLS_VERIFICATION_RESULT_V1` 门禁块。运行 `python3 .cursor/scripts/openspec-verification-fingerprint.py "<当前 change 的 verification.md 路径>"` 重新计算当前工作区指纹；只有门禁块同时包含 `状态：通过`、`阻塞项：无`，且记录的验证指纹与命令输出完全一致时才可继续。
+执行任何 sync 或 archive 操作前，必须读取当前 change 的 `verification.md`，并要求恰好一个 V2 范围块和结果块。运行 `python3 .cursor/scripts/openspec-verification-fingerprint.py "<当前 change 的 verification.md 路径>"`；只有状态为“通过”、阻塞项为“无”，且记录的范围摘要、内容指纹与当前 `scope_digest`、`content_digest` 完全一致时才可继续。
 
 本门禁发生在官方 sync / archive 主体之前。官方 archive 对未完成制品或任务仅警告并允许用户确认继续，且 `openspec instructions archive --json` 被标明为不得阻断归档的 advisory 输入；上述官方行为不得用来绕过本门禁。
 
-门禁块缺失、状态不是“通过”、阻塞项不是“无”、验证指纹不匹配，或存在多个门禁块时，立即停止；不得通过用户确认绕过。验证后发生的任何代码或制品变化都会使旧门禁失效，应先重新执行 verify，修复阻塞并刷新门禁结果。
+V1-only active change 必须先执行一次 verify，不得自动转换。V2 块缺失或重复、状态不是“通过”、阻塞项不是“无”、任一摘要不匹配、脚本失败或范围内变化时立即停止，不得通过用户确认绕过，也不得在 archive 前重复实现验证来代替已持久化门禁。
+
+正常 sync 更新未纳入范围的 main spec 时只产生范围外告警，不强制复验；sync 完成后再次运行脚本并汇报 `outside_path`，只要两个摘要仍匹配即可结束。archive 同样汇报范围外路径但 archive 前不重复实现验证。若范围外路径应属于当前 change，则扩展范围并复验。官方 spec validate 失败仍按官方主体处理，不能由 V2 告警改写成成功。
 
 官方 sync / archive 主体结束后，或门禁拦住导致官方主体未开始时，入口 Agent 不得询问隔离 worktree 如何处理（AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1）。默认留下本次 worktree；仅当本轮用户明确要求合并或清理时，才按同文件「隔离 worktree 按需收尾」节执行。
 ```
@@ -406,6 +345,7 @@ command -v rg >/dev/null || {
   exit 1
 }
 
+old_gate='AI_TOOLS_VERIFY_GATE_''V1'
 for file in \
   .cursor/commands/opsx-{apply,verify,sync,archive}.md \
   .cursor/skills/openspec-{apply-change,verify-change,sync-specs,archive-change}/SKILL.md
@@ -414,10 +354,12 @@ do
     echo "NOFILE    $file"
     continue
   fi
-  count="$( { rg -o --fixed-strings 'AI_TOOLS_VERIFY_GATE_V1' "$file" || true; } | wc -l | tr -d ' ')"
-  case "$count" in
-    0) echo "MISSING   $file" ;;
-    1)
+  count="$( { rg -o --fixed-strings 'AI_TOOLS_VERIFY_GATE_V2' "$file" || true; } | wc -l | tr -d ' ')"
+  old_count="$( { rg -o --fixed-strings "$old_gate" "$file" || true; } | wc -l | tr -d ' ')"
+  case "$count:$old_count" in
+    0:0) echo "MISSING   $file" ;;
+    0:*) echo "STALE     $file (V1 gate)" ;;
+    1:0)
       required=""
       case "$file" in
         *opsx-apply.md|*openspec-apply-change/SKILL.md)
@@ -443,12 +385,13 @@ do
         echo "OK        $file"
       fi
       ;;
-    *) echo "DUPLICATE $file ($count markers)" ;;
+    1:*) echo "STALE     $file (mixed V1/V2 gates)" ;;
+    *) echo "DUPLICATE $file ($count V2 markers, $old_count V1 markers)" ;;
   esac
 done
 ```
 
-`MISSING` 表示尚无增强块，只向这些文件追加当前 A/B/C 节的对应完整文本。`STALE` 表示文件只有一个 `AI_TOOLS_VERIFY_GATE_V1` 标记，但缺少当前 required 标记：apply/verify 须含当前委派标记、`AI_TOOLS_PARALLEL_DISPATCH_V1`、对应工作者标记（apply 为 `AI_TOOLS_WORKER_APPLY_V1`，verify 为 `AI_TOOLS_WORKER_VERIFY_V1`）以及 `AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1`；sync/archive 须含 `AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1`。必须用当前 A/B/C 节的完整注入文本替换旧块，不得再次追加。仍写「结束时必须询问 worktree 收尾」的旧块因此为 `STALE`。缺少 Superpowers 或缺少 `dispatching-parallel-agents` 不得标为 `STALE`。出现 `DUPLICATE` 时先清理重复块，再按当前文本保留唯一一块。`NOFILE` 表示官方文件不存在，应先恢复官方生成层。若官方模板升级后结构发生变化，应先人工确认追加位置是否仍适用。上述检查同时验收 apply 两个文件的 APPLY、并行、工作者与禁止主动收尾询问标记，verify 两个文件的 VERIFY、并行、工作者与禁止主动收尾询问标记，以及 sync/archive 四个文件的禁止主动收尾询问标记，无需维护第二套检查逻辑。
+`MISSING` 表示尚无增强块，只向这些文件追加当前 A/B/C 节的对应完整文本。出现 V1 时标为 `STALE`，必须以 V2 完整块替换，不得再次追加；混写 V1/V2 也为 `STALE`。只有唯一 V2 块时继续检查 required：apply/verify 须保留当前委派标记、`AI_TOOLS_PARALLEL_DISPATCH_V1`、对应工作者标记（apply 为 `AI_TOOLS_WORKER_APPLY_V1`，verify 为 `AI_TOOLS_WORKER_VERIFY_V1`）以及 `AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1`；sync/archive 须保留 `AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1`。仍写「结束时必须询问 worktree 收尾」的旧块也为 `STALE`。缺少 Superpowers 或缺少 `dispatching-parallel-agents` 不得标为 `STALE`。出现 `DUPLICATE` 时先清理重复块，再按当前文本保留唯一一块。`NOFILE` 表示官方文件不存在，应先恢复官方生成层。若官方模板升级后结构发生变化，应先人工确认追加位置是否仍适用。上述检查继续验收 apply/verify 的 delegated、parallel、worker 与 no-finish-ask 语义，以及 sync/archive 的 no-finish-ask 语义。
 
 #### D. Propose：起始 worktree 选择
 
@@ -556,11 +499,11 @@ do
 done
 ```
 
-`MISSING` 表示尚无增强块，只向这两个文件追加当前 D 节完整文本。`STALE` 表示文件只有一个 `AI_TOOLS_PROPOSE_WORKTREE_V1` 标记，但缺少 `AI_TOOLS_PROPOSE_WORKTREE_ASK_ALWAYS_V1`、`AI_TOOLS_PROPOSE_WORKTREE_INDEPENDENT_V1`、`AI_TOOLS_PROPOSE_WORKTREE_WORKSPACE_ROOT_V1`、`AI_TOOLS_PROPOSE_WORKTREE_NO_DOWNGRADE_V1`、`AI_TOOLS_PROPOSE_WORKTREE_SESSION_V1` 或 `AI_TOOLS_PROPOSE_WORKTREE_NO_FINISH_ASK_V1`（含仍只有旧标记 `AI_TOOLS_PROPOSE_WORKTREE_REUSE_V1`、未冻结 `$SESSION_WORKTREE`、或结尾仍要求「准备结束回复时必须询问收尾」的块）；必须用当前 D 节完整注入文本替换旧块，不得再次追加。出现 `DUPLICATE` 时先清理重复块，再按当前文本保留唯一一块。`NOFILE` 表示官方 propose 文件不存在，应先运行 `openspec init --tools cursor` 或 `openspec update`。不要把 propose 块写入 apply/verify/sync/archive 文件，也不要把 `AI_TOOLS_VERIFY_GATE_V1` 写入 propose 文件。不要把 `AI_TOOLS_WORKTREE_FINISH_V1` 写入 D 节正文；收尾使用独立的 E 节块。
+`MISSING` 表示尚无增强块，只向这两个文件追加当前 D 节完整文本。`STALE` 表示文件只有一个 `AI_TOOLS_PROPOSE_WORKTREE_V1` 标记，但缺少 `AI_TOOLS_PROPOSE_WORKTREE_ASK_ALWAYS_V1`、`AI_TOOLS_PROPOSE_WORKTREE_INDEPENDENT_V1`、`AI_TOOLS_PROPOSE_WORKTREE_WORKSPACE_ROOT_V1`、`AI_TOOLS_PROPOSE_WORKTREE_NO_DOWNGRADE_V1`、`AI_TOOLS_PROPOSE_WORKTREE_SESSION_V1` 或 `AI_TOOLS_PROPOSE_WORKTREE_NO_FINISH_ASK_V1`（含仍只有旧标记 `AI_TOOLS_PROPOSE_WORKTREE_REUSE_V1`、未冻结 `$SESSION_WORKTREE`、或结尾仍要求「准备结束回复时必须询问收尾」的块）；必须用当前 D 节完整注入文本替换旧块，不得再次追加。出现 `DUPLICATE` 时先清理重复块，再按当前文本保留唯一一块。`NOFILE` 表示官方 propose 文件不存在，应先运行 `openspec init --tools cursor` 或 `openspec update`。不要把 propose 块或 Verify 门禁块混写到错误文件。不要把 `AI_TOOLS_WORKTREE_FINISH_V1` 写入 D 节正文；收尾使用独立的 E 节块。
 
 #### E. 隔离 worktree 按需收尾
 
-向以下 10 个文件追加或替换为以下内容（`STALE` 时替换旧收尾块）。每个文件在已有 A/B/C 或 D 块之后再追加本块，不得把本块并入 `AI_TOOLS_VERIFY_GATE_V1` 或 `AI_TOOLS_PROPOSE_WORKTREE_V1` 正文。
+向以下 10 个文件追加或替换为以下内容（`STALE` 时替换旧收尾块）。每个文件在已有 A/B/C 或 D 块之后再追加本块，不得把本块并入 `AI_TOOLS_VERIFY_GATE_V2` 或 `AI_TOOLS_PROPOSE_WORKTREE_V1` 正文。
 
 - `.cursor/commands/opsx-propose.md`
 - `.cursor/skills/openspec-propose/SKILL.md`
@@ -780,7 +723,7 @@ propose 的 worktree 选择按 5.1 节 D 段注入，发生在官方 propose 主
 ### 6.1 迁移原则
 
 1. **官方层归还官方**：删除本地分叉的官方 skill/command，再用 `openspec update`（或 `init`）重新生成。
-2. **自定义层只留明确约定的内容**：`evidence-driven`、5.1 节的 propose worktree 选择、隔离 worktree 按需收尾、验证闭环与流转门禁及工作区指纹脚本、中文规则、from-code。
+2. **自定义层只留明确约定的内容**：`evidence-driven`、5.1 节的 propose worktree 选择、隔离 worktree 按需收尾、验证闭环与流转门禁及范围指纹脚本、中文规则、from-code。
 3. **不要**把旧分叉文件「合并进」新官方模板；仅在官方生成物上追加带幂等标记的规则，其它旧门禁迁到项目自有 rule/skill。
 4. **先备份再删**：至少保留分支或补丁，便于对照旧门禁文案。
 
@@ -895,7 +838,7 @@ openspec update
 openspec schema validate evidence-driven
 ```
 
-`openspec update` 可能刷新官方 skills/commands。升级完成后必须运行 5.1 节的三套检查并处理 `MISSING`、`STALE`、`DUPLICATE` 或 `NOFILE`：apply/verify/sync/archive 仅 `MISSING` 追加；其 `STALE` 表示旧 V1 块缺少当前委派标记、`AI_TOOLS_PARALLEL_DISPATCH_V1`、对应工作者标记或 `AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1`（sync/archive 缺少后者即为 `STALE`），须用当前 A/B/C 节完整文本替换旧块。propose 仅 `MISSING` 追加；其 `STALE` 表示旧块缺少 `AI_TOOLS_PROPOSE_WORKTREE_ASK_ALWAYS_V1`、`AI_TOOLS_PROPOSE_WORKTREE_INDEPENDENT_V1`、`AI_TOOLS_PROPOSE_WORKTREE_WORKSPACE_ROOT_V1`、`AI_TOOLS_PROPOSE_WORKTREE_NO_DOWNGRADE_V1`、`AI_TOOLS_PROPOSE_WORKTREE_SESSION_V1` 或 `AI_TOOLS_PROPOSE_WORKTREE_NO_FINISH_ASK_V1`（含仍只有 `AI_TOOLS_PROPOSE_WORKTREE_REUSE_V1`、未冻结会话 worktree、或结尾仍要求结束时询问收尾的块），须用当前 D 节完整文本替换旧块。10 个文件的收尾块仅 `MISSING` 追加；其 `STALE` 表示旧块缺少 `AI_TOOLS_WORKTREE_FINISH_NO_ASK_V1`、`AI_TOOLS_WORKTREE_FINISH_SCOPE_V1` 或 `AI_TOOLS_WORKTREE_FINISH_MERGE_CLEANUP_V1`（含仍只有 `AI_TOOLS_WORKTREE_FINISH_ASK_ALWAYS_V1` 的块），须用当前 E 节完整文本替换旧收尾块。`DUPLICATE` 先清理；10 个文件的三套检查最终必须全部为 `OK`。
+`openspec update` 可能刷新官方 skills/commands。升级完成后必须运行 5.1 节的三套检查并处理 `MISSING`、`STALE`、`DUPLICATE` 或 `NOFILE`：apply/verify/sync/archive 仅 `MISSING` 追加；出现 V1、混写 V1/V2，或唯一 V2 块缺少当前委派标记、`AI_TOOLS_PARALLEL_DISPATCH_V1`、对应工作者标记或 `AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1`（sync/archive 缺少后者）时均为 `STALE`，须用当前 A/B/C 节 V2 完整文本替换旧块。propose 仅 `MISSING` 追加；其 `STALE` 表示旧块缺少 `AI_TOOLS_PROPOSE_WORKTREE_ASK_ALWAYS_V1`、`AI_TOOLS_PROPOSE_WORKTREE_INDEPENDENT_V1`、`AI_TOOLS_PROPOSE_WORKTREE_WORKSPACE_ROOT_V1`、`AI_TOOLS_PROPOSE_WORKTREE_NO_DOWNGRADE_V1`、`AI_TOOLS_PROPOSE_WORKTREE_SESSION_V1` 或 `AI_TOOLS_PROPOSE_WORKTREE_NO_FINISH_ASK_V1`（含仍只有旧标记 `AI_TOOLS_PROPOSE_WORKTREE_REUSE_V1`、未冻结会话 worktree、或结尾仍要求结束时询问收尾的块），须用当前 D 节完整文本替换旧块。10 个文件的收尾块仅 `MISSING` 追加；其 `STALE` 表示旧块缺少 `AI_TOOLS_WORKTREE_FINISH_NO_ASK_V1`、`AI_TOOLS_WORKTREE_FINISH_SCOPE_V1` 或 `AI_TOOLS_WORKTREE_FINISH_MERGE_CLEANUP_V1`（含仍只有 `AI_TOOLS_WORKTREE_FINISH_ASK_ALWAYS_V1` 的块），须用当前 E 节完整文本替换旧收尾块。`DUPLICATE` 先清理；10 个文件的三套检查最终必须全部为 `OK`。
 
 ### 7.2 升级 ai-tools 自定义层
 
@@ -911,13 +854,17 @@ cp \
   "$AI_TOOLS_DIR/.cursor/rules/openspec-chinese.mdc" \
   "$TARGET_PROJECT/.cursor/rules/openspec-chinese.mdc"
 
+mkdir -p "$TARGET_PROJECT/.cursor/scripts"
+cp "$AI_TOOLS_DIR/.cursor/scripts/openspec-verification-fingerprint.py" \
+  "$TARGET_PROJECT/.cursor/scripts/openspec-verification-fingerprint.py"
+
 cd "$TARGET_PROJECT"
 openspec schema validate evidence-driven
 ```
 
 **禁止**用本仓库完整 `openspec/config.yaml` 覆盖目标配置；只合并 `schema: evidence-driven`。
 
-ai-tools 自定义层升级后也必须运行 5.1 节三套检查脚本，识别并替换 `STALE` 的旧 V1 apply/verify/sync/archive 块（含缺少 `AI_TOOLS_PARALLEL_DISPATCH_V1`、工作者标记或 `AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1` 的情况）、`STALE` 的旧 propose worktree 块（含缺少 `AI_TOOLS_PROPOSE_WORKTREE_NO_FINISH_ASK_V1`）以及 `STALE` 的旧 worktree 收尾块（含仍只有 `AI_TOOLS_WORKTREE_FINISH_ASK_ALWAYS_V1`）；验收前 10 个文件的三套检查都应输出 `OK`。
+ai-tools 自定义层升级后也必须同次复制 V2 范围指纹脚本，并运行 5.1 节三套检查脚本：出现 V1 或缺少 `AI_TOOLS_PARALLEL_DISPATCH_V1`、工作者标记、`AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1` 的 apply/verify/sync/archive 块均为 `STALE`，与旧 propose worktree 块（含缺少 `AI_TOOLS_PROPOSE_WORKTREE_NO_FINISH_ASK_V1`）及旧 worktree 收尾块（含仍只有 `AI_TOOLS_WORKTREE_FINISH_ASK_ALWAYS_V1`）一样，必须整块替换；验收前 10 个文件的三套检查都应输出 `OK`。
 
 ### 7.3 本仓库（ai-tools）自身注意事项
 
@@ -952,7 +899,7 @@ ai-tools 自定义层升级后也必须运行 5.1 节三套检查脚本，识别
 - active change：`openspec/changes/<name>/`
 - 归档：`<planningHome.changesDir>/archive/`（仓库内通常是 `openspec/changes/archive/`）
 
-官方 `/opsx-propose` / `/opsx-apply` / `/opsx-verify` / `/opsx-sync` / `/opsx-archive` 仍由上述 7 组生成物提供。官方 verify 只输出会话记分卡；官方 archive 对未完成制品或任务仅警告并允许确认继续。项目级 `AI_TOOLS_VERIFY_GATE_V1` 是额外门禁。
+官方 `/opsx-propose` / `/opsx-apply` / `/opsx-verify` / `/opsx-sync` / `/opsx-archive` 仍由上述 7 组生成物提供。官方 verify 只输出会话记分卡；官方 archive 对未完成制品或任务仅警告并允许确认继续。项目级 `AI_TOOLS_VERIFY_GATE_V2` 是额外门禁。
 
 ## 8. 验收清单
 
@@ -968,9 +915,9 @@ apply/verify/sync/archive 8 个文件以及 propose 2 个文件的门禁/选择�
 - [ ] 旧分叉官方 skill/command 已从 Git 跟踪中移除（路径 C）。
 - [ ] 运行 5.1 节三套脚本，8 个 verify 门禁文件与 2 个 propose 文件均输出 `OK`，10 个文件的收尾检查也均输出 `OK`，没有 `MISSING`、`STALE`、`DUPLICATE` 或 `NOFILE`；其中 apply command/skill 含 `AI_TOOLS_DELEGATED_APPLY_V1`、`AI_TOOLS_PARALLEL_DISPATCH_V1`、`AI_TOOLS_WORKER_APPLY_V1` 与 `AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1`，verify command/skill 含 `AI_TOOLS_DELEGATED_VERIFY_V1`、`AI_TOOLS_PARALLEL_DISPATCH_V1`、`AI_TOOLS_WORKER_VERIFY_V1` 与 `AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1`，sync/archive 四个文件含 `AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1`，propose command/skill 含 `AI_TOOLS_PROPOSE_WORKTREE_ASK_ALWAYS_V1`、`AI_TOOLS_PROPOSE_WORKTREE_INDEPENDENT_V1`、`AI_TOOLS_PROPOSE_WORKTREE_WORKSPACE_ROOT_V1`、`AI_TOOLS_PROPOSE_WORKTREE_NO_DOWNGRADE_V1`、`AI_TOOLS_PROPOSE_WORKTREE_SESSION_V1` 与 `AI_TOOLS_PROPOSE_WORKTREE_NO_FINISH_ASK_V1`，10 个文件均含 `AI_TOOLS_WORKTREE_FINISH_NO_ASK_V1`、`AI_TOOLS_WORKTREE_FINISH_SCOPE_V1` 与 `AI_TOOLS_WORKTREE_FINISH_MERGE_CLEANUP_V1`。
 - [ ] verify 子 Agent 最多修复复验 3 轮；每次修改代码后都对修复后的完整 diff 重新执行代码审查、更新 verification 的审查范围与结论，且未处理的 Critical/Important 会阻塞通过。
-- [ ] sync / archive command/skill 已追加入口门禁：仅 Verify 门禁为“通过、无阻塞”且验证指纹与当前工作区一致时才可继续。
+- [ ] sync / archive command/skill 已追加入口门禁：仅 Verify 门禁为“通过、无阻塞”且范围摘要、内容指纹与脚本当前输出一致时才可继续。
 - [ ] `.cursor/scripts/openspec-verification-fingerprint.py` 存在，verify 与 sync/archive 使用同一脚本计算指纹。
-- [ ] 8 个 verify 门禁文件各自仅有一个 `AI_TOOLS_VERIFY_GATE_V1` 标记；2 个 propose 文件各自仅有一个 `AI_TOOLS_PROPOSE_WORKTREE_V1` 标记；10 个文件各自仅有一个 `AI_TOOLS_WORKTREE_FINISH_V1` 标记；旧块已按 `STALE` 规则替换而非重复追加。
+- [ ] 8 个 verify 门禁文件各自仅有一个 `AI_TOOLS_VERIFY_GATE_V2` 标记；2 个 propose 文件各自仅有一个 `AI_TOOLS_PROPOSE_WORKTREE_V1` 标记；10 个文件各自仅有一个 `AI_TOOLS_WORKTREE_FINISH_V1` 标记；旧块已按 `STALE` 规则替换而非重复追加。
 - [ ] 仍需要时：中文规则、`openspec-update-change-from-code` 可用。
 - [ ] 试跑：`/opsx-propose` 小 change，确认启动后先询问隔离 worktree 或当前工作区；若选择隔离 worktree，官方 propose 结束后不得询问怎么处理本次 worktree（可报告路径仍在）；生成 `verification.md`，且 apply 前依赖满足。
 
