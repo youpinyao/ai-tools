@@ -196,6 +196,90 @@ class VerificationContractTest(unittest.TestCase):
             )
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_upgrade_plan_v2_migration_block_executes_fail_fast(self) -> None:
+        text = (ROOT / "docs/openspec-upgrade-plan.md").read_text()
+        migration = fenced_bash(
+            text,
+            "替换后直接运行以下断言：",
+            "预期：目标项目自有配置未被整文件覆盖",
+        )
+        self.assertTrue(migration.startswith("set -euo pipefail\n"))
+
+        gate_paths = (
+            ".cursor/commands/opsx-apply.md",
+            ".cursor/commands/opsx-verify.md",
+            ".cursor/commands/opsx-sync.md",
+            ".cursor/commands/opsx-archive.md",
+            ".cursor/skills/openspec-apply-change/SKILL.md",
+            ".cursor/skills/openspec-verify-change/SKILL.md",
+            ".cursor/skills/openspec-sync-specs/SKILL.md",
+            ".cursor/skills/openspec-archive-change/SKILL.md",
+        )
+        valid_gate = (
+            "<!-- AI_TOOLS_VERIFY_GATE_V2 -->\n"
+            "current\n"
+            "<!-- AI_TOOLS_VERIFY_GATE_V2_END -->\n"
+        )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "target"
+            run_dir = root / "run"
+            run_dir.mkdir()
+
+            def reset_target() -> None:
+                if target.exists():
+                    shutil.rmtree(target)
+                for relative in gate_paths:
+                    path = target / relative
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_text(valid_gate)
+
+            def invoke() -> subprocess.CompletedProcess:
+                environment = os.environ.copy()
+                environment.update({
+                    "REPRESENTATIVE_TARGET_PROJECT": str(target),
+                    "RUN_DIR": str(run_dir),
+                })
+                return subprocess.run(
+                    ["bash", "-c", migration],
+                    cwd=ROOT,
+                    env=environment,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+
+            reset_target()
+            self.assertEqual(invoke().returncode, 0)
+
+            reset_target()
+            legacy = "<!-- AI_TOOLS_VERIFY_GATE_" + "V1 -->\n"
+            (target / gate_paths[0]).write_text(valid_gate + legacy)
+            self.assertNotEqual(invoke().returncode, 0)
+
+            reset_target()
+            (target / gate_paths[0]).write_text(valid_gate + valid_gate)
+            self.assertNotEqual(invoke().returncode, 0)
+
+            reset_target()
+            (target / gate_paths[0]).unlink()
+            self.assertNotEqual(invoke().returncode, 0)
+
+            reset_target()
+            (target / gate_paths[0]).write_text("official body only\n")
+            self.assertNotEqual(invoke().returncode, 0)
+
+            reset_target()
+            verification = target / "openspec/changes/legacy/verification.md"
+            verification.parent.mkdir(parents=True)
+            marker = "AI_TOOLS_VERIFICATION_RESULT_" + "V1_START"
+            verification.write_text("<!-- {} -->\n".format(marker))
+            active = invoke()
+            self.assertNotEqual(active.returncode, 0)
+            report = run_dir / "v1-active-changes.txt"
+            self.assertIn(str(verification.relative_to(target)), report.read_text())
+
     def test_upgrade_plan_smoke_executes_and_restores_fail_fast(self) -> None:
         text = (ROOT / "docs/openspec-upgrade-plan.md").read_text()
         smoke = fenced_bash(

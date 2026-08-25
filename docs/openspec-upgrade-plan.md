@@ -504,6 +504,23 @@ openspec update
 原位替换旧块，禁止在旧块后追加。替换后直接运行以下断言：
 
 ```bash
+set -euo pipefail
+
+: "${REPRESENTATIVE_TARGET_PROJECT:?设置为 8.1 已选代表性目标项目的绝对路径}"
+: "${RUN_DIR:?先执行“每次运行的输入与记录”初始化}"
+case "$REPRESENTATIVE_TARGET_PROJECT" in
+  /*) ;;
+  *) echo "REPRESENTATIVE_TARGET_PROJECT 必须是绝对路径" >&2; exit 1 ;;
+esac
+case "$RUN_DIR" in
+  /*) ;;
+  *) echo "RUN_DIR 必须是绝对路径" >&2; exit 1 ;;
+esac
+TARGET_PROJECT="$REPRESENTATIVE_TARGET_PROJECT"
+TARGET_PROJECT="$(cd "$TARGET_PROJECT" && pwd -P)"
+RUN_DIR="$(cd "$RUN_DIR" && pwd -P)"
+cd "$TARGET_PROJECT"
+
 GATE_FILES=(
   .cursor/commands/opsx-{apply,verify,sync,archive}.md
   .cursor/skills/openspec-{apply-change,verify-change,sync-specs,archive-change}/SKILL.md
@@ -544,7 +561,9 @@ test ! -s "$V1_ACTIVE_REPORT" || {
 每个目标文件中 `AI_TOOLS_VERIFY_GATE_V2` 完整块恰好一个。旧 V1 块必须替换而不是
 重复追加；若 active change 只有 V1 结果，先执行一次 verify 迁移到 V2，不得自动
 沿用旧通过状态。第一次运行可能因 `$V1_ACTIVE_REPORT` 非空而退出 1；逐个完成 verify
-后重跑必须退出 0，报告为空。
+后重跑必须退出 0，报告为空。该独立片段全程启用 `set -euo pipefail`；目标项目、
+运行记录目录、任一目标文件或 V2 块断言失败都会立即以非零退出，不得继续执行并被
+末尾命令掩盖。
 
 - [ ] **8.4 运行目标项目 schema 和 change 冒烟测试**
 
