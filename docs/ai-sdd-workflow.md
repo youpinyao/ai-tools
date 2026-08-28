@@ -155,14 +155,14 @@ flowchart TD
   或传递 UNAVAILABLE 并串行；交接畸形或读取失败会阻塞，不得静默降级。子 Agent
   回报「阶段内并行：」行。后续安装无需再替换注入。自行扫描磁盘上的 `SKILL.md`
   不足以为可用。
-- `sync` 或 `archive` 入口会检查验证状态为通过、阻塞项为无，并复核范围摘要与内容
-  指纹。范围内变化会使旧门禁失效并阻断流转；范围外变化只告警。若范围外路径属于
+- `sync` 或 `archive` 入口会检查验证状态为通过、阻塞项为无，并复核 V2 范围指纹。
+  范围内变化构成范围内阻断；范围外变化只产生范围外告警。若范围外路径属于
   当前 change，必须扩展范围并复验。正常 sync 生成的 main spec 未纳入声明范围时，
   不使 implementation verification 失效；后续没有新增变化时，archive 入口直接复核
-  已有门禁与指纹，不重复实现验证。若要继续实施或改变范围，先通过 `update` 调整
+  已有门禁与 V2 范围指纹，不重复实现验证。若要继续实施或改变范围，先通过 `update` 调整
   受影响制品，再进入 apply。
 - 未安装增强规则时，以上子 Agent 派发、门禁与隔离 worktree 收尾均不成立；`verify`、`sync`、`archive`
-  的具体条件与行为仍以目标项目当前 OpenSpec 官方生成物为准。OpenSpec 1.10.0 官方
+  的具体条件与行为仍以目标项目当前 OpenSpec 官方生成物为准。OpenSpec 1.11.0 官方
   `/opsx-verify` 只输出会话记分卡（Completeness / Correctness / Coherence），不写
   `verification.md`；官方 `/opsx-archive` 对未完成制品或任务仅警告并允许用户确认
   继续。项目级 Verify 门禁不是官方行为。
@@ -265,8 +265,8 @@ change 再调用 `/opsx-update-change-from-code`：该命令只更新已有 chan
 然后再完成归档。是否需要先执行 `verify`，以及后续何时归档，遵循目标项目当前官方
 生成物。若 sync 发生在隔离 worktree 中，
 跑完后默认留下本次 worktree，不得主动询问怎么处理；仅当用户明确要求时才合并或清理。
-安装 V2 门禁后，sync 会复核范围摘要与内容指纹；同步生成的 main spec 若未纳入声明
-范围，只产生范围外告警，不要求重复实现验证。
+安装 V2 门禁后，sync 会复核 V2 范围指纹；同步生成的 main spec 若未纳入声明
+范围，只产生范围外告警，不要求重复实现验证。范围内变化仍构成范围内阻断。
 
 ## 使用原则
 
@@ -284,10 +284,10 @@ change 再调用 `/opsx-update-change-from-code`：该命令只更新已有 chan
   `root.path`。路径为 `<root>/openspec/specs/<capability-path>/spec.md`，不要假设仓库相对路径。
 - 实现完成后建议核验。安装 `AI_TOOLS_VERIFY_GATE_V2` 后，apply 与单独
   `/opsx-verify` 均由入口 Agent 派发子 Agent 执行，阶段内并行由入口按会话 skills
-  目录以唯一有边界的块交接 `dispatching-parallel-agents`，并通过 Verify 门禁、
-  范围摘要与内容指纹约束 sync/archive；范围内变化阻断，范围外变化告警。未安装增强规则时，
+  目录以唯一有边界的块交接 `dispatching-parallel-agents`，并通过 Verify 门禁与
+  V2 范围指纹约束 sync/archive；范围内阻断，范围外告警。未安装增强规则时，
   `verify`、`sync`、`archive` 的具体条件与行为
-  遵循目标项目当前 OpenSpec 官方生成物（1.10.0 官方 verify 仅为会话记分卡，官方
+  遵循目标项目当前 OpenSpec 官方生成物（1.11.0 官方 verify 仅为会话记分卡，官方
   archive 允许确认绕过）。
 - 隔离 worktree 跑完后默认留下现场。安装 `AI_TOOLS_WORKTREE_FINISH_V1` 后，
   入口 Agent 不得主动询问是否合并到主分支并清理；仅当用户明确要求时才执行。

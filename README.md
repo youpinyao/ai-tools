@@ -149,7 +149,7 @@ TARGET_PROJECT="/absolute/path/to/target-project"
    清理时没有同一套安全步骤；注入后各阶段结束时不得主动询问怎么处理。
 
 官方 `/opsx-*` 命令及对应 skills 归 OpenSpec 管理；升级后的具体行为应以目标项目
-中当前 OpenSpec 官方生成物为准，不要从本仓库寻找或复制官方模板。当前 CLI 1.10.0
+中当前 OpenSpec 官方生成物为准，不要从本仓库寻找或复制官方模板。当前 CLI 1.11.0
 已确认的命令（以 `openspec --help` 为准，不要猜测未列出的参数）：
 
 - 新项目：`openspec init --tools cursor`
@@ -206,7 +206,7 @@ verify、archive 与 sync 的具体行为以当前 OpenSpec 官方生成物为�
 
 ## Schema：`evidence-driven`
 
-`evidence-driven` 以 OpenSpec 1.10.0 官方 `spec-driven` 为本次语义基线：
+`evidence-driven` 以 OpenSpec 1.11.0 官方 `spec-driven` 为本次语义基线：
 
 - `proposal`、`specs`、`design`、`tasks` 是官方语义的简体中文派生。
 - 新增紧凑的 `verification.md` 账本，以范围、检查、代码审查、风险与回滚四节保存
@@ -216,7 +216,7 @@ verify、archive 与 sync 的具体行为以当前 OpenSpec 官方生成物为�
   结果、失败原因和未执行项；schema 不把这些记录扩展成额外的官方 verify 或
   archive 行为。
 
-兼容的官方 1.10.0 语义包括：
+兼容的官方 1.11.0 语义包括：
 
 - 用 `planningHome.root` 定位主规范，不要写死仓库相对路径。
 - 每项任务必须在 `- [ ]` 说明中写明如何验证完成。
@@ -230,12 +230,12 @@ verify、archive 与 sync 的具体行为以当前 OpenSpec 官方生成物为�
 - 官方 `/opsx-verify` 只在会话中输出 Completeness / Correctness / Coherence
   记分卡，不写 `verification.md`。官方 `/opsx-archive` 对未完成制品或任务仅警告
   并允许确认继续。项目级 `AI_TOOLS_VERIFY_GATE_V2` 是额外门禁，不是 OpenSpec
-  官方行为。V2 以声明范围计算摘要与内容指纹：范围内变化使门禁失效并阻断流转，
-  范围外变化只告警；若范围外路径实际属于 change，必须扩展范围并复验。正常
+  官方行为。该门禁使用 V2 范围指纹：范围内变化构成范围内阻断并使旧结果失效，
+  范围外变化只产生范围外告警；若范围外路径实际属于 change，必须扩展范围并复验。正常
   `/opsx-sync` 生成的 main spec 未纳入声明范围时，不强制重复实现验证。
 
 后续升级 OpenSpec 时，应从当前官方 `spec-driven` 基线重新核对这些语义，而不是
-永久假定 1.10.0 的实现细节。
+永久假定 1.11.0 的实现细节。
 
 ## 许可证
 

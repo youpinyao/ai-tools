@@ -107,7 +107,7 @@ class VerificationContractTest(unittest.TestCase):
             ),
             "ai-sdd-workflow.md": (
                 r"AI_TOOLS_VERIFY_GATE_V2",
-                r"范围摘要与内容\s*指纹",
+                r"V2 范围指纹",
                 r"范围内变化.{0,40}阻断",
                 r"范围外变化.{0,40}告警",
                 r"sync.{0,100}main spec.{0,60}不.{0,20}重复实现验证",
@@ -460,7 +460,7 @@ class VerificationContractTest(unittest.TestCase):
             "告警",
             "扩展范围并复验",
             "无法区分当前 change 与既有无关改动时",
-            "不回退全工作区指纹",
+            "不得把 V2 范围指纹扩大到声明范围之外",
             "更新统一表中的原行",
             "退出码、摘要和报告路径",
         ):
