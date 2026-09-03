@@ -15,7 +15,7 @@
 
 - Python 3.10+
 - `uv`（推荐）或 `pipx`
-- 支持 Agent Skills 的 AI 编程助手；本方案以 Cursor 为例
+- Cursor（本方案仅覆盖 Cursor 规则集成）
 
 安装官方包（PyPI 包名为 `graphifyy`，命令名为 `graphify`）：
 
@@ -39,8 +39,7 @@ pipx ensurepath
 
 ```text
 <project>/
-├── .agents/skills/graphify/     # Cursor 可调用的项目级 Graphify Skill
-├── .cursor/rules/graphify.mdc   # Graphify 生成的查询优先规则
+├── .cursor/rules/graphify.mdc   # Graphify 生成的 Cursor 查询优先规则
 ├── .gitattributes               # graph.json merge driver 关联
 ├── .graphifyignore              # Graphify 专用排除规则
 └── graphify-out/
@@ -50,7 +49,7 @@ pipx ensurepath
     └── manifest.json            # 增量提取所需的可移植清单
 ```
 
-建议提交项目级 Skill、Cursor rule、`.gitattributes`、`.graphifyignore`，以及 `graphify-out/` 中的三个核心图谱产物和 `manifest.json`，让团队成员拉取代码后即可查询并复用增量状态。`cost.json` 属于本地成本记录，`cache/` 是否提交取决于仓库体积和构建速度；包含本机路径的元数据不应提交。
+建议提交 Cursor rule、`.gitattributes`、`.graphifyignore`，以及 `graphify-out/` 中的三个核心图谱产物和 `manifest.json`，让团队成员拉取代码后即可查询并复用增量状态。`cost.json` 属于本地成本记录，`cache/` 是否提交取决于仓库体积和构建速度；包含本机路径的元数据不应提交。
 
 建议加入目标项目的 `.gitignore`：
 
@@ -78,17 +77,15 @@ build/
 在目标项目根目录执行：
 
 ```bash
-# 安装 Cursor 可调用的项目级 Agent Skill
-graphify install --platform agents --project
-
-# 安装项目级 Cursor 查询优先规则
-graphify cursor install
+# 安装项目级 Cursor 规则（落到 .cursor/rules/graphify.mdc）
+# 与 graphify cursor install 等价
+graphify install --platform cursor --project
 
 # 团队协作项目：安装本地 Git hook、注册 merge driver
 graphify hook install
 ```
 
-项目级 Agent Skill 是 `/graphify` 工作流的执行入口；Cursor rule 只负责在图谱已存在时引导 Agent 优先执行限定查询，不能替代 Skill。个人单机使用可跳过 Git hook；需要提交共享图谱或处理并行修改的团队项目应安装 hook。随后在 Cursor 中运行：
+Cursor 官方平台只写入 alwaysApply 规则，不安装 `.agents/skills/` 或 `.cursor/skills/` 下的 Skill。该规则会引导 Agent 优先执行限定查询。个人单机使用可跳过 Git hook；需要提交共享图谱或处理并行修改的团队项目应安装 hook。随后在 Cursor 中运行：
 
 ```text
 /graphify .
@@ -177,7 +174,7 @@ graphify update .
 
 团队协作约定：
 
-1. 首位接入者生成并提交项目级 Skill、Cursor rule、`.graphifyignore`、`.gitattributes`、核心图谱产物和 `manifest.json`。
+1. 首位接入者生成并提交 Cursor rule、`.graphifyignore`、`.gitattributes`、核心图谱产物和 `manifest.json`。
 2. 其他成员拉取后执行 `graphify hook install`，在本地 Git 配置中注册 merge driver。
 3. 代码提交前优先运行 `graphify update .`，将代码与更新后的图谱产物放入同一提交。
 4. 若依赖 `post-commit` hook 兜底，等待后台重建完成后检查并另行提交图谱产物。
@@ -203,18 +200,16 @@ graphify extract . --force
 移除项目接入时：
 
 ```bash
-graphify uninstall --project --platform agents
-graphify cursor uninstall
+graphify uninstall --project --platform cursor
 graphify hook uninstall
 ```
 
-上述命令会分别移除项目级 Agent Skill、Cursor rule、Git hook、merge driver 配置及其 `.gitattributes` 条目。随后删除 `.graphifyignore` 和 `graphify-out/`；若安装过程曾被中断，再检查并清理残留的 `.agents/skills/graphify/` 或 `.cursor/rules/graphify.mdc`。移除 Graphify 不影响 OpenSpec change、主规格或历史验证记录。
+上述命令会分别移除 Cursor rule、Git hook、merge driver 配置及其 `.gitattributes` 条目。随后删除 `.graphifyignore` 和 `graphify-out/`；若安装过程曾被中断，再检查并清理残留的 `.cursor/rules/graphify.mdc`。若仓库里还有旧版 `.agents/skills/graphify/`，一并删除。移除 Graphify 不影响 OpenSpec change、主规格或历史验证记录。
 
 ## 10. 验收清单
 
 - [ ] `graphify --version` 可正常执行。
-- [ ] Cursor 可发现并调用项目级 Graphify Skill。
-- [ ] Cursor 已加载项目级 Graphify rule。
+- [ ] Cursor 已加载项目级 Graphify rule（`.cursor/rules/graphify.mdc`）。
 - [ ] 首次构建生成三个核心图谱产物和 `manifest.json`。
 - [ ] `query`、`path`、`explain` 各完成一次冒烟查询。
 - [ ] `.graphifyignore` 已排除密钥、依赖和构建产物。
