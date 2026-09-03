@@ -5,9 +5,9 @@
 通常意味着需要补充或更新的制品越多，整体工作量也越大。
 
 官方入口因助手而异，本文用阶段名（`explore` / `propose` / `apply` 等）描述流程；
-实际调用请换成当前助手的写法：Cursor `/opsx-*`，Qoder `/opsx:*`，Codex `$openspec-*`。
+实际调用请换成当前助手的写法：Cursor `/opsx-*`，Codex `$openspec-*`。
 图中的 `from-code` 是 skill `openspec-update-change-from-code`（通用 Agent Skill）。
-Cursor 另有斜杠命令 `/opsx-update-change-from-code`；Qoder / Codex 发现同名 skill 后按各自入口调用。
+Cursor 另有斜杠命令 `/opsx-update-change-from-code`；Codex 发现同名 skill 后调用。
 
 ## 各个场景工作量
 

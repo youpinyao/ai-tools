@@ -14,13 +14,12 @@
 目标项目
 ├── OpenSpec 官方生成层（openspec init / update 管理）
 │   ├── Cursor：.cursor/skills/openspec-* 与 .cursor/commands/opsx-*.md
-│   ├── Qoder：.qoder/skills/openspec-* 与 .qoder/commands/opsx/*.md
 │   └── Codex：.agents/skills/openspec-*（skills-only，不生成 command）
 │
 └── ai-tools 自定义层（从本仓库复制或安装）
     ├── openspec/schemas/evidence-driven/
     ├── openspec/config.yaml 中的 schema: evidence-driven
-    ├── .cursor/rules/openspec-chinese.mdc          （可选；Qoder 复制为 .qoder/rules/openspec-chinese.md）
+    ├── .cursor/rules/openspec-chinese.mdc          （可选）
     ├── AGENTS.md 中的「OpenSpec 中文」片段          （可选；Codex，追加勿覆盖）
     └── openspec-update-change-from-code             （可选旁路：skill 通用；斜杠命令仅 Cursor）
 ```
@@ -30,7 +29,7 @@
 | 官方生成层 | OpenSpec CLI 为基线，项目补充 propose worktree 选择、隔离 worktree 收尾、验证闭环与流转门禁 | explore / propose / update / apply / verify / archive / sync |
 | 自定义层 | ai-tools | `evidence-driven` schema（含 `verification`）、propose worktree 选择、隔离 worktree 收尾、验证闭环与流转门禁、V2 范围指纹脚本、中文规则、from-code 旁路 |
 
-**不要**再把本仓库里的官方 skill/command 副本拷进业务仓覆盖官方文件。应先由 `openspec init` / `openspec update` 生成官方层，再按本文向 propose、apply、verify、sync、archive 的 command/skill 追加项目规则。本仓库 `.gitignore` 已忽略 Cursor / Qoder / Codex 三套官方路径。
+**不要**再把本仓库里的官方 skill/command 副本拷进业务仓覆盖官方文件。应先由 `openspec init` / `openspec update` 生成官方层，再按本文向 propose、apply、verify、sync、archive 的 command/skill 追加项目规则。本仓库 `.gitignore` 已忽略 Cursor / Codex 两套官方路径。
 
 ### 1.1 相对纯官方 OpenSpec，你多得到什么
 
@@ -56,7 +55,7 @@
 
 - Node.js 满足 OpenSpec CLI 要求（官方要求 Node.js ≥ 20.19.0）。
 - Python 3.8+（用于计算 verify、sync、archive 共用的确定性 V2 范围指纹）。
-- 支持 [Agent Skills](https://agentskills.io) 的助手。本文默认同时接入 **Cursor、Qoder、Codex**（`openspec init --tools cursor,qoder,codex`）。入口写法不同：Cursor `/opsx-propose`，Qoder `/opsx:propose`，Codex `$openspec-propose`。只使用其中一种时，把 `--tools` 改成对应 id。
+- 支持 [Agent Skills](https://agentskills.io) 的助手。本文默认同时接入 **Cursor、Codex**（`openspec init --tools cursor,codex`）。入口写法不同：Cursor `/opsx-propose`，Codex `$openspec-propose`。只使用其中一种时，把 `--tools` 改成对应 id。
 - 能在目标项目根目录执行 shell。
 
 建议固定变量：
@@ -108,14 +107,11 @@ grep -E '^schema:' openspec/config.yaml 2>/dev/null || true
 # 是否像「旧版本地定制」：官方 skill 被 Git 跟踪，或含本仓库旧门禁关键词
 git ls-files \
   '.cursor/skills/openspec-apply-change/*' '.cursor/commands/opsx-apply.md' \
-  '.qoder/skills/openspec-apply-change/*' '.qoder/commands/opsx/apply.md' \
   '.agents/skills/openspec-apply-change/*' \
   2>/dev/null
 rg -n "独立验证结论|代码审查（归档硬门禁）|Superpowers 对接" \
   .cursor/skills/openspec-apply-change \
   .cursor/commands/opsx-apply.md \
-  .qoder/skills/openspec-apply-change \
-  .qoder/commands/opsx/apply.md \
   .agents/skills/openspec-apply-change \
   2>/dev/null || true
 ```
@@ -131,8 +127,8 @@ rg -n "独立验证结论|代码审查（归档硬门禁）|Superpowers 对接" 
 ```bash
 cd "$TARGET_PROJECT"
 
-# 1) 生成官方 Cursor / Qoder / Codex skills（Codex 无 command）
-openspec init --tools cursor,qoder,codex
+# 1) 生成官方 Cursor / Codex skills（Codex 无 command）
+openspec init --tools cursor,codex
 
 # 2) 安装 evidence-driven schema
 mkdir -p openspec/schemas
@@ -157,12 +153,6 @@ cp \
   "$AI_TOOLS_DIR/.cursor/rules/openspec-chinese.mdc" \
   .cursor/rules/openspec-chinese.mdc
 
-# 中文规则（Qoder：用 .md。Qoder 不一定加载 Cursor 的 .mdc）
-mkdir -p .qoder/rules
-cp \
-  "$AI_TOOLS_DIR/.cursor/rules/openspec-chinese.mdc" \
-  .qoder/rules/openspec-chinese.md
-
 # 中文规则（Codex：追加到 AGENTS.md，不要整文件覆盖；Graphify 也可能写入该文件）
 # 若尚无 AGENTS.md，先创建再追加下列片段：
 # ## OpenSpec 中文
@@ -170,9 +160,7 @@ cp \
 
 # from-code：skill 通用。源在 .cursor/skills/。斜杠命令只为 Cursor 维护。
 npx skills add youpinyao/ai-tools --skill openspec-update-change-from-code --agent cursor
-mkdir -p .qoder/skills .agents/skills
-rm -rf .qoder/skills/openspec-update-change-from-code .agents/skills/openspec-update-change-from-code
-cp -R .cursor/skills/openspec-update-change-from-code .qoder/skills/
+mkdir -p .agents/skills
 cp -R .cursor/skills/openspec-update-change-from-code .agents/skills/
 ```
 
@@ -182,7 +170,7 @@ cp -R .cursor/skills/openspec-update-change-from-code .agents/skills/
 
 适用于：项目已 `openspec init`，默认 `spec-driven`，未深度分叉官方 skill。
 
-`openspec update` **只刷新已经配置过的工具**。Cursor-only 项目再跑 `update` 不会生成 `.qoder/` 或 `.agents/skills/openspec-*`。要兼容 Qoder / Codex，必须再跑一次 `openspec init --tools …` 追加工具。`init` 会 Refresh 已有 Cursor 生成物，可能清掉 5.1 注入，因此追加工具后必须立刻重跑 5.1。只使用其中一种助手时，把 `--tools` 改成对应 id，不要把未 init 路径的 `NOFILE` 当成失败。
+`openspec update` **只刷新已经配置过的工具**。Cursor-only 项目再跑 `update` 不会生成 `.agents/skills/openspec-*`。要兼容 Codex，必须再跑一次 `openspec init --tools cursor,codex` 追加工具。`init` 会 Refresh 已有 Cursor 生成物，可能清掉 5.1 注入，因此追加工具后必须立刻重跑 5.1。只使用其中一种助手时，把 `--tools` 改成对应 id，不要把未 init 路径的 `NOFILE` 当成失败。
 
 ```bash
 cd "$TARGET_PROJECT"
@@ -193,8 +181,8 @@ openspec --version
 # 团队升级请改用精确版本，见 7.1 节
 openspec update
 
-# 1b) 追加工具（已有 Cursor-only 项目必做，否则没有 Qoder/Codex 官方层）
-openspec init --tools cursor,qoder,codex
+# 1b) 追加工具（已有 Cursor-only 项目必做，否则没有 Codex 官方层）
+openspec init --tools cursor,codex
 
 # 2) 安装 / 覆盖自定义 schema（只覆盖 evidence-driven 目录）
 mkdir -p openspec/schemas
@@ -214,9 +202,9 @@ openspec schema validate evidence-driven
 
 安装或更新 OpenSpec 官方 command/skills 后，必须确保 propose、apply、verify、sync、archive 都含当前规则。apply、verify、sync、archive 每个文件只保留一个 `AI_TOOLS_VERIFY_GATE_V2` 增强块；propose command/skill 每个文件只保留一个 `AI_TOOLS_PROPOSE_WORKTREE_V1` 增强块；上述全部目标文件每个还只保留一个 `AI_TOOLS_WORKTREE_FINISH_V1` 收尾块。三套标记不得混写：Verify 门禁不得写入 propose，propose worktree 选择不得写入 apply/verify/sync/archive，收尾块必须同时出现在全部目标文件且不得并入另外两套块的正文。
 
-推荐同时生成 Cursor、Qoder、Codex 官方层。目标文件合计 **25** 个：Cursor 10（5 个 command + 5 个 skill）、Qoder 10（`.qoder/commands/opsx/*.md` + 对应 skill）、Codex 5（仅 `.agents/skills/openspec-*`，不生成 command）。只 init 了其中一种助手时，5.1 检查对未生成路径报 `NOFILE` 是预期，不要把缺失工具的路径标成必须 `OK`。
+推荐同时生成 Cursor、Codex 官方层。目标文件合计 **15** 个：Cursor 10（5 个 command + 5 个 skill）、Codex 5（仅 `.agents/skills/openspec-*`，不生成 command）。只 init 了其中一种助手时，5.1 检查对未生成路径报 `NOFILE` 是预期，不要把缺失工具的路径标成必须 `OK`。
 
-插入位置按流程分别确定：propose 的 D/E 块紧接 YAML frontmatter，位于官方 Planning boundary、Store selection 与任何主体步骤之前；apply、verify、sync、archive 先执行官方 Store selection 与 **Steps** 第 1 步以选定 change，再在第 2 步之前放置 A/B/C 与 E 块。这样既保证 propose 在命名或写制品前询问工作区，也保证其余门禁使用已选定的 store-aware change。1.11.0 的 `openspec init --tools cursor,qoder,codex` 仍生成上述目标文件；官方 apply 在制品缺失时可能提示未随 init 生成的 `/opsx-continue`，不要把它纳入本仓库 `.gitignore` 或本节幂等清单。官方流程本身不提供 worktree 选择、隔离 worktree 收尾、子 Agent 编排、`verification.md` 持久化门禁或范围指纹；下列 A/B/C/D/E 仍是项目级追加，不是官方已实现能力。这些追加块属于 Agent 的 prompt-level behavior contracts，并非 OpenSpec CLI 可执行、不可绕过的硬门禁；接入文档中的“门禁”均指 Agent 在继续流程前必须执行的项目规则。V2 范围指纹脚本放在 `.cursor/scripts/`，三种助手都执行同一路径，不要按 IDE 再复制一份。
+插入位置按流程分别确定：propose 的 D/E 块紧接 YAML frontmatter，位于官方 Planning boundary、Store selection 与任何主体步骤之前；apply、verify、sync、archive 先执行官方 Store selection 与 **Steps** 第 1 步以选定 change，再在第 2 步之前放置 A/B/C 与 E 块。这样既保证 propose 在命名或写制品前询问工作区，也保证其余门禁使用已选定的 store-aware change。1.11.0 的 `openspec init --tools cursor,codex` 仍生成上述目标文件；官方 apply 在制品缺失时可能提示未随 init 生成的 `/opsx-continue`，不要把它纳入本仓库 `.gitignore` 或本节幂等清单。官方流程本身不提供 worktree 选择、隔离 worktree 收尾、子 Agent 编排、`verification.md` 持久化门禁或范围指纹；下列 A/B/C/D/E 仍是项目级追加，不是官方已实现能力。这些追加块属于 Agent 的 prompt-level behavior contracts，并非 OpenSpec CLI 可执行、不可绕过的硬门禁；接入文档中的“门禁”均指 Agent 在继续流程前必须执行的项目规则。V2 范围指纹脚本放在 `.cursor/scripts/`，两种助手都执行同一路径，不要按 IDE 再复制一份。
 
 #### V2 范围指纹脚本
 
@@ -240,8 +228,6 @@ python3 -c 'import ast, pathlib, sys; ast.parse(pathlib.Path(sys.argv[1]).read_t
 
 - `.cursor/commands/opsx-apply.md`
 - `.cursor/skills/openspec-apply-change/SKILL.md`
-- `.qoder/commands/opsx/apply.md`
-- `.qoder/skills/openspec-apply-change/SKILL.md`
 - `.agents/skills/openspec-apply-change/SKILL.md`
 
 插入位置：官方 Store selection 和 **Steps** 第 1 步（Select the change）之后、第 2 步（Check status to understand the schema）之前。1.11.0 官方 apply 是串行任务循环，不含子 Agent；其 `context` 与 `operationGuidance` 明确只是 prompt-level behavior contracts，不能替代 CLI 状态或证明任务完成；在 `state: "all_done"` 与完成输出中仍会建议 `/opsx-archive`。以本块第 4–5 条为准，门禁通过前不得按官方文案建议 sync 或 archive。
@@ -310,8 +296,6 @@ python3 -c 'import ast, pathlib, sys; ast.parse(pathlib.Path(sys.argv[1]).read_t
 
 - `.cursor/commands/opsx-verify.md`
 - `.cursor/skills/openspec-verify-change/SKILL.md`
-- `.qoder/commands/opsx/verify.md`
-- `.qoder/skills/openspec-verify-change/SKILL.md`
 - `.agents/skills/openspec-verify-change/SKILL.md`
 
 插入位置：官方 Store selection 和 **Steps** 第 1 步（Select the change）之后、第 2 步（Check status to understand the schema）之前。1.11.0 官方 verify 只在会话中输出 Completeness / Correctness / Coherence 记分卡，不写 `verification.md`、不修复、不算指纹；官方「Ready for archive」不是本项目持久化门禁，不得替代下方闭环。
@@ -388,10 +372,6 @@ python3 -c 'import ast, pathlib, sys; ast.parse(pathlib.Path(sys.argv[1]).read_t
 - `.cursor/skills/openspec-sync-specs/SKILL.md`
 - `.cursor/commands/opsx-archive.md`
 - `.cursor/skills/openspec-archive-change/SKILL.md`
-- `.qoder/commands/opsx/sync.md`
-- `.qoder/skills/openspec-sync-specs/SKILL.md`
-- `.qoder/commands/opsx/archive.md`
-- `.qoder/skills/openspec-archive-change/SKILL.md`
 - `.agents/skills/openspec-sync-specs/SKILL.md`
 - `.agents/skills/openspec-archive-change/SKILL.md`
 
@@ -419,8 +399,6 @@ V1-only active change 必须先执行一次 verify，不得自动转换。V2 块
 for file in \
   .cursor/commands/opsx-{apply,verify,sync,archive}.md \
   .cursor/skills/openspec-{apply-change,verify-change,sync-specs,archive-change}/SKILL.md \
-  .qoder/commands/opsx/{apply,verify,sync,archive}.md \
-  .qoder/skills/openspec-{apply-change,verify-change,sync-specs,archive-change}/SKILL.md \
   .agents/skills/openspec-{apply-change,verify-change,sync-specs,archive-change}/SKILL.md
 do
   if [ ! -f "$file" ]; then
@@ -533,8 +511,6 @@ apply 块内必须同时包含当前 APPLY delegated、parallel、handoff 起止
 
 - `.cursor/commands/opsx-propose.md`
 - `.cursor/skills/openspec-propose/SKILL.md`
-- `.qoder/commands/opsx/propose.md`
-- `.qoder/skills/openspec-propose/SKILL.md`
 - `.agents/skills/openspec-propose/SKILL.md`
 
 command 与 skill 使用同一规则正文；仅当官方文件标题层级会与本节冲突时，才把本节 `##` / `###` 降一级，不得改语义。1.11.0 官方 propose 正文使用加粗小节而非 `##` 标题，本节标题层级无需降级。
@@ -608,8 +584,6 @@ command -v rg >/dev/null || {
 for file in \
   .cursor/commands/opsx-propose.md \
   .cursor/skills/openspec-propose/SKILL.md \
-  .qoder/commands/opsx/propose.md \
-  .qoder/skills/openspec-propose/SKILL.md \
   .agents/skills/openspec-propose/SKILL.md
 do
   if [ ! -f "$file" ]; then
@@ -639,11 +613,11 @@ do
 done
 ```
 
-`MISSING` 表示尚无增强块，只向这些 propose 文件追加当前 D 节完整文本。`STALE` 表示文件只有一个 `AI_TOOLS_PROPOSE_WORKTREE_V1` 标记，但缺少 `AI_TOOLS_PROPOSE_WORKTREE_ASK_ALWAYS_V1`、`AI_TOOLS_PROPOSE_WORKTREE_INDEPENDENT_V1`、`AI_TOOLS_PROPOSE_WORKTREE_WORKSPACE_ROOT_V1`、`AI_TOOLS_PROPOSE_WORKTREE_NO_DOWNGRADE_V1`、`AI_TOOLS_PROPOSE_WORKTREE_SESSION_V1`、`AI_TOOLS_PROPOSE_WORKTREE_NO_FINISH_ASK_V1` 或 `AI_TOOLS_MULTI_IDE_V1`（含仍只有旧标记 `AI_TOOLS_PROPOSE_WORKTREE_REUSE_V1`、未冻结 `$SESSION_WORKTREE`、仍写「Cursor workspace」、只提 `/opsx-propose` 未提 `/opsx:propose` 与 `$openspec-propose`、或结尾仍要求「准备结束回复时必须询问收尾」的块）；必须用当前 D 节完整注入文本替换旧块，不得再次追加。出现 `DUPLICATE` 时先清理重复块，再按当前文本保留唯一一块。`NOFILE` 表示该助手的官方 propose 文件不存在，应先运行 `openspec init --tools cursor,qoder,codex` 或 `openspec update`；若从未 init 该助手，可忽略对应 `NOFILE`。不要把 propose 块或 Verify 门禁块混写到错误文件。不要把 `AI_TOOLS_WORKTREE_FINISH_V1` 写入 D 节正文；收尾使用独立的 E 节块。
+`MISSING` 表示尚无增强块，只向这些 propose 文件追加当前 D 节完整文本。`STALE` 表示文件只有一个 `AI_TOOLS_PROPOSE_WORKTREE_V1` 标记，但缺少 `AI_TOOLS_PROPOSE_WORKTREE_ASK_ALWAYS_V1`、`AI_TOOLS_PROPOSE_WORKTREE_INDEPENDENT_V1`、`AI_TOOLS_PROPOSE_WORKTREE_WORKSPACE_ROOT_V1`、`AI_TOOLS_PROPOSE_WORKTREE_NO_DOWNGRADE_V1`、`AI_TOOLS_PROPOSE_WORKTREE_SESSION_V1`、`AI_TOOLS_PROPOSE_WORKTREE_NO_FINISH_ASK_V1` 或 `AI_TOOLS_MULTI_IDE_V1`（含仍只有旧标记 `AI_TOOLS_PROPOSE_WORKTREE_REUSE_V1`、未冻结 `$SESSION_WORKTREE`、仍写「Cursor workspace」、只提 `/opsx-propose` 未提 `/opsx:propose` 与 `$openspec-propose`、或结尾仍要求「准备结束回复时必须询问收尾」的块）；必须用当前 D 节完整注入文本替换旧块，不得再次追加。出现 `DUPLICATE` 时先清理重复块，再按当前文本保留唯一一块。`NOFILE` 表示该助手的官方 propose 文件不存在，应先运行 `openspec init --tools cursor,codex` 或 `openspec update`；若从未 init 该助手，可忽略对应 `NOFILE`。不要把 propose 块或 Verify 门禁块混写到错误文件。不要把 `AI_TOOLS_WORKTREE_FINISH_V1` 写入 D 节正文；收尾使用独立的 E 节块。
 
 #### E. 隔离 worktree 按需收尾
 
-向以下 25 个文件追加或替换为以下内容（`STALE` 时替换旧收尾块）。每个文件在已有 A/B/C 或 D 块之后再追加本块，不得把本块并入 `AI_TOOLS_VERIFY_GATE_V2` 或 `AI_TOOLS_PROPOSE_WORKTREE_V1` 正文。
+向以下 15 个文件追加或替换为以下内容（`STALE` 时替换旧收尾块）。每个文件在已有 A/B/C 或 D 块之后再追加本块，不得把本块并入 `AI_TOOLS_VERIFY_GATE_V2` 或 `AI_TOOLS_PROPOSE_WORKTREE_V1` 正文。
 
 - `.cursor/commands/opsx-propose.md`
 - `.cursor/skills/openspec-propose/SKILL.md`
@@ -655,16 +629,6 @@ done
 - `.cursor/skills/openspec-sync-specs/SKILL.md`
 - `.cursor/commands/opsx-archive.md`
 - `.cursor/skills/openspec-archive-change/SKILL.md`
-- `.qoder/commands/opsx/propose.md`
-- `.qoder/skills/openspec-propose/SKILL.md`
-- `.qoder/commands/opsx/apply.md`
-- `.qoder/skills/openspec-apply-change/SKILL.md`
-- `.qoder/commands/opsx/verify.md`
-- `.qoder/skills/openspec-verify-change/SKILL.md`
-- `.qoder/commands/opsx/sync.md`
-- `.qoder/skills/openspec-sync-specs/SKILL.md`
-- `.qoder/commands/opsx/archive.md`
-- `.qoder/skills/openspec-archive-change/SKILL.md`
 - `.agents/skills/openspec-propose/SKILL.md`
 - `.agents/skills/openspec-apply-change/SKILL.md`
 - `.agents/skills/openspec-verify-change/SKILL.md`
@@ -764,9 +728,6 @@ for file in \
   .cursor/commands/opsx-{propose,apply,verify,sync,archive}.md \
   .cursor/skills/openspec-propose/SKILL.md \
   .cursor/skills/openspec-{apply-change,verify-change,sync-specs,archive-change}/SKILL.md \
-  .qoder/commands/opsx/{propose,apply,verify,sync,archive}.md \
-  .qoder/skills/openspec-propose/SKILL.md \
-  .qoder/skills/openspec-{apply-change,verify-change,sync-specs,archive-change}/SKILL.md \
   .agents/skills/openspec-propose/SKILL.md \
   .agents/skills/openspec-{apply-change,verify-change,sync-specs,archive-change}/SKILL.md
 do
@@ -797,7 +758,7 @@ do
 done
 ```
 
-`MISSING` 表示尚无收尾块，只向这些目标文件追加当前 E 节完整文本。`STALE` 表示文件只有一个 `AI_TOOLS_WORKTREE_FINISH_V1` 标记，但缺少 `AI_TOOLS_WORKTREE_FINISH_NO_ASK_V1`、`AI_TOOLS_WORKTREE_FINISH_SCOPE_V1` 或 `AI_TOOLS_WORKTREE_FINISH_MERGE_CLEANUP_V1`（含仍只有 `AI_TOOLS_WORKTREE_FINISH_ASK_ALWAYS_V1`、或仍要求入口结束时必须询问的旧收尾块）；必须用当前 E 节完整注入文本替换旧收尾块，不得再次追加，也不得改写同文件中的 Verify 门禁块或 propose worktree 块。出现 `DUPLICATE` 时先清理重复收尾块，再按当前文本保留唯一一块。`NOFILE` 表示该助手的官方文件不存在，应先运行 `openspec init --tools cursor,qoder,codex` 或 `openspec update`；若从未 init 该助手，可忽略对应 `NOFILE`。内嵌标记不得把 `AI_TOOLS_WORKTREE_FINISH_V1` 的固定字符串计数抬成 `DUPLICATE`。
+`MISSING` 表示尚无收尾块，只向这些目标文件追加当前 E 节完整文本。`STALE` 表示文件只有一个 `AI_TOOLS_WORKTREE_FINISH_V1` 标记，但缺少 `AI_TOOLS_WORKTREE_FINISH_NO_ASK_V1`、`AI_TOOLS_WORKTREE_FINISH_SCOPE_V1` 或 `AI_TOOLS_WORKTREE_FINISH_MERGE_CLEANUP_V1`（含仍只有 `AI_TOOLS_WORKTREE_FINISH_ASK_ALWAYS_V1`、或仍要求入口结束时必须询问的旧收尾块）；必须用当前 E 节完整注入文本替换旧收尾块，不得再次追加，也不得改写同文件中的 Verify 门禁块或 propose worktree 块。出现 `DUPLICATE` 时先清理重复收尾块，再按当前文本保留唯一一块。`NOFILE` 表示该助手的官方文件不存在，应先运行 `openspec init --tools cursor,codex` 或 `openspec update`；若从未 init 该助手，可忽略对应 `NOFILE`。内嵌标记不得把 `AI_TOOLS_WORKTREE_FINISH_V1` 的固定字符串计数抬成 `DUPLICATE`。
 
 在临时目录确认检查脚本（不要改本仓库官方忽略路径）：
 
@@ -870,7 +831,7 @@ evidence-driven: proposal → specs/design → tasks → verification → apply
 
 阶段内并行由入口通过唯一有边界的交接块传递：入口在自己的会话 skills 目录中查找 `dispatching-parallel-agents`，找到则交接 AVAILABLE 与绝对 Path；找不到则交接 UNAVAILABLE 并串行。交接无效或读取失败会阻塞，不得静默降级。阶段子 Agent 必须回报「阶段内并行：」行，入口须转述。自行扫描磁盘或插件缓存仍不算可用。
 
-propose 的 worktree 选择按 5.1 节 D 段注入，发生在官方 propose 主体之前，不改变后续制品依赖。隔离 worktree 按需收尾按 5.1 节 E 段注入到 Cursor / Qoder / Codex 的 propose / apply / verify / sync / archive 全部目标文件；各命令结束时不得主动询问，仅在用户明确要求时执行，不改变 Verify 门禁。
+propose 的 worktree 选择按 5.1 节 D 段注入，发生在官方 propose 主体之前，不改变后续制品依赖。隔离 worktree 按需收尾按 5.1 节 E 段注入到 Cursor / Codex 的 propose / apply / verify / sync / archive 全部目标文件；各命令结束时不得主动询问，仅在用户明确要求时执行，不改变 Verify 门禁。
 
 ## 6. 路径 C：从旧版 ai-tools 迁移
 
@@ -907,13 +868,6 @@ git rm -r --ignore-unmatch \
   .cursor/skills/openspec-verify-change \
   .cursor/skills/openspec-archive-change \
   .cursor/skills/openspec-sync-specs \
-  .qoder/skills/openspec-explore \
-  .qoder/skills/openspec-propose \
-  .qoder/skills/openspec-update-change \
-  .qoder/skills/openspec-apply-change \
-  .qoder/skills/openspec-verify-change \
-  .qoder/skills/openspec-archive-change \
-  .qoder/skills/openspec-sync-specs \
   .agents/skills/openspec-explore \
   .agents/skills/openspec-propose \
   .agents/skills/openspec-update-change \
@@ -928,22 +882,15 @@ git rm --ignore-unmatch \
   .cursor/commands/opsx-apply.md \
   .cursor/commands/opsx-verify.md \
   .cursor/commands/opsx-archive.md \
-  .cursor/commands/opsx-sync.md \
-  .qoder/commands/opsx/explore.md \
-  .qoder/commands/opsx/propose.md \
-  .qoder/commands/opsx/update.md \
-  .qoder/commands/opsx/apply.md \
-  .qoder/commands/opsx/verify.md \
-  .qoder/commands/opsx/archive.md \
-  .qoder/commands/opsx/sync.md
+  .cursor/commands/opsx-sync.md
 
 # 2) 升级 CLI 并重新生成官方层
 npm install --global @fission-ai/openspec@latest
 openspec --version
 # 团队升级请改用精确版本，见 7.1 节
 openspec update
-# 若还要 Qoder / Codex：update 不会补生成物，须再跑 init（会 Refresh 已有 Cursor 文件）
-openspec init --tools cursor,qoder,codex
+# 若还要 Codex：update 不会补生成物，须再跑 init（会 Refresh 已有 Cursor 文件）
+openspec init --tools cursor,codex
 # 若项目尚不完整，也用上面的 init
 
 # 3) 刷新自定义 schema
@@ -957,17 +904,13 @@ cp -R \
 # schema: evidence-driven
 
 # 5) 保留 / 重装旁路与中文规则（若仍需要）
-mkdir -p .cursor/rules .qoder/rules
+mkdir -p .cursor/rules
 cp \
   "$AI_TOOLS_DIR/.cursor/rules/openspec-chinese.mdc" \
   .cursor/rules/openspec-chinese.mdc
-cp \
-  "$AI_TOOLS_DIR/.cursor/rules/openspec-chinese.mdc" \
-  .qoder/rules/openspec-chinese.md
 # Codex：向 AGENTS.md 追加「OpenSpec 中文」片段，不要整文件覆盖
 # from-code：skill 通用；斜杠命令仅 Cursor。若目录仍在可保留；否则
 # npx skills add youpinyao/ai-tools --skill openspec-update-change-from-code --agent cursor
-# 需要 Qoder / Codex 时再把同一份 skill 复制到 .qoder/skills/ 与 .agents/skills/
 
 # 6) 校验
 openspec schema validate evidence-driven
@@ -1012,8 +955,8 @@ cd "$TARGET_PROJECT"
 npm install --global @fission-ai/openspec@latest
 openspec --version
 openspec update
-# 若还要 Qoder / Codex，update 不会补生成物：
-openspec init --tools cursor,qoder,codex
+# 若还要 Codex，update 不会补生成物：
+openspec init --tools cursor,codex
 openspec schema validate evidence-driven
 ```
 
@@ -1025,12 +968,12 @@ TARGET_VERSION="$(npm view @fission-ai/openspec version)"
 npm install --global "@fission-ai/openspec@$TARGET_VERSION"
 test "$(openspec --version)" = "$TARGET_VERSION"
 openspec update
-# 若还要 Qoder / Codex，update 不会补生成物：
-openspec init --tools cursor,qoder,codex
+# 若还要 Codex，update 不会补生成物：
+openspec init --tools cursor,codex
 openspec schema validate evidence-driven
 ```
 
-`openspec update` 可能刷新已配置工具的官方 skills/commands，但不会给 Cursor-only 项目补上 Qoder / Codex。需要三助手时，升级后必须再跑 `openspec init --tools cursor,qoder,codex`（会 Refresh 已有 Cursor 文件）。然后必须运行 5.1 节的三套检查并处理 `MISSING`、`STALE`、`DUPLICATE` 或 `NOFILE`：apply/verify/sync/archive 仅 `MISSING` 追加；出现 V1、混写 V1/V2，或唯一 V2 块缺少当前委派标记、`AI_TOOLS_PARALLEL_DISPATCH_V1`、`AI_TOOLS_PARALLEL_HANDOFF_V1` 及其 START/END、AVAILABLE/UNAVAILABLE/READ_FAILED、对应工作者标记、`AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1`（sync/archive 缺少后者）或 apply/verify 缺少 `AI_TOOLS_MULTI_IDE_V1` 时均为 `STALE`，须用当前 A/B/C 节 V2 完整文本替换旧块。propose 仅 `MISSING` 追加；其 `STALE` 表示旧块缺少 `AI_TOOLS_PROPOSE_WORKTREE_ASK_ALWAYS_V1`、`AI_TOOLS_PROPOSE_WORKTREE_INDEPENDENT_V1`、`AI_TOOLS_PROPOSE_WORKTREE_WORKSPACE_ROOT_V1`、`AI_TOOLS_PROPOSE_WORKTREE_NO_DOWNGRADE_V1`、`AI_TOOLS_PROPOSE_WORKTREE_SESSION_V1`、`AI_TOOLS_PROPOSE_WORKTREE_NO_FINISH_ASK_V1` 或 `AI_TOOLS_MULTI_IDE_V1`（含仍只有旧标记 `AI_TOOLS_PROPOSE_WORKTREE_REUSE_V1`、未冻结会话 worktree、仍写 Cursor workspace、或结尾仍要求结束时询问收尾的块），须用当前 D 节完整文本替换旧块。已 init 助手的目标文件收尾块仅 `MISSING` 追加；其 `STALE` 表示旧块缺少 `AI_TOOLS_WORKTREE_FINISH_NO_ASK_V1`、`AI_TOOLS_WORKTREE_FINISH_SCOPE_V1` 或 `AI_TOOLS_WORKTREE_FINISH_MERGE_CLEANUP_V1`（含仍只有 `AI_TOOLS_WORKTREE_FINISH_ASK_ALWAYS_V1` 的块），须用当前 E 节完整文本替换旧收尾块。`DUPLICATE` 先清理；已 init 的助手对应目标文件的三套检查最终必须全部为 `OK`。只 init 了部分助手时，未生成路径的 `NOFILE` 可忽略。
+`openspec update` 可能刷新已配置工具的官方 skills/commands，但不会给 Cursor-only 项目补上 Codex。需要两种助手时，升级后必须再跑 `openspec init --tools cursor,codex`（会 Refresh 已有 Cursor 文件）。然后必须运行 5.1 节的三套检查并处理 `MISSING`、`STALE`、`DUPLICATE` 或 `NOFILE`：apply/verify/sync/archive 仅 `MISSING` 追加；出现 V1、混写 V1/V2，或唯一 V2 块缺少当前委派标记、`AI_TOOLS_PARALLEL_DISPATCH_V1`、`AI_TOOLS_PARALLEL_HANDOFF_V1` 及其 START/END、AVAILABLE/UNAVAILABLE/READ_FAILED、对应工作者标记、`AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1`（sync/archive 缺少后者）或 apply/verify 缺少 `AI_TOOLS_MULTI_IDE_V1` 时均为 `STALE`，须用当前 A/B/C 节 V2 完整文本替换旧块。propose 仅 `MISSING` 追加；其 `STALE` 表示旧块缺少 `AI_TOOLS_PROPOSE_WORKTREE_ASK_ALWAYS_V1`、`AI_TOOLS_PROPOSE_WORKTREE_INDEPENDENT_V1`、`AI_TOOLS_PROPOSE_WORKTREE_WORKSPACE_ROOT_V1`、`AI_TOOLS_PROPOSE_WORKTREE_NO_DOWNGRADE_V1`、`AI_TOOLS_PROPOSE_WORKTREE_SESSION_V1`、`AI_TOOLS_PROPOSE_WORKTREE_NO_FINISH_ASK_V1` 或 `AI_TOOLS_MULTI_IDE_V1`（含仍只有旧标记 `AI_TOOLS_PROPOSE_WORKTREE_REUSE_V1`、未冻结会话 worktree、仍写 Cursor workspace、或结尾仍要求结束时询问收尾的块），须用当前 D 节完整文本替换旧块。已 init 助手的目标文件收尾块仅 `MISSING` 追加；其 `STALE` 表示旧块缺少 `AI_TOOLS_WORKTREE_FINISH_NO_ASK_V1`、`AI_TOOLS_WORKTREE_FINISH_SCOPE_V1` 或 `AI_TOOLS_WORKTREE_FINISH_MERGE_CLEANUP_V1`（含仍只有 `AI_TOOLS_WORKTREE_FINISH_ASK_ALWAYS_V1` 的块），须用当前 E 节完整文本替换旧收尾块。`DUPLICATE` 先清理；已 init 的助手对应目标文件的三套检查最终必须全部为 `OK`。只 init 了部分助手时，未生成路径的 `NOFILE` 可忽略。
 
 ### 7.2 升级 ai-tools 自定义层
 
@@ -1042,23 +985,15 @@ cp -R \
   "$TARGET_PROJECT/openspec/schemas/"
 
 # 按需更新中文规则、from-code skill
-mkdir -p "$TARGET_PROJECT/.cursor/rules" "$TARGET_PROJECT/.qoder/rules"
+mkdir -p "$TARGET_PROJECT/.cursor/rules"
 cp \
   "$AI_TOOLS_DIR/.cursor/rules/openspec-chinese.mdc" \
   "$TARGET_PROJECT/.cursor/rules/openspec-chinese.mdc"
-cp \
-  "$AI_TOOLS_DIR/.cursor/rules/openspec-chinese.mdc" \
-  "$TARGET_PROJECT/.qoder/rules/openspec-chinese.md"
 
-# 若目标项目在 Qoder / Codex 使用 from-code，同步同一份 skill
+# 若目标项目在 Codex 使用 from-code，同步同一份 skill
 if [ -d "$TARGET_PROJECT/.cursor/skills/openspec-update-change-from-code" ]; then
-  mkdir -p "$TARGET_PROJECT/.qoder/skills" "$TARGET_PROJECT/.agents/skills"
-  rm -rf \
-    "$TARGET_PROJECT/.qoder/skills/openspec-update-change-from-code" \
-    "$TARGET_PROJECT/.agents/skills/openspec-update-change-from-code"
-  cp -R \
-    "$TARGET_PROJECT/.cursor/skills/openspec-update-change-from-code" \
-    "$TARGET_PROJECT/.qoder/skills/"
+  mkdir -p "$TARGET_PROJECT/.agents/skills"
+  rm -rf "$TARGET_PROJECT/.agents/skills/openspec-update-change-from-code"
   cp -R \
     "$TARGET_PROJECT/.cursor/skills/openspec-update-change-from-code" \
     "$TARGET_PROJECT/.agents/skills/"
@@ -1087,11 +1022,11 @@ ai-tools 自定义层升级后也必须同次复制 V2 范围指纹脚本，并�
 
 ### 7.4 工作流命令、JSON 与目录（OpenSpec 1.11.0）
 
-以下命令与字段均来自 1.11.0 的 `openspec --help`、子命令 help、官方 schema 和临时 `openspec init --tools cursor,qoder,codex` 生成物，不要猜测未列出的参数。
+以下命令与字段均来自 1.11.0 的 `openspec --help`、子命令 help、官方 schema 和临时 `openspec init --tools cursor,codex` 生成物，不要猜测未列出的参数。
 
 | 用途 | 命令 | 1.11.0 说明 |
 |------|------|-------------|
-| 新项目官方生成层 | `openspec init --tools cursor,qoder,codex` | `--tools` 用于非交互指定工具。Cursor 与 Qoder 各生成 7 组 skill + 7 个 command；Codex 只生成 7 组 skill（skills-only，入口为 `$openspec-*`）。Qoder command 路径为 `.qoder/commands/opsx/*.md`，斜杠命令为 `/opsx:propose`。官方 apply 在制品缺失时可能提示未随 init 生成的 `/opsx-continue`，不要纳入本仓库忽略清单或 5.1 幂等清单。 |
+| 新项目官方生成层 | `openspec init --tools cursor,codex` | `--tools` 用于非交互指定工具。Cursor 生成 7 组 skill + 7 个 command；Codex 生成 7 组 skill（skills-only，入口为 `$openspec-*`）。官方 apply 在制品缺失时可能提示未随 init 生成的 `/opsx-continue`，不要纳入本仓库忽略清单或 5.1 幂等清单。 |
 | 已初始化刷新 | `openspec update` | 更新 instruction 文件；`--force` 可在工具已是最新时仍刷新。 |
 | schema 校验 | `openspec schema validate evidence-driven` | schema 子命令仍标为 experimental；`--json` 返回 `name` / `path` / `valid` / `issues`。 |
 | 新建 change | `openspec new change "<name>" --schema evidence-driven` | `--schema` 覆盖默认 schema。 |
@@ -1113,16 +1048,16 @@ ai-tools 自定义层升级后也必须同次复制 V2 范围指纹脚本，并�
 - active change：`openspec/changes/<name>/`
 - 归档：`<planningHome.changesDir>/archive/`（仓库内通常是 `openspec/changes/archive/`）
 
-官方 `/opsx-propose`（Cursor）、`/opsx:propose`（Qoder）、`$openspec-propose`（Codex）及对应 skills 仍由上述官方生成物提供。1.11.0 官方 verify 只输出 Completeness / Correctness / Coherence 会话记分卡，不写 `verification.md`。官方 sync 以 `artifactPaths.specs.existingOutputPaths` 为 delta 路径来源，合并后运行 `openspec validate --specs`；archive 在内联 sync 后复核 delta，对未完成制品或任务仅警告并允许确认继续。项目级 `AI_TOOLS_VERIFY_GATE_V2` 使用 V2 范围指纹（范围内阻断、范围外告警），不是官方行为。正常 sync 生成的 main spec 未纳入声明范围时不强制重复实现验证。
+官方 `/opsx-propose`（Cursor）、`$openspec-propose`（Codex）及对应 skills 仍由上述官方生成物提供。1.11.0 官方 verify 只输出 Completeness / Correctness / Coherence 会话记分卡，不写 `verification.md`。官方 sync 以 `artifactPaths.specs.existingOutputPaths` 为 delta 路径来源，合并后运行 `openspec validate --specs`；archive 在内联 sync 后复核 delta，对未完成制品或任务仅警告并允许确认继续。项目级 `AI_TOOLS_VERIFY_GATE_V2` 使用 V2 范围指纹（范围内阻断、范围外告警），不是官方行为。
 
 ## 8. 验收清单
 
 首次接入或任何升级后，必须在目标项目实际运行 5.1 节三套脚本并处理所有异常状态，直到
 已 init 助手的 apply/verify/sync/archive 门禁文件以及 propose 文件的门禁/选择检查全部输出 `OK`，且
-这些文件的收尾检查也全部输出 `OK`（推荐三套助手合计 20 个门禁文件、5 个 propose 文件、25 个收尾文件），然后确认：
+这些文件的收尾检查也全部输出 `OK`（推荐两种助手合计 12 个门禁文件、3 个 propose 文件、15 个收尾文件），然后确认：
 
 - [ ] `openspec --version` 为团队约定并已记录的精确稳定版（升级时用 `@$TARGET_VERSION` 固定，不要只看 `@latest`）。
-- [ ] 所用助手能看到官方入口：Cursor `/opsx-propose`，Qoder `/opsx:propose`，Codex `$openspec-propose`（重启后可见）。
+- [ ] 所用助手能看到官方入口：Cursor `/opsx-propose`，Codex `$openspec-propose`（重启后可见）。
 - [ ] `openspec/schemas/evidence-driven/schema.yaml` 存在。
 - [ ] `openspec/config.yaml` 含 `schema: evidence-driven`，且项目原有 context/rules 未丢。
 - [ ] `openspec schema validate evidence-driven` 通过。
@@ -1132,8 +1067,8 @@ ai-tools 自定义层升级后也必须同次复制 V2 范围指纹脚本，并�
 - [ ] sync / archive command/skill 已追加入口门禁：仅 Verify 门禁为“通过、无阻塞”且 V2 范围指纹与脚本当前输出一致时才可继续；范围内阻断，范围外告警；正常 sync 生成的 main spec 未纳入声明范围时不强制重复实现验证。
 - [ ] `.cursor/scripts/openspec-verification-fingerprint.py` 存在，verify 与 sync/archive 使用同一脚本计算指纹。
 - [ ] 已 init 助手的 verify 门禁文件各自恰有一个独立的 `AI_TOOLS_VERIFY_GATE_V2` 起始标记和一个对应结束标记；propose 文件各自仅有一个 `AI_TOOLS_PROPOSE_WORKTREE_V1` 标记；收尾目标文件各自仅有一个 `AI_TOOLS_WORKTREE_FINISH_V1` 标记；旧块已按 `STALE` 规则替换而非重复追加。
-- [ ] 仍需要时：中文规则（Cursor `.cursor/rules/openspec-chinese.mdc`、Qoder `.qoder/rules/openspec-chinese.md`、Codex `AGENTS.md` 中的中文片段）；from-code skill 已装到所用助手的 skills 目录（Cursor 另有 `/opsx-update-change-from-code`）。
-- [ ] 试跑：Cursor `/opsx-propose`、Qoder `/opsx:propose` 或 Codex `$openspec-propose` 小 change，确认启动后先询问隔离 worktree 或当前工作区；若选择隔离 worktree，官方 propose 结束后不得询问怎么处理本次 worktree（可报告路径仍在）；生成 `verification.md`，且 apply 前依赖满足。
+- [ ] 仍需要时：中文规则（Cursor `.cursor/rules/openspec-chinese.mdc`、Codex `AGENTS.md` 中的中文片段）；from-code skill 已装到所用助手的 skills 目录（Cursor 另有 `/opsx-update-change-from-code`）。
+- [ ] 试跑 Cursor `/opsx-propose` 或 Codex `$openspec-propose` 小 change，确认启动后先询问隔离 worktree 或当前工作区，并生成 `verification.md`。
 
 冒烟命令示例：
 
