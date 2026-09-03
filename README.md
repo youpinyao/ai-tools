@@ -2,11 +2,12 @@
 
 面向 AI 编程助手的 **OpenSpec / AI-SDD 工作流工具包**。本仓库维护
 `evidence-driven` 自定义 schema、简体中文规则、可选的 from-code 旁路及场景文档；
-OpenSpec 官方 Cursor skills 与 `/opsx-*` commands 由 OpenSpec 在目标项目生成，本仓库
+OpenSpec 官方 Cursor / Qoder / Codex skills 与命令由 OpenSpec 在目标项目生成，本仓库
 不跟踪、不复制也不定制这些官方生成物。
 
-默认约定：OpenSpec 相关对话与规划产物使用**简体中文**（见
-`.cursor/rules/openspec-chinese.mdc`）。
+默认约定：OpenSpec 相关对话与规划产物使用**简体中文**（Cursor 见
+`.cursor/rules/openspec-chinese.mdc`；Qoder 复制为 `.qoder/rules/openspec-chinese.md`；
+Codex 向 `AGENTS.md` 追加片段，不要整文件覆盖）。
 
 ## 仓库包含什么
 
@@ -14,9 +15,9 @@ OpenSpec 官方 Cursor skills 与 `/opsx-*` commands 由 OpenSpec 在目标项�
 |------|------|------|
 | Schema | `openspec/schemas/evidence-driven/` | 官方 `spec-driven` 的中文派生，增加 `verification` 制品 |
 | 配置 | `openspec/config.yaml` | 默认使用 `schema: evidence-driven` |
-| 中文规则 | `.cursor/rules/openspec-chinese.mdc` | OpenSpec 相关输出强制简体中文 |
-| 可选 Skill | `.cursor/skills/openspec-update-change-from-code/` | 非官方的从代码回写旁路：优先 active change，否则回写已有 main spec |
-| 可选 Command | `.cursor/commands/opsx-update-change-from-code.md` | 在 Cursor 中暴露 `/opsx-update-change-from-code` |
+| 中文规则 | `.cursor/rules/openspec-chinese.mdc` | 强制简体中文；Qoder 复制为 `.md`，Codex 追加到 `AGENTS.md` |
+| 可选 Skill | `.cursor/skills/openspec-update-change-from-code/` | 通用 Agent Skill（从代码回写）；源路径在 Cursor 目录，可复制/安装到 Qoder、Codex |
+| 可选 Command | `.cursor/commands/opsx-update-change-from-code.md` | 仅 Cursor 斜杠命令 `/opsx-update-change-from-code`；Qoder / Codex 靠发现同名 skill |
 | 工作流文档 | [docs/ai-sdd-workflow.md](docs/ai-sdd-workflow.md) | 官方命令场景选择与推荐路径 |
 | 接入与迁移 | [docs/ai-tools-integration.md](docs/ai-tools-integration.md) | 其它项目从官方 OpenSpec 或旧版 ai-tools 接入/升级 |
 | 升级维护 | [docs/openspec-upgrade-plan.md](docs/openspec-upgrade-plan.md) | OpenSpec 版本升级与语义复核清单 |
@@ -35,7 +36,7 @@ sync/archive 流转门禁还须按
 前置条件：
 
 - Node.js ≥ 20.19.0，并可使用 npm 安装 OpenSpec CLI。
-- 支持 [Agent Skills](https://agentskills.io) 的 AI 编程助手（本仓库以 Cursor 为主）。
+- 支持 [Agent Skills](https://agentskills.io) 的 AI 编程助手（默认 Cursor、Qoder、Codex）。
 - 若安装完整验证闭环，还需 Python 3.8+ 计算确定性 V2 范围指纹。
 
 以下命令中的 `AI_TOOLS_DIR` 是本仓库的绝对路径，`TARGET_PROJECT` 是目标项目的
@@ -64,19 +65,20 @@ TARGET_PROJECT="/absolute/path/to/target-project"
    test "$(openspec --version)" = "$TARGET_VERSION"
    ```
 
-2. 在目标项目根目录生成或升级 OpenSpec 官方 Cursor skills 与 commands。新项目
+2. 在目标项目根目录生成或升级 OpenSpec 官方 Cursor、Qoder、Codex skills（Codex 无 command）。新项目
    使用 `init`：
 
    ```bash
    cd "$TARGET_PROJECT"
-   openspec init --tools cursor
+   openspec init --tools cursor,qoder,codex
    ```
 
-   已初始化的目标项目使用官方 `update` 升级生成物：
+   已初始化的目标项目：`openspec update` 只刷新已经配置过的工具。Cursor-only 项目要补 Qoder / Codex，必须再跑 `openspec init --tools cursor,qoder,codex`（会 Refresh 已有 Cursor 文件，随后须重做 5.1 注入）：
 
    ```bash
    cd "$TARGET_PROJECT"
    openspec update
+   openspec init --tools cursor,qoder,codex
    ```
 
 3. 将本仓库的 schema 复制到目标项目，并在目标配置中启用：
@@ -99,13 +101,16 @@ TARGET_PROJECT="/absolute/path/to/target-project"
    中文规则可按需从本仓库明确复制到目标项目：
 
    ```bash
-   mkdir -p "$TARGET_PROJECT/.cursor/rules"
+   mkdir -p "$TARGET_PROJECT/.cursor/rules" "$TARGET_PROJECT/.qoder/rules"
    cp \
      "$AI_TOOLS_DIR/.cursor/rules/openspec-chinese.mdc" \
      "$TARGET_PROJECT/.cursor/rules/openspec-chinese.mdc"
+   cp \
+     "$AI_TOOLS_DIR/.cursor/rules/openspec-chinese.mdc" \
+     "$TARGET_PROJECT/.qoder/rules/openspec-chinese.md"
    ```
 
-   from-code 旁路可选安装：
+   Codex 请把中文约定追加到项目 `AGENTS.md`（不要整文件覆盖）。from-code 的 **skill 是通用 Agent Skill**；本仓库源文件在 `.cursor/skills/`。斜杠命令只为 Cursor 维护。
 
    ```bash
    cd "$TARGET_PROJECT"
@@ -113,7 +118,19 @@ TARGET_PROJECT="/absolute/path/to/target-project"
      --skill openspec-update-change-from-code \
      --agent cursor
 
-   # 如需在 Cursor 中使用同名 slash command，同时安装 command 文件
+   # 需要 Qoder / Codex 时，把同一份 skill 拷到对应 skills 目录（正文相同）
+   mkdir -p "$TARGET_PROJECT/.qoder/skills" "$TARGET_PROJECT/.agents/skills"
+   rm -rf \
+     "$TARGET_PROJECT/.qoder/skills/openspec-update-change-from-code" \
+     "$TARGET_PROJECT/.agents/skills/openspec-update-change-from-code"
+   cp -R \
+     "$TARGET_PROJECT/.cursor/skills/openspec-update-change-from-code" \
+     "$TARGET_PROJECT/.qoder/skills/"
+   cp -R \
+     "$TARGET_PROJECT/.cursor/skills/openspec-update-change-from-code" \
+     "$TARGET_PROJECT/.agents/skills/"
+
+   # 仅 Cursor 有本仓库维护的 slash command
    mkdir -p "$TARGET_PROJECT/.cursor/commands"
    cp \
      "$AI_TOOLS_DIR/.cursor/commands/opsx-update-change-from-code.md" \
@@ -130,10 +147,10 @@ TARGET_PROJECT="/absolute/path/to/target-project"
 5. 要完成当前 ai-tools 接入，必须继续执行
    [接入文档 5.1 节](docs/ai-tools-integration.md#51-补充-verify-修复闭环与流转门禁)：
    从本仓库复制 `.cursor/scripts/openspec-verification-fingerprint.py`，向 apply、
-   verify、sync、archive 的 8 个官方 command/skill 文件幂等追加
-   `AI_TOOLS_VERIFY_GATE_V2` 规则，并向 propose 的 2 个
-   官方 command/skill 文件幂等追加 `AI_TOOLS_PROPOSE_WORKTREE_V1` 规则，并向上述 10 个
-   官方 command/skill 文件幂等追加 `AI_TOOLS_WORKTREE_FINISH_V1` 收尾规则。增强规则同时提供
+   verify、sync、archive 的官方 command/skill 文件幂等追加
+   `AI_TOOLS_VERIFY_GATE_V2` 规则，并向 propose 的官方 command/skill 文件幂等追加
+   `AI_TOOLS_PROPOSE_WORKTREE_V1` 规则，并向上述目标文件幂等追加
+   `AI_TOOLS_WORKTREE_FINISH_V1` 收尾规则。增强规则同时提供
    apply 子 Agent 派发、独立 verify 子 Agent 派发、防递归标记（
    `AI_TOOLS_DELEGATED_APPLY_V1`、`AI_TOOLS_DELEGATED_VERIFY_V1`）与阶段内并行开关
    （`AI_TOOLS_PARALLEL_DISPATCH_V1`、`AI_TOOLS_PARALLEL_HANDOFF_V1`）：apply 时入口
@@ -148,12 +165,12 @@ TARGET_PROJECT="/absolute/path/to/target-project"
    工作区创建 change。也必须注入隔离 worktree 按需收尾，否则用户事后明确要求合并或
    清理时没有同一套安全步骤；注入后各阶段结束时不得主动询问怎么处理。
 
-官方 `/opsx-*` 命令及对应 skills 归 OpenSpec 管理；升级后的具体行为应以目标项目
+官方 `/opsx-*`（Cursor）、`/opsx:*`（Qoder）、`$openspec-*`（Codex）命令及对应 skills 归 OpenSpec 管理；升级后的具体行为应以目标项目
 中当前 OpenSpec 官方生成物为准，不要从本仓库寻找或复制官方模板。当前 CLI 1.11.0
 已确认的命令（以 `openspec --help` 为准，不要猜测未列出的参数）：
 
-- 新项目：`openspec init --tools cursor`
-- 已初始化：`openspec update`（`--force` 可在工具已是最新时仍刷新）
+- 新项目：`openspec init --tools cursor,qoder,codex`
+- 已初始化：`openspec update`（`--force` 可在工具已是最新时仍刷新）。Cursor-only 项目要补 Qoder / Codex 须再跑 `openspec init --tools cursor,qoder,codex`，随后重做 5.1 注入
 - 校验 schema：`openspec schema validate evidence-driven`（schema 子命令仍标为 experimental）
 - 新建 change：`openspec new change "<name>" --schema evidence-driven`
 - JSON：`openspec list --json`、`openspec list --specs --json`、
@@ -195,7 +212,7 @@ apply 与 verify 两个阶段始终串行。阶段内并行不是接入时开关
 常见旁路：
 
 - 已有 change，只调整规划不改代码 → 使用官方 `/opsx-update`。
-- 代码已先于规划变化 → `/opsx-update-change-from-code`（有唯一匹配的 active
+- 代码已先于规划变化 → from-code skill（Cursor 另有 `/opsx-update-change-from-code`；有唯一匹配的 active
   change 回写 change；无 change 且只有一份对应 spec 则回写该 spec；有歧义先问）。
 - 只合并 delta specs 到 main specs、不归档 → 使用官方 `/opsx-sync`。
 - 无规范层行为变化 → 在 change 的 `.openspec.yaml` 设置 `skip_specs: true`，不要

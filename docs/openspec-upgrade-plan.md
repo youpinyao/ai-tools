@@ -115,7 +115,7 @@ cp -R "$SOURCE_SCHEMA_DIR" "$UPGRADE_TMP/source-spec-driven-$SOURCE_VERSION"
 **文件：**
 - 临时读取：`$UPGRADE_TMP/source-spec-driven-$SOURCE_VERSION/`
 - 临时创建：`$UPGRADE_TMP/target-spec-driven-$TARGET_VERSION/`
-- 临时创建：`$UPGRADE_TMP/cursor-generated-$TARGET_VERSION/`
+- 临时创建：`$UPGRADE_TMP/tools-generated-$TARGET_VERSION/`
 
 - [ ] **2.1 安装已固定的精确目标版本**
 
@@ -145,12 +145,12 @@ cp -R "$TARGET_SCHEMA_DIR" "$UPGRADE_TMP/target-spec-driven-$TARGET_VERSION"
 运行：
 
 ```bash
-mkdir -p "$UPGRADE_TMP/cursor-generated-$TARGET_VERSION"
-cd "$UPGRADE_TMP/cursor-generated-$TARGET_VERSION"
-openspec init --tools cursor
+mkdir -p "$UPGRADE_TMP/tools-generated-$TARGET_VERSION"
+cd "$UPGRADE_TMP/tools-generated-$TARGET_VERSION"
+openspec init --tools cursor,qoder,codex
 ```
 
-预期：初始化成功。记录实际生成的 `.cursor/skills/openspec-*` 和 `.cursor/commands/opsx-*` 路径，不依赖旧版本名称推断。
+预期：初始化成功。记录实际生成的 `.cursor/skills/openspec-*`、`.cursor/commands/opsx-*`、`.qoder/skills/openspec-*`、`.qoder/commands/opsx/*` 与 `.agents/skills/openspec-*` 路径，不依赖旧版本名称推断。
 
 - [ ] **2.4 比较新旧官方基线**
 
@@ -259,7 +259,7 @@ openspec schema validate evidence-driven
 将本仓库 `openspec/schemas/evidence-driven/` 复制到临时项目，只合并 `schema: evidence-driven`，然后运行：
 
 ```bash
-cd "$UPGRADE_TMP/cursor-generated-$TARGET_VERSION"
+cd "$UPGRADE_TMP/tools-generated-$TARGET_VERSION"
 mkdir -p openspec/schemas
 cp -R "$AI_TOOLS_DIR/openspec/schemas/evidence-driven" openspec/schemas/
 printf 'schema: evidence-driven\n' > openspec/config.yaml
@@ -330,19 +330,36 @@ openspec status --change "upgrade-contract-smoke" --json |
 运行：
 
 ```bash
-cd "$UPGRADE_TMP/cursor-generated-$TARGET_VERSION"
-printf '%s\n' .cursor/skills/openspec-* .cursor/commands/opsx-*
+cd "$UPGRADE_TMP/tools-generated-$TARGET_VERSION"
+printf '%s\n' \
+  .cursor/skills/openspec-* .cursor/commands/opsx-* \
+  .qoder/skills/openspec-* .qoder/commands/opsx/* \
+  .agents/skills/openspec-* .agents/skills/.openspec-target
+
+# 5.1 注入目标必须存在（explore/update 不注入，但须出现在 gitignore 对账中）
+for file in \
+  .cursor/commands/opsx-{propose,apply,verify,sync,archive}.md \
+  .cursor/skills/openspec-propose/SKILL.md \
+  .cursor/skills/openspec-{apply-change,verify-change,sync-specs,archive-change}/SKILL.md \
+  .qoder/commands/opsx/{propose,apply,verify,sync,archive}.md \
+  .qoder/skills/openspec-propose/SKILL.md \
+  .qoder/skills/openspec-{apply-change,verify-change,sync-specs,archive-change}/SKILL.md \
+  .agents/skills/openspec-propose/SKILL.md \
+  .agents/skills/openspec-{apply-change,verify-change,sync-specs,archive-change}/SKILL.md
+do
+  test -f "$file" || { echo "missing injection target: $file" >&2; exit 1; }
+done
 ```
 
-预期：得到新版实际文件清单。若官方新增、删除或重命名路径，精确更新 `.gitignore`；不得忽略 `.cursor/skills/openspec-update-change-from-code/` 和 `.cursor/commands/opsx-update-change-from-code.md`。
+预期：得到新版实际文件清单，且上述 25 个注入目标都存在。若官方新增、删除或重命名路径，精确更新 `.gitignore` 与 `docs/ai-tools-integration.md` 5.1 检查器；不得忽略 `.cursor/skills/openspec-update-change-from-code/` 和 `.cursor/commands/opsx-update-change-from-code.md`。
 
 - [ ] **5.2 核对中文规则覆盖范围**
 
-比较 `.cursor/rules/openspec-chinese.mdc` 中列出的阶段、skill 和 `/opsx-*` 命令与新版清单。
+比较 `.cursor/rules/openspec-chinese.mdc` 中列出的阶段、skill 与 Cursor `/opsx-*`、Qoder `/opsx:*`、Codex `$openspec-*` 入口是否覆盖新版清单。
 
-预期：规则覆盖新版 OpenSpec 操作，同时保留 `/opsx-update-change-from-code`。
+预期：规则覆盖新版 OpenSpec 操作及三套入口别名，同时保留 `/opsx-update-change-from-code`。
 
-- [ ] **5.3 复核 `AI_TOOLS_VERIFY_GATE_V2`、`AI_TOOLS_PROPOSE_WORKTREE_V1` 与 `AI_TOOLS_WORKTREE_FINISH_V1` 追加点**
+- [ ] **5.3 复核 `AI_TOOLS_VERIFY_GATE_V2`、`AI_TOOLS_PROPOSE_WORKTREE_V1`、`AI_TOOLS_WORKTREE_FINISH_V1` 与 `AI_TOOLS_MULTI_IDE_V1` 追加点**
 
 阅读新版 propose、apply、verify、sync、archive 的 command 和 skill，逐项判断 `docs/ai-tools-integration.md` 第 5.1 节 A/B/C、D 与 E 的追加内容是否仍有有效插入点、是否与新版官方行为冲突。
 
@@ -356,7 +373,8 @@ printf '%s\n' .cursor/skills/openspec-* .cursor/commands/opsx-*
 - 隔离 worktree 按需收尾仍不得在入口准备结束回复时主动询问（含官方主体失败但本次 worktree 已在）；只在用户明确要求时收尾本次相关路径，且不得自动合并或删除；
 - V2 范围指纹脚本的命令行接口、输出字段和单元测试仍与注入块一致；
 - 目标项目中旧 V1 Verify 块必须标为 `STALE` 并由唯一 V2 完整块替换，不得在旧块后重复追加；
-- V1-only active change 不得自动迁移结果，必须先执行一次 verify，生成新的范围块、结果块与指纹。
+- V1-only active change 不得自动迁移结果，必须先执行一次 verify，生成新的范围块、结果块与指纹；
+- 注入正文不得再写死仅 Cursor 的入口或「Cursor workspace」；apply/verify 与 propose 的 D 块须带 `AI_TOOLS_MULTI_IDE_V1`。
 
 ## 6. 同步当前维护文档
 
@@ -456,15 +474,19 @@ fi
 - [ ] **7.3 验证官方生成物所有权边界**
 
 ```bash
-git ls-files '.cursor/skills/openspec-*' '.cursor/commands/opsx-*'
+git ls-files '.cursor/skills/openspec-*' '.cursor/commands/opsx-*' \
+  '.qoder/skills/openspec-*' '.qoder/commands/opsx/*' \
+  '.agents/skills/openspec-*'
 git check-ignore .cursor/skills/openspec-apply-change/SKILL.md
+git check-ignore .qoder/skills/openspec-apply-change/SKILL.md
+git check-ignore .agents/skills/openspec-apply-change/SKILL.md
 if git check-ignore -q .cursor/skills/openspec-update-change-from-code/SKILL.md; then
   echo "错误：from-code skill 不应被忽略" >&2
   exit 1
 fi
 ```
 
-预期：`git ls-files` 只包含 from-code skill 和 command；官方 apply skill 被忽略；from-code skill 不被忽略。
+预期：`git ls-files` 只包含 Cursor from-code skill 和 command；三套官方 apply skill 都被忽略；from-code skill 不被忽略。
 
 - [ ] **7.4 人工执行差异审查**
 
@@ -479,7 +501,7 @@ fi
 ## 8. 目标项目升级与冒烟验证
 
 **文件：**
-- 目标项目官方生成物：由 `openspec update` 管理
+- 目标项目官方生成物：由 `openspec update` 刷新已配置工具；需要 Cursor / Qoder / Codex 时再跑 `openspec init --tools cursor,qoder,codex`
 - 目标项目自定义 schema：`openspec/schemas/evidence-driven/`
 - 目标项目配置：`openspec/config.yaml`
 - 目标项目验证门禁文件：以新版实际生成清单和 `docs/ai-tools-integration.md` 为准
@@ -495,9 +517,11 @@ fi
 ```bash
 openspec --version
 openspec update
+# 只刷新已配置工具。Cursor-only 项目要补 Qoder / Codex 必须再跑 init（会 Refresh Cursor，随后须重做 5.1）
+openspec init --tools cursor,qoder,codex
 ```
 
-预期：更新成功，官方生成物与目标 CLI 版本一致。
+预期：官方生成物与目标 CLI 版本一致；需要三助手时 `.qoder/` 与 `.agents/skills/openspec-*` 已存在。
 
 - [ ] **8.3 安装升级后的自定义层**
 
@@ -524,9 +548,14 @@ TARGET_PROJECT="$(cd "$TARGET_PROJECT" && pwd -P)"
 RUN_DIR="$(cd "$RUN_DIR" && pwd -P)"
 cd "$TARGET_PROJECT"
 
+# 代表性项目已 init 三助手时检查这 20 个 Verify 门禁文件；只使用一种助手则缩到已 init 路径。
+# propose 的 D 块与 MULTI_IDE 标记由接入文档 5.1 检查器覆盖，不在本断言内。
 GATE_FILES=(
   .cursor/commands/opsx-{apply,verify,sync,archive}.md
   .cursor/skills/openspec-{apply-change,verify-change,sync-specs,archive-change}/SKILL.md
+  .qoder/commands/opsx/{apply,verify,sync,archive}.md
+  .qoder/skills/openspec-{apply-change,verify-change,sync-specs,archive-change}/SKILL.md
+  .agents/skills/openspec-{apply-change,verify-change,sync-specs,archive-change}/SKILL.md
 )
 
 python3 - "${GATE_FILES[@]}" <<'PY'

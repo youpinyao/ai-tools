@@ -4,14 +4,19 @@
 方案调整、实现、验证还是代码回写阶段，再沿流程图选择对应路径。图中的步骤越多，
 通常意味着需要补充或更新的制品越多，整体工作量也越大。
 
+官方入口因助手而异，本文用阶段名（`explore` / `propose` / `apply` 等）描述流程；
+实际调用请换成当前助手的写法：Cursor `/opsx-*`，Qoder `/opsx:*`，Codex `$openspec-*`。
+图中的 `from-code` 是 skill `openspec-update-change-from-code`（通用 Agent Skill）。
+Cursor 另有斜杠命令 `/opsx-update-change-from-code`；Qoder / Codex 发现同名 skill 后按各自入口调用。
+
 ## 各个场景工作量
 
 下图展示七类场景的推荐路径。其中 `explore` 用于澄清问题，`propose` 用于建立
 change，`update` 用于调整已有规划，`apply` 用于实施任务，`verify` 用于核验实现，
 `archive` 用于结束 change，`sync` 用于在不归档的情况下将 delta specs 合并到
 main specs。手动执行 `sync` 是可选步骤；若归档前尚未同步，`archive` 会提示先同步
-delta specs，再完成归档。图中的 `from-code` 是本仓库
-`/opsx-update-change-from-code` 命令的简称，用于从代码回写已有 active change，
+delta specs，再完成归档。图中的 `from-code` 是 skill
+`openspec-update-change-from-code` 的简称（Cursor 斜杠命令为 `/opsx-update-change-from-code`），用于从代码回写已有 active change，
 或在没有 active change 且只有一份对应 main spec 时回写该 spec；目标有歧义时先请用户选择。
 
 ```mermaid
@@ -61,7 +66,7 @@ flowchart TD
 后的增强闭环。目标项目使用本仓库
 `evidence-driven` schema，并按[接入文档](ai-tools-integration.md#51-补充-verify-修复闭环与流转门禁)
 安装 `AI_TOOLS_VERIFY_GATE_V2` 增强规则后，可形成下面的规格驱动、证据验证和反馈
-回流闭环；若同时安装 `/opsx-update-change-from-code`，已有代码也可从对应入口接入。
+回流闭环；若同时安装 from-code skill，已有代码也可从对应入口接入。
 这些增强不改变 OpenSpec 官方命令的默认语义。
 
 ```mermaid
@@ -218,7 +223,7 @@ flowchart TD
 ### 场景 5：已有代码，且存在 active change
 
 当代码已经发生变化，同时存在对应的 active change 时，使用
-`/opsx-update-change-from-code` 比较代码事实与现有制品，将确认需要保留的实现回写
+from-code skill（Cursor：`/opsx-update-change-from-code`）比较代码事实与现有制品，将确认需要保留的实现回写
 到 change，再执行验证。
 
 推荐路径：`/opsx-update-change-from-code → verify → archive`。

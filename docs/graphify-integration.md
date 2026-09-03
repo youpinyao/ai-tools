@@ -9,13 +9,13 @@
 - Graphify 用于快速定位相关文件、符号和依赖路径。
 - 源代码、OpenSpec 规划产物和实际验证结果仍是事实依据。
 - 图谱查询结果必须在涉及实现判断时回到源码或测试复核。
-- 首期采用本地 CLI 与 Cursor 项目规则，不引入常驻 MCP 服务。
+- 首期采用本地 CLI，以及 Cursor / Codex 官方项目集成；Qoder 无官方平台，以 CLI 为主、skill 复制为非官方回退。
 
 ## 2. 前置条件
 
 - Python 3.10+
 - `uv`（推荐）或 `pipx`
-- Cursor（本方案仅覆盖 Cursor 规则集成）
+- Cursor、Qoder 或 Codex（OpenSpec 同时覆盖这三者。Graphify：Cursor / Codex 有官方平台；Qoder 只能非官方回退或只用 CLI）
 
 安装官方包（PyPI 包名为 `graphifyy`，命令名为 `graphify`）：
 
@@ -39,17 +39,21 @@ pipx ensurepath
 
 ```text
 <project>/
-├── .cursor/rules/graphify.mdc   # Graphify 生成的 Cursor 查询优先规则
-├── .gitattributes               # graph.json merge driver 关联
-├── .graphifyignore              # Graphify 专用排除规则
+├── .cursor/rules/graphify.mdc     # Cursor：alwaysApply 查询优先规则
+├── .codex/skills/graphify/        # Codex：项目级 Skill（另写 AGENTS.md）
+├── .agents/skills/graphify/       # 跨框架 Agent Skills（Qoder 回退源）
+├── .qoder/skills/graphify/        # Qoder：非官方回退副本，助手未必能发现
+├── AGENTS.md                      # Codex always-on 引导（Graphify 写入片段）
+├── .gitattributes                 # graph.json merge driver 关联
+├── .graphifyignore                # Graphify 专用排除规则
 └── graphify-out/
-    ├── graph.json               # 可查询的完整图谱
-    ├── GRAPH_REPORT.md          # 架构与关键关系摘要
-    ├── graph.html               # 本地图谱可视化
-    └── manifest.json            # 增量提取所需的可移植清单
+    ├── graph.json                 # 可查询的完整图谱
+    ├── GRAPH_REPORT.md            # 架构与关键关系摘要
+    ├── graph.html                 # 本地图谱可视化
+    └── manifest.json              # 增量提取所需的可移植清单
 ```
 
-建议提交 Cursor rule、`.gitattributes`、`.graphifyignore`，以及 `graphify-out/` 中的三个核心图谱产物和 `manifest.json`，让团队成员拉取代码后即可查询并复用增量状态。`cost.json` 属于本地成本记录，`cache/` 是否提交取决于仓库体积和构建速度；包含本机路径的元数据不应提交。
+建议提交 Cursor 规则、Codex Skill/`AGENTS.md` 片段、`.gitattributes`、`.graphifyignore`，以及 `graphify-out/` 中的三个核心图谱产物和 `manifest.json`，让团队成员拉取代码后即可查询并复用增量状态。Qoder 的 `.qoder/skills/graphify/` 是非官方回退，未确认助手能发现前不要当成已接入产物提交。`cost.json` 属于本地成本记录，`cache/` 是否提交取决于仓库体积和构建速度；包含本机路径的元数据不应提交。只使用其中一种助手时，可以只提交对应平台的官方集成文件。
 
 建议加入目标项目的 `.gitignore`：
 
@@ -77,18 +81,41 @@ build/
 在目标项目根目录执行：
 
 ```bash
-# 安装项目级 Cursor 规则（落到 .cursor/rules/graphify.mdc）
+# Cursor：alwaysApply 规则，落到 .cursor/rules/graphify.mdc
 # 与 graphify cursor install 等价
 graphify install --platform cursor --project
+
+# Codex：项目级 Skill + AGENTS.md，落到 .codex/skills/graphify/
+# 与 graphify codex install --project 等价
+graphify install --platform codex --project
+
+# Qoder：Graphify CLI 当前没有官方 qoder 平台。下面是非官方回退，
+# 不能当成与 Cursor 规则或 Codex AGENTS.md 等价。
+# 查询请优先用终端 graphify query / path / explain，不要假定 /graphify 可用。
+graphify install --platform agents --project
+mkdir -p .qoder/skills
+rm -rf .qoder/skills/graphify
+cp -R .agents/skills/graphify .qoder/skills/graphify
+# 接入后必须在 Qoder 里确认能否发现该 skill；发现不了就只用 CLI。
+# 可选：若 Qoder 加载 .qoder/rules/*.md，可自行写一条 always-on 规则，要求先跑 graphify query。
 
 # 团队协作项目：安装本地 Git hook、注册 merge driver
 graphify hook install
 ```
 
-Cursor 官方平台只写入 alwaysApply 规则，不安装 `.agents/skills/` 或 `.cursor/skills/` 下的 Skill。该规则会引导 Agent 优先执行限定查询。个人单机使用可跳过 Git hook；需要提交共享图谱或处理并行修改的团队项目应安装 hook。随后在 Cursor 中运行：
+只使用其中一种助手时，只跑对应平台的安装命令即可。若日后 `graphify install --help` 出现 `qoder`，优先改用 `graphify install --platform qoder --project`，不必再手工复制。
+
+各平台能力不同：Cursor 官方只写 alwaysApply 规则；Codex 官方写 Skill 与 `AGENTS.md`（hook 为 no-op，always-on 靠 `AGENTS.md`）。Qoder 回退只复制 Agent Skills 包，没有官方 always-on 规则，助手未必能触发 skill。个人单机使用可跳过 Git hook；需要提交共享图谱或处理并行修改的团队项目应安装 hook。随后构建图谱：
 
 ```text
+# 任意助手都可用的终端入口（推荐，不依赖斜杠命令）
+graphify extract .
+
+# Cursor：若规则已加载，也可在对话中让助手构建
 /graphify .
+
+# Codex：skill 名以本机安装为准，常见为 $graphify ；也可用终端 extract
+# Qoder：不要默认存在 /graphify ；未确认 skill 可用前只用终端
 ```
 
 首次构建应生成：
@@ -166,15 +193,18 @@ graphify hook install
 # 代码提交前手动增量更新，可将代码与对应图谱放入同一提交
 graphify update .
 
-# 文档或其他语义内容发生变化时，在 Cursor 中更新
-/graphify . --update
+# 文档或其他语义内容发生变化时：
+# 终端（推荐）：graphify update .
+# Cursor：/graphify . --update
+# Codex：以本机 skill 名为准，或用终端
+# Qoder：未确认 skill 前只用终端
 ```
 
 `graphify hook install` 安装的是异步 `post-commit` 和 `post-checkout` hook。提交完成后，hook 只在后台更新工作区中的图谱，不会修改刚刚创建的提交，也不会自动提交产物。因此，不应依赖 hook 将最新图谱自动带入当前代码提交；若未在提交前手动更新，应等待后台重建完成、检查产物后再单独提交。
 
 团队协作约定：
 
-1. 首位接入者生成并提交 Cursor rule、`.graphifyignore`、`.gitattributes`、核心图谱产物和 `manifest.json`。
+1. 首位接入者生成并提交所用助手的集成文件、`.graphifyignore`、`.gitattributes`、核心图谱产物和 `manifest.json`。
 2. 其他成员拉取后执行 `graphify hook install`，在本地 Git 配置中注册 merge driver。
 3. 代码提交前优先运行 `graphify update .`，将代码与更新后的图谱产物放入同一提交。
 4. 若依赖 `post-commit` hook 兜底，等待后台重建完成后检查并另行提交图谱产物。
@@ -201,15 +231,19 @@ graphify extract . --force
 
 ```bash
 graphify uninstall --project --platform cursor
+graphify uninstall --project --platform codex
+graphify uninstall --project --platform agents
+rm -rf .qoder/skills/graphify
 graphify hook uninstall
 ```
 
-上述命令会分别移除 Cursor rule、Git hook、merge driver 配置及其 `.gitattributes` 条目。随后删除 `.graphifyignore` 和 `graphify-out/`；若安装过程曾被中断，再检查并清理残留的 `.cursor/rules/graphify.mdc`。若仓库里还有旧版 `.agents/skills/graphify/`，一并删除。移除 Graphify 不影响 OpenSpec change、主规格或历史验证记录。
+上述命令会分别移除 Cursor 官方规则、Codex 官方 Skill/`AGENTS.md` 片段、Agent Skills、Qoder 非官方 Skill 副本、Git hook、merge driver 配置及其 `.gitattributes` 条目。随后删除 `.graphifyignore` 和 `graphify-out/`；若安装过程曾被中断，再检查并清理残留的 `.cursor/rules/graphify.mdc`、`.codex/skills/graphify/`、`.agents/skills/graphify/`、`.qoder/skills/graphify/`。移除 Graphify 不影响 OpenSpec change、主规格或历史验证记录。
 
 ## 10. 验收清单
 
 - [ ] `graphify --version` 可正常执行。
-- [ ] Cursor 已加载项目级 Graphify rule（`.cursor/rules/graphify.mdc`）。
+- [ ] 所用助手已加载对应**官方**集成：Cursor 为 `.cursor/rules/graphify.mdc`；Codex 为 `.codex/skills/graphify/` 与 `AGENTS.md`。
+- [ ] Qoder：仅当已确认助手能发现 `.qoder/skills/graphify/` 才勾选 skill；否则以 CLI 为准，不把回退复制当成已接入。
 - [ ] 首次构建生成三个核心图谱产物和 `manifest.json`。
 - [ ] `query`、`path`、`explain` 各完成一次冒烟查询。
 - [ ] `.graphifyignore` 已排除密钥、依赖和构建产物。
