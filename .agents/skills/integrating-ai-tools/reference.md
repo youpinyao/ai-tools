@@ -4,7 +4,7 @@
 
 当前语义基线为 OpenSpec **1.12.0** 官方 `spec-driven`（以 `openspec --version` 与 `npm view @fission-ai/openspec version` 为准）。后续升级须重新查询最新稳定版，不得永久假定该版本细节。
 
-场景化日常用法见 [ai-sdd-workflow.md](./ai-sdd-workflow.md)。Graphify 可选增强见 [graphify-integration.md](./graphify-integration.md)。
+场景化日常用法见 [ai-sdd-workflow.md](../../../docs/ai-sdd-workflow.md)。Graphify 可选增强见 [integrating-graphify reference](../integrating-graphify/reference.md)。
 
 ## 1. 当前 ai-tools 是什么
 
@@ -1115,8 +1115,8 @@ verify 主体仍跟随官方生成物。OpenSpec 1.12.0 官方 verify 只在会�
 
 ## 10. 相关文档
 
-- 安装与仓库边界：[README.md](../README.md)
-- 场景化工作流：[ai-sdd-workflow.md](./ai-sdd-workflow.md)
-- Graphify 可选增强：[graphify-integration.md](./graphify-integration.md)
+- 安装与仓库边界：[README.md](../../../README.md)
+- 场景化工作流：[ai-sdd-workflow.md](../../../docs/ai-sdd-workflow.md)
+- Graphify 可选增强：[integrating-graphify reference](../integrating-graphify/reference.md)
 - 当前维护基线见 README 与本文。历史架构规格 `spec/spec-architecture-openspec-workflow-refactor.md` 已移出版本控制（`.gitignore` 含 `/spec`），本仓库不再跟踪等价文件。
 - OpenSpec 上游：https://github.com/Fission-AI/OpenSpec

@@ -11,12 +11,12 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = ROOT / "openspec/schemas/evidence-driven/templates/verification.md"
 SCHEMA = ROOT / "openspec/schemas/evidence-driven/schema.yaml"
-INTEGRATION = ROOT / "docs/ai-tools-integration.md"
+INTEGRATION = ROOT / ".agents/skills/integrating-ai-tools/reference.md"
 CURRENT_DOCS = [
     ROOT / "README.md",
     ROOT / "docs/ai-sdd-workflow.md",
-    ROOT / "docs/ai-tools-integration.md",
-    ROOT / "docs/openspec-upgrade-plan.md",
+    ROOT / ".agents/skills/integrating-ai-tools/reference.md",
+    ROOT / ".agents/skills/upgrading-openspec/reference.md",
 ]
 
 
@@ -136,21 +136,21 @@ class VerificationContractTest(unittest.TestCase):
                 r"范围外变化.{0,40}告警",
                 r"sync.{0,80}main spec.{0,40}不强制重复实现验证",
             ),
-            "ai-sdd-workflow.md": (
+            "docs/ai-sdd-workflow.md": (
                 r"AI_TOOLS_VERIFY_GATE_V2",
                 r"V2 范围指纹",
                 r"范围内变化.{0,40}阻断",
                 r"范围外变化.{0,40}告警",
                 r"sync.{0,100}main spec.{0,60}不.{0,20}重复实现验证",
             ),
-            "ai-tools-integration.md": (
+            ".agents/skills/integrating-ai-tools/reference.md": (
                 r"AI_TOOLS_VERIFY_GATE_V2",
                 r"V2 范围指纹",
                 r"范围内变化.{0,40}阻断",
                 r"范围外变化.{0,40}告警",
                 r"正常 sync.{0,100}main spec.{0,60}不强制复验",
             ),
-            "openspec-upgrade-plan.md": (
+            ".agents/skills/upgrading-openspec/reference.md": (
                 r"AI_TOOLS_VERIFY_GATE_V2",
                 r"V2 范围指纹",
                 r"范围内阻断",
@@ -160,8 +160,9 @@ class VerificationContractTest(unittest.TestCase):
         }
         for path in CURRENT_DOCS:
             text = path.read_text()
-            for pattern in required_by_doc[path.name]:
-                with self.subTest(path=path.name, pattern=pattern):
+            relative_path = path.relative_to(ROOT).as_posix()
+            for pattern in required_by_doc[relative_path]:
+                with self.subTest(path=relative_path, pattern=pattern):
                     self.assertRegex(text, re.compile(pattern, re.DOTALL))
 
     def test_current_docs_reject_legacy_workspace_and_finish_prompt_semantics(
@@ -207,7 +208,7 @@ class VerificationContractTest(unittest.TestCase):
     def test_upgrade_plan_has_executable_v1_migration_and_scoped_smoke(
         self,
     ) -> None:
-        text = (ROOT / "docs/openspec-upgrade-plan.md").read_text()
+        text = (ROOT / ".agents/skills/upgrading-openspec/reference.md").read_text()
         required_commands = (
             'SCOPED_SMOKE="$(mktemp -d',
             "trap 'rm -rf \"$SCOPED_SMOKE\"' EXIT",
@@ -233,7 +234,7 @@ class VerificationContractTest(unittest.TestCase):
         self.assertRegex(text, re.compile(r"(?:禁止|不得).{0,20}追加"))
 
     def test_upgrade_plan_v1_detector_matches_real_marker_sample(self) -> None:
-        text = (ROOT / "docs/openspec-upgrade-plan.md").read_text()
+        text = (ROOT / ".agents/skills/upgrading-openspec/reference.md").read_text()
         match = re.search(r"^V1_ACTIVE_PATTERN='([^']+)'$", text, re.MULTILINE)
         self.assertIsNotNone(match)
         assert match is not None
@@ -252,7 +253,7 @@ class VerificationContractTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_upgrade_plan_v2_migration_block_executes_fail_fast(self) -> None:
-        text = (ROOT / "docs/openspec-upgrade-plan.md").read_text()
+        text = (ROOT / ".agents/skills/upgrading-openspec/reference.md").read_text()
         migration = fenced_bash(
             text,
             "替换后直接运行以下断言：",
@@ -343,7 +344,7 @@ class VerificationContractTest(unittest.TestCase):
             self.assertIn(str(verification.relative_to(target)), report.read_text())
 
     def test_upgrade_plan_smoke_executes_and_restores_fail_fast(self) -> None:
-        text = (ROOT / "docs/openspec-upgrade-plan.md").read_text()
+        text = (ROOT / ".agents/skills/upgrading-openspec/reference.md").read_text()
         smoke = fenced_bash(
             text,
             "然后执行以下可重复的范围指纹冒烟",

@@ -64,7 +64,7 @@ flowchart TD
 
 上一张图用于选择命令场景和推荐路径；下图复用其中的入口，并展开进入 active change
 后的增强闭环。目标项目使用本仓库
-`evidence-driven` schema，并按[接入文档](ai-tools-integration.md#51-补充-verify-修复闭环与流转门禁)
+`evidence-driven` schema，并按[接入文档](../.agents/skills/integrating-ai-tools/reference.md#51-补充-verify-修复闭环与流转门禁)
 安装 `AI_TOOLS_VERIFY_GATE_V2` 增强规则后，可形成下面的规格驱动、证据验证和反馈
 回流闭环；若同时安装 from-code skill，已有代码也可从对应入口接入。
 这些增强不改变 OpenSpec 官方命令的默认语义。

@@ -1,6 +1,6 @@
 # OpenSpec 可重复升级实施计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: 使用 `superpowers:subagent-driven-development`（推荐）或 `superpowers:executing-plans` 逐项执行本计划。每次执行前复制本计划作为当次运行记录，只在副本中勾选任务，不要修改本计划模板的复选框。OpenSpec 相关对话、制品与总结必须使用简体中文。
+> **执行要求：** 逐项执行本计划。每次执行前复制本计划作为当次运行记录，只在副本中勾选任务，不要修改本计划模板的复选框。OpenSpec 相关对话、制品与总结必须使用简体中文。
 
 **目标：** 在每次执行时，将 OpenSpec CLI 从当前已安装版本升级到指定目标版本（默认取 npm 发布的最新稳定版），使 `evidence-driven` 与目标版本官方 `spec-driven` 重新对齐，并验证本仓库扩展和目标项目仍可正常工作。
 
@@ -40,7 +40,7 @@ RUN_DIR="$RUN_LOG_ROOT/$RUN_ID"
 RUN_LOG="$RUN_DIR/run.md"
 RUN_CHECKLIST="$RUN_DIR/checklist.md"
 mkdir -p "$RUN_DIR"
-cp "$AI_TOOLS_DIR/docs/openspec-upgrade-plan.md" "$RUN_CHECKLIST"
+cp "$AI_TOOLS_DIR/.agents/skills/upgrading-openspec/reference.md" "$RUN_CHECKLIST"
 export AI_TOOLS_DIR SOURCE_VERSION TARGET_VERSION RUN_ID UPGRADE_TMP
 export RUN_LOG_ROOT RUN_DIR RUN_LOG RUN_CHECKLIST
 printf '# OpenSpec 升级运行记录\n\n- run: `%s`\n- source: `%s`\n- target: `%s`\n- temp: `%s`\n' \
@@ -323,7 +323,7 @@ openspec status --change "upgrade-contract-smoke" --json |
 **文件：**
 - 检查或修改：`.gitignore`
 - 检查或修改：`AGENTS.md`
-- 检查或修改：`docs/ai-tools-integration.md`
+- 检查或修改：`.agents/skills/integrating-ai-tools/reference.md`
 
 - [ ] **5.1 比较新版生成的 skill/command 清单**
 
@@ -347,7 +347,7 @@ do
 done
 ```
 
-预期：得到新版实际文件清单，且上述 15 个注入目标都存在。若官方新增、删除或重命名路径，精确更新 `.gitignore` 与 `docs/ai-tools-integration.md` 5.1 检查器；不得忽略本仓库唯一的 `.agents/skills/openspec-update-change-from-code/`。
+预期：得到新版实际文件清单，且上述 15 个注入目标都存在。若官方新增、删除或重命名路径，精确更新 `.gitignore` 与 `.agents/skills/integrating-ai-tools/reference.md` 5.1 检查器；不得忽略本仓库唯一的 `.agents/skills/openspec-update-change-from-code/`。
 
 - [ ] **5.2 核对中文规则覆盖范围**
 
@@ -357,7 +357,7 @@ done
 
 - [ ] **5.3 复核 `AI_TOOLS_VERIFY_GATE_V2`、`AI_TOOLS_PROPOSE_WORKTREE_V1`、`AI_TOOLS_WORKTREE_FINISH_V1` 与 `AI_TOOLS_MULTI_IDE_V1` 追加点**
 
-阅读新版 propose、apply、verify、sync、archive 的 command 和 skill，逐项判断 `docs/ai-tools-integration.md` 第 5.1 节 A/B/C、D 与 E 的追加内容是否仍有有效插入点、是否与新版官方行为冲突。
+阅读新版 propose、apply、verify、sync、archive 的 command 和 skill，逐项判断 `.agents/skills/integrating-ai-tools/reference.md` 第 5.1 节 A/B/C、D 与 E 的追加内容是否仍有有效插入点、是否与新版官方行为冲突。
 
 预期：
 
@@ -377,10 +377,9 @@ done
 **文件：**
 - 修改：`README.md`
 - 修改：`docs/ai-sdd-workflow.md`
-- 修改：`docs/ai-tools-integration.md`
+- 修改：`.agents/skills/integrating-ai-tools/reference.md`
 - 按需修改：`spec/spec-architecture-openspec-workflow-refactor.md`（文件存在且属于当前维护范围时）
-- 按需修改：`docs/graphify-integration.md`
-- 不修改：`docs/superpowers/plans/2026-08-14-openspec-official-first-refactor.md`
+- 按需修改：`.agents/skills/integrating-graphify/reference.md`
 
 - [ ] **6.1 更新当前基线版本和官方语义说明**
 
@@ -405,9 +404,9 @@ test "$(openspec --version)" = "$TARGET_VERSION"
 
 当前维护文档必须统一使用“V2 范围指纹”“范围内阻断”“范围外告警”，并说明正常
 sync 生成的 main spec 未纳入声明范围时不强制重复实现验证。搜索
-`README.md`、`docs/ai-sdd-workflow.md`、`docs/ai-tools-integration.md` 与本计划，
-不得残留旧版 Verify 门禁标记或全工作区指纹表述；`docs/superpowers/plans/` 和
-`docs/superpowers/specs/` 是历史记录，允许保留当时的 V1 事实，不做批量改写。
+`README.md`、`docs/ai-sdd-workflow.md`、`.agents/skills/integrating-ai-tools/reference.md` 与本计划，
+不得残留旧版 Verify 门禁标记或全工作区指纹表述。历史记录允许保留当时的 V1
+事实，不做批量改写。
 
 - [ ] **6.5 更新架构规格验收基线**
 
@@ -448,7 +447,7 @@ if len(text.splitlines()) > 30:
 PY
 if [ "$SOURCE_VERSION" != "$TARGET_VERSION" ]; then
   if rg -n -F "OpenSpec $SOURCE_VERSION" \
-    README.md docs/ai-sdd-workflow.md docs/ai-tools-integration.md; then
+    README.md docs/ai-sdd-workflow.md .agents/skills/integrating-ai-tools/reference.md; then
     echo "错误：当前维护文档仍包含源版本 $SOURCE_VERSION" >&2
     exit 1
   else
@@ -457,13 +456,12 @@ if [ "$SOURCE_VERSION" != "$TARGET_VERSION" ]; then
   fi
 else
   rg -n -F "OpenSpec $SOURCE_VERSION" \
-    README.md docs/ai-sdd-workflow.md docs/ai-tools-integration.md
+    README.md docs/ai-sdd-workflow.md .agents/skills/integrating-ai-tools/reference.md
 fi
 ```
 
 预期：schema、V2 脚本接口与契约测试全部通过；紧凑模板严格为四个章节且不超过
-30 行；当前维护文档无旧版 Verify 门禁标记或全工作区指纹表述。历史
-`docs/superpowers/` 文档不在该静态搜索范围内。若 `SOURCE_VERSION` 与
+30 行；当前维护文档无旧版 Verify 门禁标记或全工作区指纹表述。若 `SOURCE_VERSION` 与
 `TARGET_VERSION` 不同，最后一组在当前维护文档中无命中；若版本相同，则人工核对
 命中上下文是否准确。
 
@@ -505,7 +503,7 @@ fi
 - 目标项目官方生成物：由 `openspec update` 刷新已配置工具；需要 Cursor / Codex 时再跑 `openspec init --tools cursor,codex`
 - 目标项目自定义 schema：`openspec/schemas/evidence-driven/`
 - 目标项目配置：`openspec/config.yaml`
-- 目标项目验证门禁文件：以新版实际生成清单和 `docs/ai-tools-integration.md` 为准
+- 目标项目验证门禁文件：以新版实际生成清单和 `.agents/skills/integrating-ai-tools/reference.md` 为准
 
 - [ ] **8.1 选择一个可回滚的代表性目标项目**
 
@@ -802,7 +800,7 @@ test "$(openspec --version)" = "$SOURCE_VERSION"
 ```bash
 git status --short
 git diff --check
-git diff -- README.md docs/ openspec/ .cursor/ spec/
+git diff -- README.md docs/ openspec/ .cursor/ .agents/skills/ spec/
 ```
 
 预期：无空白错误；修改范围与本计划一致；没有提交临时目录、官方生成物或无关文件。只有在用户明确要求时，才按逻辑变更组创建 commit。

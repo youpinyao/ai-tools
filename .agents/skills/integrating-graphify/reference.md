@@ -1,4 +1,4 @@
-# Graphify 接入方案
+# Graphify 接入方案（Skill Reference）
 
 ## 1. 目标与定位
 

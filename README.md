@@ -18,17 +18,17 @@ Codex 共用根目录 `AGENTS.md` 中的同一份规则。
 | 可选 Skill | `.agents/skills/openspec-update-change-from-code/` | Cursor / Codex 共用的唯一 Agent Skill 源（从代码回写） |
 | 指纹脚本 | `scripts/openspec-verification-fingerprint.py` | 与具体 Agent 无关的 V2 范围指纹工具 |
 | 工作流文档 | [docs/ai-sdd-workflow.md](docs/ai-sdd-workflow.md) | 官方命令场景选择与推荐路径 |
-| 接入与迁移 | [docs/ai-tools-integration.md](docs/ai-tools-integration.md) | 其它项目从官方 OpenSpec 或旧版 ai-tools 接入/升级 |
-| 升级维护 | [docs/openspec-upgrade-plan.md](docs/openspec-upgrade-plan.md) | OpenSpec 版本升级与语义复核清单 |
-| 可选 Graphify 方案 | [docs/graphify-integration.md](docs/graphify-integration.md) | 用知识图谱增强 AI-SDD / OpenSpec 工作流 |
+| 接入与迁移 | [integrating-ai-tools](.agents/skills/integrating-ai-tools/reference.md) | 其它项目从官方 OpenSpec 或旧版 ai-tools 接入/升级 |
+| 升级维护 | [upgrading-openspec](.agents/skills/upgrading-openspec/reference.md) | OpenSpec 版本升级与语义复核清单 |
+| 可选 Graphify 方案 | [integrating-graphify](.agents/skills/integrating-graphify/reference.md) | 用知识图谱增强 AI-SDD / OpenSpec 工作流 |
 
 ## 安装到目标项目
 
 其它业务仓的完整接入、从旧版 ai-tools 迁移、以及日常升级步骤见
-[docs/ai-tools-integration.md](docs/ai-tools-integration.md)。下文只完成官方生成层、自定义
+[integrating-ai-tools reference](.agents/skills/integrating-ai-tools/reference.md)。下文只完成官方生成层、自定义
 schema 与可选旁路的基础安装；完整的 propose worktree 选择、隔离 worktree 收尾、verify 修复闭环及
 sync/archive 流转门禁还须按
-[接入文档 5.1 节](docs/ai-tools-integration.md#51-补充-verify-修复闭环与流转门禁)
+[接入文档 5.1 节](.agents/skills/integrating-ai-tools/reference.md#51-补充-verify-修复闭环与流转门禁)
 安装 `AI_TOOLS_VERIFY_GATE_V2`、`AI_TOOLS_PROPOSE_WORKTREE_V1` 与
 `AI_TOOLS_WORKTREE_FINISH_V1` 增强规则。
 
@@ -123,7 +123,7 @@ TARGET_PROJECT="/absolute/path/to/target-project"
    ```
 
 5. 要完成当前 ai-tools 接入，必须继续执行
-   [接入文档 5.1 节](docs/ai-tools-integration.md#51-补充-verify-修复闭环与流转门禁)：
+   [接入文档 5.1 节](.agents/skills/integrating-ai-tools/reference.md#51-补充-verify-修复闭环与流转门禁)：
    从本仓库复制 `scripts/openspec-verification-fingerprint.py`，向 apply、
    verify、sync、archive 的官方 command/skill 文件幂等追加
    `AI_TOOLS_VERIFY_GATE_V2` 规则，并向 propose 的官方 command/skill 文件幂等追加
