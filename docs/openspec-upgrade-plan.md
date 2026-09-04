@@ -18,7 +18,7 @@
 - `proposal`、`specs`、`design`、`tasks` 必须继承新版官方 `spec-driven`；本地只允许简体中文化、`evidence-driven` 命名、`verification` 制品、apply 前置和验证记录语义等已批准差异。
 - `openspec/config.yaml` 必须继续使用 `schema: evidence-driven`。
 - 目标项目已有 `openspec/config.yaml` 时只合并 `schema` 字段，不得整文件覆盖。
-- 不修改与升级无关的工作区变更；开始前使用独立分支或 worktree，并确保基线可恢复。
+- 不修改与升级无关的工作区变更；直接在当前分支执行，不新建独立分支或 worktree；用 Git 记录升级前状态，确保基线可恢复。
 - 不自动创建 commit；只有用户明确授权时才在任务检查点提交。
 
 ## 每次运行的输入与记录
@@ -73,7 +73,7 @@ git status --short
 git branch --show-current
 ```
 
-预期：明确记录执行前已有变更；升级不得覆盖或混入这些变更。若工作区不干净，先创建保留现状的独立 worktree，或暂停并让用户选择处理方式。
+预期：明确记录执行前已有变更与当前分支名；升级直接在当前分支进行，不新建分支或 worktree。升级不得覆盖或混入这些变更。若工作区不干净，暂停并让用户选择如何处理已有变更后再继续。
 
 - [ ] **1.2 固定源版本与目标版本**
 
@@ -774,7 +774,7 @@ npm install --global "@fission-ai/openspec@$SOURCE_VERSION"
 test "$(openspec --version)" = "$SOURCE_VERSION"
 ```
 
-预期：CLI 恢复到源版本。仓库文件使用本次独立分支/worktree 的 Git diff 人工撤销，不使用 `git reset --hard`。
+预期：CLI 恢复到源版本。仓库文件使用当前分支的 Git diff 人工撤销，不使用 `git reset --hard`。
 
 - [ ] **9.2 汇总升级证据**
 
