@@ -81,6 +81,7 @@ APPLY_PARALLEL_MARKERS = (
     "AI_TOOLS_PARALLEL_SKILL_READ_FAILED_V1",
     "AI_TOOLS_WORKER_APPLY_V1",
     "AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1",
+    "AI_TOOLS_MULTI_IDE_V1",
 )
 VERIFY_PARALLEL_MARKERS = (
     "AI_TOOLS_DELEGATED_VERIFY_V1",
@@ -92,6 +93,7 @@ VERIFY_PARALLEL_MARKERS = (
     "AI_TOOLS_PARALLEL_SKILL_READ_FAILED_V1",
     "AI_TOOLS_WORKER_VERIFY_V1",
     "AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1",
+    "AI_TOOLS_MULTI_IDE_V1",
 )
 
 
@@ -238,6 +240,10 @@ class VerificationContractTest(unittest.TestCase):
             ".cursor/skills/openspec-verify-change/SKILL.md",
             ".cursor/skills/openspec-sync-specs/SKILL.md",
             ".cursor/skills/openspec-archive-change/SKILL.md",
+            ".agents/skills/openspec-apply-change/SKILL.md",
+            ".agents/skills/openspec-verify-change/SKILL.md",
+            ".agents/skills/openspec-sync-specs/SKILL.md",
+            ".agents/skills/openspec-archive-change/SKILL.md",
         )
         valid_gate = (
             "<!-- AI_TOOLS_VERIFY_GATE_V2 -->\n"

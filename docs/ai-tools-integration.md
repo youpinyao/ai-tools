@@ -2,7 +2,7 @@
 
 本文面向**其它业务仓库**：说明如何从「仅有官方 OpenSpec」或「旧版 ai-tools（本地定制 skills/commands）」升级并接入当前 `ai-tools`。
 
-当前语义基线为 OpenSpec **1.11.0** 官方 `spec-driven`（以 `openspec --version` 与 `npm view @fission-ai/openspec version` 为准）。后续升级须重新查询最新稳定版，不得永久假定该版本细节。
+当前语义基线为 OpenSpec **1.12.0** 官方 `spec-driven`（以 `openspec --version` 与 `npm view @fission-ai/openspec version` 为准）。后续升级须重新查询最新稳定版，不得永久假定该版本细节。
 
 场景化日常用法见 [ai-sdd-workflow.md](./ai-sdd-workflow.md)。Graphify 可选增强见 [graphify-integration.md](./graphify-integration.md)。
 
@@ -204,7 +204,7 @@ openspec schema validate evidence-driven
 
 推荐同时生成 Cursor、Codex 官方层。目标文件合计 **15** 个：Cursor 10（5 个 command + 5 个 skill）、Codex 5（仅 `.agents/skills/openspec-*`，不生成 command）。只 init 了其中一种助手时，5.1 检查对未生成路径报 `NOFILE` 是预期，不要把缺失工具的路径标成必须 `OK`。
 
-插入位置按流程分别确定：propose 的 D/E 块紧接 YAML frontmatter，位于官方 Planning boundary、Store selection 与任何主体步骤之前；apply、verify、sync、archive 先执行官方 Store selection 与 **Steps** 第 1 步以选定 change，再在第 2 步之前放置 A/B/C 与 E 块。这样既保证 propose 在命名或写制品前询问工作区，也保证其余门禁使用已选定的 store-aware change。1.11.0 的 `openspec init --tools cursor,codex` 仍生成上述目标文件；官方 apply 在制品缺失时可能提示未随 init 生成的 `/opsx-continue`，不要把它纳入本仓库 `.gitignore` 或本节幂等清单。官方流程本身不提供 worktree 选择、隔离 worktree 收尾、子 Agent 编排、`verification.md` 持久化门禁或范围指纹；下列 A/B/C/D/E 仍是项目级追加，不是官方已实现能力。这些追加块属于 Agent 的 prompt-level behavior contracts，并非 OpenSpec CLI 可执行、不可绕过的硬门禁；接入文档中的“门禁”均指 Agent 在继续流程前必须执行的项目规则。V2 范围指纹脚本放在 `.cursor/scripts/`，两种助手都执行同一路径，不要按 IDE 再复制一份。
+插入位置按流程分别确定：propose 的 D/E 块紧接 YAML frontmatter，位于官方 Planning boundary、Store selection 与任何主体步骤之前；apply、verify、sync、archive 先执行官方 Store selection 与 **Steps** 第 1 步以选定 change，再在第 2 步之前放置 A/B/C 与 E 块。这样既保证 propose 在命名或写制品前询问工作区，也保证其余门禁使用已选定的 store-aware change。1.12.0 的 `openspec init --tools cursor,codex` 仍生成上述目标文件；官方 apply 在制品缺失时可能提示未随 init 生成的 `/opsx-continue`，不要把它纳入本仓库 `.gitignore` 或本节幂等清单。官方流程本身不提供 worktree 选择、隔离 worktree 收尾、子 Agent 编排、`verification.md` 持久化门禁或范围指纹；下列 A/B/C/D/E 仍是项目级追加，不是官方已实现能力。这些追加块属于 Agent 的 prompt-level behavior contracts，并非 OpenSpec CLI 可执行、不可绕过的硬门禁；接入文档中的“门禁”均指 Agent 在继续流程前必须执行的项目规则。V2 范围指纹脚本放在 `.cursor/scripts/`，两种助手都执行同一路径，不要按 IDE 再复制一份。
 
 #### V2 范围指纹脚本
 
@@ -230,7 +230,7 @@ python3 -c 'import ast, pathlib, sys; ast.parse(pathlib.Path(sys.argv[1]).read_t
 - `.cursor/skills/openspec-apply-change/SKILL.md`
 - `.agents/skills/openspec-apply-change/SKILL.md`
 
-插入位置：官方 Store selection 和 **Steps** 第 1 步（Select the change）之后、第 2 步（Check status to understand the schema）之前。1.11.0 官方 apply 是串行任务循环，不含子 Agent；其 `context` 与 `operationGuidance` 明确只是 prompt-level behavior contracts，不能替代 CLI 状态或证明任务完成；在 `state: "all_done"` 与完成输出中仍会建议 `/opsx-archive`。以本块第 4–5 条为准，门禁通过前不得按官方文案建议 sync 或 archive。
+插入位置：官方 Store selection 和 **Steps** 第 1 步（Select the change）之后、第 2 步（Check status to understand the schema）之前。1.12.0 官方 apply 是串行任务循环，不含子 Agent；其 `context` 与 `operationGuidance` 明确只是 prompt-level behavior contracts，不能替代 CLI 状态或证明任务完成；在 `state: "all_done"` 与完成输出中仍会建议 `/opsx-archive`。以本块第 4–5 条为准，门禁通过前不得按官方文案建议 sync 或 archive。
 
 ```markdown
 <!-- AI_TOOLS_VERIFY_GATE_V2 -->
@@ -298,7 +298,7 @@ python3 -c 'import ast, pathlib, sys; ast.parse(pathlib.Path(sys.argv[1]).read_t
 - `.cursor/skills/openspec-verify-change/SKILL.md`
 - `.agents/skills/openspec-verify-change/SKILL.md`
 
-插入位置：官方 Store selection 和 **Steps** 第 1 步（Select the change）之后、第 2 步（Check status to understand the schema）之前。1.11.0 官方 verify 只在会话中输出 Completeness / Correctness / Coherence 记分卡，不写 `verification.md`、不修复、不算指纹；官方「Ready for archive」不是本项目持久化门禁，不得替代下方闭环。
+插入位置：官方 Store selection 和 **Steps** 第 1 步（Select the change）之后、第 2 步（Check status to understand the schema）之前。1.12.0 官方 verify 只在会话中输出 Completeness / Correctness / Coherence 记分卡，不写 `verification.md`、不修复、不算指纹；官方「Ready for archive」不是本项目持久化门禁，不得替代下方闭环。
 
 ```markdown
 <!-- AI_TOOLS_VERIFY_GATE_V2 -->
@@ -375,7 +375,7 @@ python3 -c 'import ast, pathlib, sys; ast.parse(pathlib.Path(sys.argv[1]).read_t
 - `.agents/skills/openspec-sync-specs/SKILL.md`
 - `.agents/skills/openspec-archive-change/SKILL.md`
 
-插入位置：官方 Store selection 和 **Steps** 第 1 步选定 change 之后、第 2 步之前。sync 在第 2 步 Resolve change context 前检查；archive 则在第 1 步选定 change 后、读取 advisory `openspec instructions archive --json` 前检查。1.11.0 官方 sync 已使用 `artifactPaths.specs.existingOutputPaths`、specs rules 快照和 `openspec validate --specs` 约束 main spec 合并，archive 也会在内联 sync 后复核 delta，但两者均不检查 `verification.md` 或范围指纹，因此 C 块不与这些官方行为重复。官方 archive 对未完成制品或任务仍仅警告并允许用户确认继续，且 archive instructions 仍是不得阻断归档的 advisory 输入；这些官方行为不能替代本项目 Verify 门禁规则。
+插入位置：官方 Store selection 和 **Steps** 第 1 步选定 change 之后、第 2 步之前。sync 在第 2 步 Resolve change context 前检查；archive 则在第 1 步选定 change 后、读取 advisory `openspec instructions archive --json` 前检查。1.12.0 官方 sync 已使用 `artifactPaths.specs.existingOutputPaths`、specs rules 快照和 `openspec validate --specs` 约束 main spec 合并，archive 也会在内联 sync 后复核 delta，但两者均不检查 `verification.md` 或范围指纹，因此 C 块不与这些官方行为重复。官方 archive 对未完成制品或任务仍仅警告并允许用户确认继续，且 archive instructions 仍是不得阻断归档的 advisory 输入；这些官方行为不能替代本项目 Verify 门禁规则。
 
 ```markdown
 <!-- AI_TOOLS_VERIFY_GATE_V2 -->
@@ -513,9 +513,9 @@ apply 块内必须同时包含当前 APPLY delegated、parallel、handoff 起止
 - `.cursor/skills/openspec-propose/SKILL.md`
 - `.agents/skills/openspec-propose/SKILL.md`
 
-command 与 skill 使用同一规则正文；仅当官方文件标题层级会与本节冲突时，才把本节 `##` / `###` 降一级，不得改语义。1.11.0 官方 propose 正文使用加粗小节而非 `##` 标题，本节标题层级无需降级。
+command 与 skill 使用同一规则正文；仅当官方文件标题层级会与本节冲突时，才把本节 `##` / `###` 降一级，不得改语义。1.12.0 官方 propose 正文使用加粗小节而非 `##` 标题，本节标题层级无需降级。
 
-插入位置：紧接 YAML frontmatter，位于官方 Planning boundary、Store selection 与 **Steps** 第 1 步（理解需求并推导 kebab-case 名称）之前。1.11.0 官方新增并强化了 planning-only 边界、制品依赖闭包和 material ambiguity 处理，但仍无 worktree 选择；首次写入仍发生在 Step 3 的 `openspec new change`，因此 D 块不重复官方能力，且必须先于整个官方 propose 主体。
+插入位置：紧接 YAML frontmatter，位于官方 Planning boundary、Store selection 与 **Steps** 第 1 步（理解需求并推导 kebab-case 名称）之前。1.12.0 保留 planning-only 边界、制品依赖闭包和 material ambiguity 处理，并新增在起草制品时只读检查相关实现、测试、配置与文档的要求，但仍无 worktree 选择；首次写入仍发生在 Step 3 的 `openspec new change`，因此 D 块不重复官方能力，且必须先于整个官方 propose 主体，也不妨碍新版在选择 worktree 后执行项目检查。
 
 ```markdown
 <!-- AI_TOOLS_PROPOSE_WORKTREE_V1 -->
@@ -1020,11 +1020,11 @@ ai-tools 自定义层升级后也必须同次复制 V2 范围指纹脚本，并�
 - 不要在 `ai-tools` 仓库根目录对官方路径跑 `openspec init` / `openspec update` 并提交生成物。
 - 官方模板对照应在临时目录完成，再手工同步到 `evidence-driven`。
 
-### 7.4 工作流命令、JSON 与目录（OpenSpec 1.11.0）
+### 7.4 工作流命令、JSON 与目录（OpenSpec 1.12.0）
 
-以下命令与字段均来自 1.11.0 的 `openspec --help`、子命令 help、官方 schema 和临时 `openspec init --tools cursor,codex` 生成物，不要猜测未列出的参数。
+以下命令与字段均来自 1.12.0 的 `openspec --help`、子命令 help、官方 schema 和临时 `openspec init --tools cursor,codex` 生成物，不要猜测未列出的参数。
 
-| 用途 | 命令 | 1.11.0 说明 |
+| 用途 | 命令 | 1.12.0 说明 |
 |------|------|-------------|
 | 新项目官方生成层 | `openspec init --tools cursor,codex` | `--tools` 用于非交互指定工具。Cursor 生成 7 组 skill + 7 个 command；Codex 生成 7 组 skill（skills-only，入口为 `$openspec-*`）。官方 apply 在制品缺失时可能提示未随 init 生成的 `/opsx-continue`，不要纳入本仓库忽略清单或 5.1 幂等清单。 |
 | 已初始化刷新 | `openspec update` | 更新 instruction 文件；`--force` 可在工具已是最新时仍刷新。 |
@@ -1038,7 +1038,7 @@ ai-tools 自定义层升级后也必须同次复制 V2 范围指纹脚本，并�
 | apply 指令 | `openspec instructions apply --change "<name>" --json` | 顶层含 `state`、`missingArtifacts`、`contextFiles`。`evidence-driven` 在缺少 `verification` 时 `state` 可为 `blocked`。 |
 | archive 指令 | `openspec instructions archive --change "<name>" --json` | 官方 skill 标明该查询为 advisory，不得当作硬门禁；成功 JSON 可省略 `context` / `operationGuidance`。 |
 
-以 `schemaName` / `--schema` 为准，不要用 `planningHome.defaultSchema`（该字段在 1.11.0 仍可能报 `spec-driven`）。
+以 `schemaName` / `--schema` 为准，不要用 `planningHome.defaultSchema`（该字段在 1.12.0 仍可能报 `spec-driven`）。
 
 目录（用 JSON 里的 store-aware 路径，不要写死仓库相对路径）：
 
@@ -1048,7 +1048,7 @@ ai-tools 自定义层升级后也必须同次复制 V2 范围指纹脚本，并�
 - active change：`openspec/changes/<name>/`
 - 归档：`<planningHome.changesDir>/archive/`（仓库内通常是 `openspec/changes/archive/`）
 
-官方 `/opsx-propose`（Cursor）、`$openspec-propose`（Codex）及对应 skills 仍由上述官方生成物提供。1.11.0 官方 verify 只输出 Completeness / Correctness / Coherence 会话记分卡，不写 `verification.md`。官方 sync 以 `artifactPaths.specs.existingOutputPaths` 为 delta 路径来源，合并后运行 `openspec validate --specs`；archive 在内联 sync 后复核 delta，对未完成制品或任务仅警告并允许确认继续。项目级 `AI_TOOLS_VERIFY_GATE_V2` 使用 V2 范围指纹（范围内阻断、范围外告警），不是官方行为。
+官方 `/opsx-propose`（Cursor）、`$openspec-propose`（Codex）及对应 skills 仍由上述官方生成物提供。1.12.0 的生成 workflow 除更新 `generatedBy` 外有两项上游语义变化：`explore` 在提出事实性问题前只读检查相关 OpenSpec 制品、源码、测试、文档与配置，按决策依赖逐项澄清；`propose` 在起草制品时先读取 `context` / `rules`，再按需只读检查相关实现、测试、配置与文档，用实际发现落实 scope、approach 与 tasks。其余 apply、update、verify、sync、archive 正文相对 1.11.0 无语义变化。1.12.0 官方 verify 只输出 Completeness / Correctness / Coherence 会话记分卡，不写 `verification.md`。官方 sync 以 `artifactPaths.specs.existingOutputPaths` 为 delta 路径来源，合并后运行 `openspec validate --specs`；archive 在内联 sync 后复核 delta，对未完成制品或任务仅警告并允许确认继续。项目级 `AI_TOOLS_VERIFY_GATE_V2` 使用 V2 范围指纹（范围内阻断、范围外告警），不是官方行为。
 
 ## 8. 验收清单
 
@@ -1077,7 +1077,7 @@ cd "$TARGET_PROJECT"
 openspec schema validate evidence-driven
 openspec new change "smoke-ai-tools-integration" --schema evidence-driven
 openspec status --change "smoke-ai-tools-integration" --json
-# 1.11.0 顶层应含 changeRoot、artifactPaths、actionContext、schemaName、planningHome
+# 1.12.0 顶层应含 changeRoot、artifactPaths、actionContext、schemaName、planningHome
 openspec instructions apply --change "smoke-ai-tools-integration" --json
 # 未填 verification 时 evidence-driven 的 apply 可为 blocked
 openspec validate "smoke-ai-tools-integration" --type change --strict --json
@@ -1092,7 +1092,7 @@ openspec validate "smoke-ai-tools-integration" --type change --strict --json
 
 ### 接入后官方 verify 变「弱」了？
 
-verify 主体仍跟随官方生成物。OpenSpec 1.11.0 官方 verify 只在会话中输出 Completeness / Correctness / Coherence 记分卡，不写 `verification.md`。增强规则要求无论由 apply 衔接还是单独运行 `/opsx-verify`，都由入口 Agent 派发独立 verify 子 Agent 执行。verify 子 Agent 仅对可安全、在当前 change 范围内且不需要用户决策的阻塞直接修复并重新验证（最多 3 轮）；其余情况停止并将阻塞返回入口 Agent。结构化结论写回 verification，sync/archive 会在各自入口强制检查该结论（V2 范围指纹：范围内阻断、范围外告警）。若还需要不可绕过的 Code Review 等更严门禁，应另加项目规则或独立 skill。
+verify 主体仍跟随官方生成物。OpenSpec 1.12.0 官方 verify 只在会话中输出 Completeness / Correctness / Coherence 记分卡，不写 `verification.md`。增强规则要求无论由 apply 衔接还是单独运行 `/opsx-verify`，都由入口 Agent 派发独立 verify 子 Agent 执行。verify 子 Agent 仅对可安全、在当前 change 范围内且不需要用户决策的阻塞直接修复并重新验证（最多 3 轮）；其余情况停止并将阻塞返回入口 Agent。结构化结论写回 verification，sync/archive 会在各自入口强制检查该结论（V2 范围指纹：范围内阻断、范围外告警）。若还需要不可绕过的 Code Review 等更严门禁，应另加项目规则或独立 skill。
 
 ### 每次 propose 都要选 worktree 吗？已经在 worktree 里呢？
 
