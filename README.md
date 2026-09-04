@@ -157,7 +157,7 @@ TARGET_PROJECT="/absolute/path/to/target-project"
    清理时没有同一套安全步骤；注入后各阶段结束时不得主动询问怎么处理。
 
 官方 `/opsx-*`（Cursor）、`$openspec-*`（Codex）命令及对应 skills 归 OpenSpec 管理；升级后的具体行为应以目标项目
-中当前 OpenSpec 官方生成物为准，不要从本仓库寻找或复制官方模板。当前 CLI 1.11.0
+中当前 OpenSpec 官方生成物为准，不要从本仓库寻找或复制官方模板。当前 CLI 1.12.0
 已确认的命令（以 `openspec --help` 为准，不要猜测未列出的参数）：
 
 - 新项目：`openspec init --tools cursor,codex`
@@ -214,7 +214,7 @@ verify、archive 与 sync 的具体行为以当前 OpenSpec 官方生成物为�
 
 ## Schema：`evidence-driven`
 
-`evidence-driven` 以 OpenSpec 1.11.0 官方 `spec-driven` 为本次语义基线：
+`evidence-driven` 以 OpenSpec 1.12.0 官方 `spec-driven` 为本次语义基线：
 
 - `proposal`、`specs`、`design`、`tasks` 是官方语义的简体中文派生。
 - 新增紧凑的 `verification.md` 账本，以范围、检查、代码审查、风险与回滚四节保存
@@ -224,8 +224,13 @@ verify、archive 与 sync 的具体行为以当前 OpenSpec 官方生成物为�
   结果、失败原因和未执行项；schema 不把这些记录扩展成额外的官方 verify 或
   archive 行为。
 
-兼容的官方 1.11.0 语义包括：
+兼容的官方 1.12.0 语义包括：
 
+- `explore` 在提出事实性问题前先只读检查相关 OpenSpec 制品、源码、测试、文档与配置，
+  按依赖顺序一次澄清一个关键决策，并区分已确认结论、建议默认值与未决问题。
+- `propose` 在起草制品时先读取 `context` / `rules`，再按变更需要只读检查相关实现、
+  测试、配置和文档；范围、方案与任务必须以实际发现为依据，不能把泛化的“探索代码库”
+  留到实施阶段。
 - 用 `planningHome.root` 定位主规范，不要写死仓库相对路径。
 - 每项任务必须在 `- [ ]` 说明中写明如何验证完成。
 - 无规范层行为变化时在 `.openspec.yaml` 设置 `skip_specs: true`。
@@ -243,7 +248,7 @@ verify、archive 与 sync 的具体行为以当前 OpenSpec 官方生成物为�
   `/opsx-sync` 生成的 main spec 未纳入声明范围时，不强制重复实现验证。
 
 后续升级 OpenSpec 时，应从当前官方 `spec-driven` 基线重新核对这些语义，而不是
-永久假定 1.11.0 的实现细节。
+永久假定 1.12.0 的实现细节。
 
 ## 许可证
 
