@@ -98,6 +98,35 @@ VERIFY_PARALLEL_MARKERS = (
 
 
 class VerificationContractTest(unittest.TestCase):
+    def test_cross_agent_custom_artifacts_have_single_sources(self) -> None:
+        canonical = (
+            ROOT / ".agents/skills/openspec-update-change-from-code/SKILL.md",
+            ROOT / "AGENTS.md",
+            ROOT / "scripts/openspec-verification-fingerprint.py",
+        )
+        for path in canonical:
+            with self.subTest(path=path):
+                self.assertTrue(path.is_file())
+
+        legacy = (
+            ROOT / ".cursor/skills/openspec-update-change-from-code/SKILL.md",
+            ROOT / ".cursor/commands/opsx-update-change-from-code.md",
+            ROOT / ".cursor/rules/openspec-chinese.mdc",
+            ROOT / ".cursor/scripts/openspec-verification-fingerprint.py",
+        )
+        for path in legacy:
+            with self.subTest(path=path):
+                self.assertFalse(path.exists())
+
+        agents = (ROOT / "AGENTS.md").read_text()
+        self.assertEqual(agents.count("AI_TOOLS_OPENSPEC_CHINESE_V1_START"), 1)
+        self.assertEqual(agents.count("AI_TOOLS_OPENSPEC_CHINESE_V1_END"), 1)
+
+        current = "\n".join(path.read_text() for path in CURRENT_DOCS)
+        self.assertIn(".agents/skills/openspec-update-change-from-code", current)
+        self.assertIn("scripts/openspec-verification-fingerprint.py", current)
+        self.assertNotIn("Cursor 另有斜杠命令", current)
+
     def test_current_docs_each_define_scoped_v2_responsibilities(self) -> None:
         required_by_doc = {
             "README.md": (
@@ -334,10 +363,10 @@ class VerificationContractTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             target = root / "target"
-            script = target / ".cursor/scripts/openspec-verification-fingerprint.py"
+            script = target / "scripts/openspec-verification-fingerprint.py"
             script.parent.mkdir(parents=True)
             shutil.copy2(
-                ROOT / ".cursor/scripts/openspec-verification-fingerprint.py",
+                ROOT / "scripts/openspec-verification-fingerprint.py",
                 script,
             )
             environment = os.environ.copy()
@@ -425,13 +454,13 @@ class VerificationContractTest(unittest.TestCase):
         self.assertIn("AI_TOOLS_VERIFICATION_SCOPE_V2_START", text)
         self.assertIn("AI_TOOLS_VERIFICATION_RESULT_V2_START", text)
         complete_install = (
-            r'mkdir -p "\$TARGET_PROJECT/\.cursor/scripts"\n'
-            r'cp "\$AI_TOOLS_DIR/\.cursor/scripts/'
+            r'mkdir -p "\$TARGET_PROJECT/scripts"\n'
+            r'cp "\$AI_TOOLS_DIR/scripts/'
             r'openspec-verification-fingerprint\.py" \\\n'
-            r'  "\$TARGET_PROJECT/\.cursor/scripts/'
+            r'  "\$TARGET_PROJECT/scripts/'
             r'openspec-verification-fingerprint\.py".*?'
             r"ast\.parse.*?\n"
-            r'  "\$TARGET_PROJECT/\.cursor/scripts/'
+            r'  "\$TARGET_PROJECT/scripts/'
             r'openspec-verification-fingerprint\.py"'
         )
         install_sections = {

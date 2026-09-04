@@ -19,9 +19,9 @@
 └── ai-tools 自定义层（从本仓库复制或安装）
     ├── openspec/schemas/evidence-driven/
     ├── openspec/config.yaml 中的 schema: evidence-driven
-    ├── .cursor/rules/openspec-chinese.mdc          （可选）
-    ├── AGENTS.md 中的「OpenSpec 中文」片段          （可选；Codex，追加勿覆盖）
-    └── openspec-update-change-from-code             （可选旁路：skill 通用；斜杠命令仅 Cursor）
+    ├── AGENTS.md 中的「OpenSpec 中文」标记片段 （可选；Cursor / Codex 共用）
+    ├── .agents/skills/openspec-update-change-from-code/ （可选；唯一 Skill 源）
+    └── scripts/openspec-verification-fingerprint.py   （通用指纹脚本）
 ```
 
 | 层级 | 谁维护 | 内容 |
@@ -40,7 +40,7 @@
 - 每次 `/opsx-propose`、`/opsx:propose`、`$openspec-propose` 或 `openspec-propose` skill 启动时，必须先询问使用隔离 worktree 还是当前工作区；该询问发生在创建 change 或写入任何制品之前。未安装增强规则时，该询问不成立。
 - 隔离 worktree 默认留下。propose / apply / verify / sync / archive 结束时不得询问怎么处理。仅当本轮用户明确要求合并或清理时，才按收尾规则执行；未同意提交不得在脏工作区继续。未安装收尾增强块时，该按需收尾不成立。
 - 入口 Agent 先派发 apply 子 Agent；成功后再派发独立 verify 子 Agent。单独运行 `/opsx-verify` 时，入口 Agent 同样派发 verify 子 Agent。apply / verify 阶段仍串行。阶段内并行由入口通过唯一、有边界的 `AI_TOOLS_PARALLEL_HANDOFF_V1` 块交接：入口在自己的会话 skills 目录中查找 `dispatching-parallel-agents`，找到则交接 AVAILABLE 与绝对 Path，找不到则交接 UNAVAILABLE 并串行。交接畸形或 skill 读取失败会阻塞阶段，不得静默降级。阶段子 Agent 必须回报「阶段内并行：」行，入口须转述给用户。不得靠扫描磁盘或插件缓存自行启用。后续安装该 skill 无需再次替换注入。verify 子 Agent 仅直接修复可安全、在当前 change 范围内且无需用户决策的阻塞并重新验证（最多 3 轮）；遇正式规则列出的其它情况停止并返回入口 Agent。verification 完成且无阻塞项后，才可进入 sync 或 archive。
-- 可选：简体中文强制规则、from-code skill（通用；Cursor 另有斜杠命令 `/opsx-update-change-from-code`）。
+- 可选：Cursor / Codex 共用的简体中文规则与 from-code skill。
 
 ### 1.2 相对旧版 ai-tools，你不再从本仓库获得什么
 
@@ -147,21 +147,14 @@ openspec schema validate evidence-driven
 可选：
 
 ```bash
-# 中文规则（Cursor：alwaysApply .mdc）
-mkdir -p .cursor/rules
-cp \
-  "$AI_TOOLS_DIR/.cursor/rules/openspec-chinese.mdc" \
-  .cursor/rules/openspec-chinese.mdc
+# 中文规则：无 AGENTS.md 时直接复制；已有时只合并
+# AI_TOOLS_OPENSPEC_CHINESE_V1_START/END 边界内容，不要整文件覆盖。
+test -e AGENTS.md || cp "$AI_TOOLS_DIR/AGENTS.md" AGENTS.md
 
-# 中文规则（Codex：追加到 AGENTS.md，不要整文件覆盖；Graphify 也可能写入该文件）
-# 若尚无 AGENTS.md，先创建再追加下列片段：
-# ## OpenSpec 中文
-# OpenSpec 相关对话与规划产物使用简体中文。入口为 `$openspec-*`。
-
-# from-code：skill 通用。源在 .cursor/skills/。斜杠命令只为 Cursor 维护。
-npx skills add youpinyao/ai-tools --skill openspec-update-change-from-code --agent cursor
+# from-code：Cursor / Codex 共用同一份项目 Skill。
 mkdir -p .agents/skills
-cp -R .cursor/skills/openspec-update-change-from-code .agents/skills/
+rm -rf .agents/skills/openspec-update-change-from-code
+cp -R "$AI_TOOLS_DIR/.agents/skills/openspec-update-change-from-code" .agents/skills/
 ```
 
 建议在目标项目 `.gitignore` 中**不要**忽略官方 skills（它们通常需要提交给团队共用）；本 `ai-tools` 仓库自身忽略它们，是因为工具包仓库不负责分发官方副本。业务仓按团队惯例选择是否提交官方生成物即可。
@@ -211,13 +204,13 @@ openspec schema validate evidence-driven
 从 ai-tools 同次复制脚本与升级注入块，不再把脚本源码内嵌到业务仓文档：
 
 ```bash
-mkdir -p "$TARGET_PROJECT/.cursor/scripts"
-cp "$AI_TOOLS_DIR/.cursor/scripts/openspec-verification-fingerprint.py" \
-  "$TARGET_PROJECT/.cursor/scripts/openspec-verification-fingerprint.py"
+mkdir -p "$TARGET_PROJECT/scripts"
+cp "$AI_TOOLS_DIR/scripts/openspec-verification-fingerprint.py" \
+  "$TARGET_PROJECT/scripts/openspec-verification-fingerprint.py"
 
 # 无副作用语法解析检查；不会生成 __pycache__
 python3 -c 'import ast, pathlib, sys; ast.parse(pathlib.Path(sys.argv[1]).read_text())' \
-  "$TARGET_PROJECT/.cursor/scripts/openspec-verification-fingerprint.py"
+  "$TARGET_PROJECT/scripts/openspec-verification-fingerprint.py"
 ```
 
 脚本版本与 `AI_TOOLS_VERIFY_GATE_V2` 注入块必须同次升级。V2 范围指纹只对范围块声明的路径计算内容指纹；范围内变化构成范围内阻断并使旧结果失效，范围外变化由 `outside_path` 输出为范围外告警，不会把指纹扩大到声明范围之外。若范围外路径实际属于当前 change，必须扩展范围并复验。
@@ -283,7 +276,7 @@ python3 -c 'import ast, pathlib, sys; ast.parse(pathlib.Path(sys.argv[1]).read_t
    - 共享状态、会改同一路径或同一制品、修 A 可能带上 B、或拿不准时：不并行。
    - 实施者缺少必要上下文：由 apply 子 Agent 补齐后重派或改串行，不得让实施者猜测 change。
    完成后把结果或阻塞返回入口 Agent，且必须包含恰好一行：`阶段内并行：已派发（<N> 个独立域）`，或 `阶段内并行：已读取 skill，未派发（无独立域|共享状态或路径重叠|派发工具不可用）`，或 `阶段内并行：未读取 skill（不在会话目录）`。不得静默省略该行。
-4. apply 子 Agent 不计算摘要；它仍须对完整实现 diff 做首次代码审查。verify 返回后，入口 Agent 读取恰好一个 `AI_TOOLS_VERIFICATION_SCOPE_V2_START` 范围块和一个 `AI_TOOLS_VERIFICATION_RESULT_V2_START` 结果块，运行 `python3 .cursor/scripts/openspec-verification-fingerprint.py "<当前 change 的 verification.md 路径>"`，并将输出的 `scope_digest`、`content_digest` 分别与“范围摘要”“内容指纹”比较。
+4. apply 子 Agent 不计算摘要；它仍须对完整实现 diff 做首次代码审查。verify 返回后，入口 Agent 读取恰好一个 `AI_TOOLS_VERIFICATION_SCOPE_V2_START` 范围块和一个 `AI_TOOLS_VERIFICATION_RESULT_V2_START` 结果块，运行 `python3 scripts/openspec-verification-fingerprint.py "<当前 change 的 verification.md 路径>"`，并将输出的 `scope_digest`、`content_digest` 分别与“范围摘要”“内容指纹”比较。
 5. 仅当状态为“通过”、阻塞项为“无”、两个摘要一致且脚本成功时，入口 Agent 才可结束 apply 并建议 sync 或 archive。范围内变化、状态阻塞、摘要不匹配、脚本失败或 verify 子 Agent 失败均阻止完成；change 保持 active，必须报告具体原因，且不得建议 sync 或 archive。
 6. `outside_changes` 大于 0 时逐项汇报 `outside_path`，但范围外变化只告警，不改变通过状态；若入口判断某路径属于当前 change，则停止完成、扩展范围并复验。
 7. 入口 Agent 准备结束本命令（含成功后的 verify、apply/verify 失败停止，或会话 worktree 已创建但官方主体未完成）时，不得询问隔离 worktree 如何处理（AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1）。默认留下本次 worktree；可以简短报告路径与分支仍在，不得弹出合并 / 清理 / 保留菜单。仅当本轮用户明确要求合并或清理时，才按同文件「隔离 worktree 按需收尾」节执行。实施者与 apply 子 Agent 不得询问、不得合并或删除 worktree。
@@ -355,7 +348,7 @@ python3 -c 'import ast, pathlib, sys; ast.parse(pathlib.Path(sys.argv[1]).read_t
    - 内容指纹：PENDING
    <!-- AI_TOOLS_VERIFICATION_RESULT_V2_END -->
 
-7. 运行 `python3 .cursor/scripts/openspec-verification-fingerprint.py "<当前 change 的 verification.md 路径>"`，将 `scope_digest` 和 `content_digest` 分别回填为“范围摘要”和“内容指纹”；再次运行后两个输出必须与记录值一致。V2 结果字段为“状态、阻塞项、范围摘要、内容指纹”。
+7. 运行 `python3 scripts/openspec-verification-fingerprint.py "<当前 change 的 verification.md 路径>"`，将 `scope_digest` 和 `content_digest` 分别回填为“范围摘要”和“内容指纹”；再次运行后两个输出必须与记录值一致。V2 结果字段为“状态、阻塞项、范围摘要、内容指纹”。
 8. 未通过时仍保留唯一 V2 范围块，将结果状态写为“阻塞”、列出具体阻塞项，并把两个摘要写为“无效”；不得保留旧“通过”结果。范围外变化只产生范围外告警，写入汇报，不将状态改为阻塞；范围内摘要不匹配构成范围内阻断。若判断属于 change，则扩展范围并复验。
 
 单独运行 `/opsx-verify` 时也执行以上步骤；其两个摘要仍由后续 sync/archive 入口重新计算并复核。
@@ -381,7 +374,7 @@ python3 -c 'import ast, pathlib, sys; ast.parse(pathlib.Path(sys.argv[1]).read_t
 <!-- AI_TOOLS_VERIFY_GATE_V2 -->
 ## Verification 流转门禁
 
-官方第 1 步选定 change 后、执行第 2 步及任何 sync 写入或 archive advisory 查询前，必须读取当前 change 的 `verification.md`，并要求恰好一个 V2 范围块和结果块。运行 `python3 .cursor/scripts/openspec-verification-fingerprint.py "<当前 change 的 verification.md 路径>"`；只有状态为“通过”、阻塞项为“无”，且记录的范围摘要、内容指纹与当前 `scope_digest`、`content_digest` 完全一致时才可继续。范围摘要或内容指纹不一致构成范围内阻断。
+官方第 1 步选定 change 后、执行第 2 步及任何 sync 写入或 archive advisory 查询前，必须读取当前 change 的 `verification.md`，并要求恰好一个 V2 范围块和结果块。运行 `python3 scripts/openspec-verification-fingerprint.py "<当前 change 的 verification.md 路径>"`；只有状态为“通过”、阻塞项为“无”，且记录的范围摘要、内容指纹与当前 `scope_digest`、`content_digest` 完全一致时才可继续。范围摘要或内容指纹不一致构成范围内阻断。
 
 本门禁发生在官方 sync / archive 主体之前。官方 archive 对未完成制品或任务仅警告并允许用户确认继续，且 `openspec instructions archive --json` 被标明为不得阻断归档的 advisory 输入；上述官方行为不得用来绕过本门禁。
 
@@ -884,6 +877,13 @@ git rm --ignore-unmatch \
   .cursor/commands/opsx-archive.md \
   .cursor/commands/opsx-sync.md
 
+# 移除 ai-tools 旧的 Cursor 专属自定义产物；不影响其他 Cursor 文件
+git rm -r --ignore-unmatch .cursor/skills/openspec-update-change-from-code
+git rm --ignore-unmatch \
+  .cursor/commands/opsx-update-change-from-code.md \
+  .cursor/rules/openspec-chinese.mdc \
+  .cursor/scripts/openspec-verification-fingerprint.py
+
 # 2) 升级 CLI 并重新生成官方层
 npm install --global @fission-ai/openspec@latest
 openspec --version
@@ -903,14 +903,12 @@ cp -R \
 # 4) 确认 config
 # schema: evidence-driven
 
-# 5) 保留 / 重装旁路与中文规则（若仍需要）
-mkdir -p .cursor/rules
-cp \
-  "$AI_TOOLS_DIR/.cursor/rules/openspec-chinese.mdc" \
-  .cursor/rules/openspec-chinese.mdc
-# Codex：向 AGENTS.md 追加「OpenSpec 中文」片段，不要整文件覆盖
-# from-code：skill 通用；斜杠命令仅 Cursor。若目录仍在可保留；否则
-# npx skills add youpinyao/ai-tools --skill openspec-update-change-from-code --agent cursor
+# 5) 重装共用旁路与中文规则（若仍需要）
+# 已有 AGENTS.md 时只合并本仓库的边界标记片段。
+test -e AGENTS.md || cp "$AI_TOOLS_DIR/AGENTS.md" AGENTS.md
+mkdir -p .agents/skills
+rm -rf .agents/skills/openspec-update-change-from-code
+cp -R "$AI_TOOLS_DIR/.agents/skills/openspec-update-change-from-code" .agents/skills/
 
 # 6) 校验
 openspec schema validate evidence-driven
@@ -984,28 +982,22 @@ cp -R \
   "$AI_TOOLS_DIR/openspec/schemas/evidence-driven" \
   "$TARGET_PROJECT/openspec/schemas/"
 
-# 按需更新中文规则、from-code skill
-mkdir -p "$TARGET_PROJECT/.cursor/rules"
-cp \
-  "$AI_TOOLS_DIR/.cursor/rules/openspec-chinese.mdc" \
-  "$TARGET_PROJECT/.cursor/rules/openspec-chinese.mdc"
+# 按需更新共用中文规则。已有 AGENTS.md 时只替换标记片段。
+test -e "$TARGET_PROJECT/AGENTS.md" || cp "$AI_TOOLS_DIR/AGENTS.md" "$TARGET_PROJECT/AGENTS.md"
 
-# 若目标项目在 Codex 使用 from-code，同步同一份 skill
-if [ -d "$TARGET_PROJECT/.cursor/skills/openspec-update-change-from-code" ]; then
-  mkdir -p "$TARGET_PROJECT/.agents/skills"
-  rm -rf "$TARGET_PROJECT/.agents/skills/openspec-update-change-from-code"
-  cp -R \
-    "$TARGET_PROJECT/.cursor/skills/openspec-update-change-from-code" \
-    "$TARGET_PROJECT/.agents/skills/"
-fi
+# Cursor / Codex 共用唯一 from-code Skill。
+mkdir -p "$TARGET_PROJECT/.agents/skills"
+rm -rf "$TARGET_PROJECT/.agents/skills/openspec-update-change-from-code"
+cp -R "$AI_TOOLS_DIR/.agents/skills/openspec-update-change-from-code" \
+  "$TARGET_PROJECT/.agents/skills/"
 
-mkdir -p "$TARGET_PROJECT/.cursor/scripts"
-cp "$AI_TOOLS_DIR/.cursor/scripts/openspec-verification-fingerprint.py" \
-  "$TARGET_PROJECT/.cursor/scripts/openspec-verification-fingerprint.py"
+mkdir -p "$TARGET_PROJECT/scripts"
+cp "$AI_TOOLS_DIR/scripts/openspec-verification-fingerprint.py" \
+  "$TARGET_PROJECT/scripts/openspec-verification-fingerprint.py"
 
 # 无副作用语法解析检查；不会生成 __pycache__
 python3 -c 'import ast, pathlib, sys; ast.parse(pathlib.Path(sys.argv[1]).read_text())' \
-  "$TARGET_PROJECT/.cursor/scripts/openspec-verification-fingerprint.py"
+  "$TARGET_PROJECT/scripts/openspec-verification-fingerprint.py"
 
 cd "$TARGET_PROJECT"
 openspec schema validate evidence-driven
@@ -1065,9 +1057,9 @@ ai-tools 自定义层升级后也必须同次复制 V2 范围指纹脚本，并�
 - [ ] 运行 5.1 节三套脚本，已 init 助手的 verify 门禁文件与 propose 文件均输出 `OK`，收尾检查也均输出 `OK`，没有 `MISSING`、`STALE`、`DUPLICATE`；未 init 助手的 `NOFILE` 可忽略。其中 apply command/skill 含 `AI_TOOLS_DELEGATED_APPLY_V1`、`AI_TOOLS_PARALLEL_DISPATCH_V1`、`AI_TOOLS_PARALLEL_HANDOFF_V1` 及其 START/END、AVAILABLE/UNAVAILABLE/READ_FAILED、`AI_TOOLS_WORKER_APPLY_V1`、`AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1` 与 `AI_TOOLS_MULTI_IDE_V1`，verify command/skill 含 `AI_TOOLS_DELEGATED_VERIFY_V1`、`AI_TOOLS_PARALLEL_DISPATCH_V1`、`AI_TOOLS_PARALLEL_HANDOFF_V1` 及其 START/END、AVAILABLE/UNAVAILABLE/READ_FAILED、`AI_TOOLS_WORKER_VERIFY_V1`、`AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1` 与 `AI_TOOLS_MULTI_IDE_V1`，sync/archive 文件含 `AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1`，propose command/skill 含 `AI_TOOLS_PROPOSE_WORKTREE_ASK_ALWAYS_V1`、`AI_TOOLS_PROPOSE_WORKTREE_INDEPENDENT_V1`、`AI_TOOLS_PROPOSE_WORKTREE_WORKSPACE_ROOT_V1`、`AI_TOOLS_PROPOSE_WORKTREE_NO_DOWNGRADE_V1`、`AI_TOOLS_PROPOSE_WORKTREE_SESSION_V1`、`AI_TOOLS_PROPOSE_WORKTREE_NO_FINISH_ASK_V1` 与 `AI_TOOLS_MULTI_IDE_V1`，收尾目标文件均含 `AI_TOOLS_WORKTREE_FINISH_NO_ASK_V1`、`AI_TOOLS_WORKTREE_FINISH_SCOPE_V1` 与 `AI_TOOLS_WORKTREE_FINISH_MERGE_CLEANUP_V1`。
 - [ ] verify 子 Agent 最多修复复验 3 轮；每次修改代码后都对修复后的完整 diff 重新执行代码审查、更新 verification 的审查范围与结论，且未处理的 Critical/Important 会阻塞通过。
 - [ ] sync / archive command/skill 已追加入口门禁：仅 Verify 门禁为“通过、无阻塞”且 V2 范围指纹与脚本当前输出一致时才可继续；范围内阻断，范围外告警；正常 sync 生成的 main spec 未纳入声明范围时不强制重复实现验证。
-- [ ] `.cursor/scripts/openspec-verification-fingerprint.py` 存在，verify 与 sync/archive 使用同一脚本计算指纹。
+- [ ] `scripts/openspec-verification-fingerprint.py` 存在，verify 与 sync/archive 使用同一脚本计算指纹。
 - [ ] 已 init 助手的 verify 门禁文件各自恰有一个独立的 `AI_TOOLS_VERIFY_GATE_V2` 起始标记和一个对应结束标记；propose 文件各自仅有一个 `AI_TOOLS_PROPOSE_WORKTREE_V1` 标记；收尾目标文件各自仅有一个 `AI_TOOLS_WORKTREE_FINISH_V1` 标记；旧块已按 `STALE` 规则替换而非重复追加。
-- [ ] 仍需要时：中文规则（Cursor `.cursor/rules/openspec-chinese.mdc`、Codex `AGENTS.md` 中的中文片段）；from-code skill 已装到所用助手的 skills 目录（Cursor 另有 `/opsx-update-change-from-code`）。
+- [ ] 仍需要时：中文规则已合并到 `AGENTS.md`；共用 from-code skill 只存在于 `.agents/skills/openspec-update-change-from-code/`。
 - [ ] 试跑 Cursor `/opsx-propose` 或 Codex `$openspec-propose` 小 change，确认启动后先询问隔离 worktree 或当前工作区，并生成 `verification.md`。
 
 冒烟命令示例：
@@ -1118,7 +1110,7 @@ verify 主体仍跟随官方生成物。OpenSpec 1.12.0 官方 verify 只在会�
 
 | 命令 | 真源 | 写入范围 |
 |------|------|----------|
-| `openspec-update-change-from-code` skill（Cursor 另有 `/opsx-update-change-from-code`） | 已实现代码 + 用户决策 | 优先唯一匹配的 active change（及 `actionContext` 文档）；无 change 且唯一匹配已有 spec 时只改该 main spec；目标有歧义时先请用户选择；不创建 change/spec |
+| `openspec-update-change-from-code` skill | 已实现代码 + 用户决策 | 优先唯一匹配的 active change（及 `actionContext` 文档）；无 change 且唯一匹配已有 spec 时只改该 main spec；目标有歧义时先请用户选择；不创建 change/spec |
 | 官方 `/opsx-sync` | change 内 delta specs | main specs |
 
 ## 10. 相关文档

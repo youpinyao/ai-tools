@@ -5,8 +5,8 @@
 OpenSpec 官方 Cursor / Codex skills 与命令由 OpenSpec 在目标项目生成，本仓库
 不跟踪、不复制也不定制这些官方生成物。
 
-默认约定：OpenSpec 相关对话与规划产物使用**简体中文**（Cursor 见
-`.cursor/rules/openspec-chinese.mdc`；Codex 向 `AGENTS.md` 追加片段，不要整文件覆盖）。
+默认约定：OpenSpec 相关对话与规划产物使用**简体中文**；Cursor 与
+Codex 共用根目录 `AGENTS.md` 中的同一份规则。
 
 ## 仓库包含什么
 
@@ -14,9 +14,9 @@ OpenSpec 官方 Cursor / Codex skills 与命令由 OpenSpec 在目标项目生�
 |------|------|------|
 | Schema | `openspec/schemas/evidence-driven/` | 官方 `spec-driven` 的中文派生，增加 `verification` 制品 |
 | 配置 | `openspec/config.yaml` | 默认使用 `schema: evidence-driven` |
-| 中文规则 | `.cursor/rules/openspec-chinese.mdc` | 强制简体中文；Codex 追加到 `AGENTS.md` |
-| 可选 Skill | `.cursor/skills/openspec-update-change-from-code/` | 通用 Agent Skill（从代码回写）；源路径在 Cursor 目录，可复制/安装到 Codex |
-| 可选 Command | `.cursor/commands/opsx-update-change-from-code.md` | 仅 Cursor 斜杠命令 `/opsx-update-change-from-code`；Codex 靠发现同名 skill |
+| 中文规则 | `AGENTS.md` | Cursor / Codex 共用的简体中文约定，带幂等合并边界标记 |
+| 可选 Skill | `.agents/skills/openspec-update-change-from-code/` | Cursor / Codex 共用的唯一 Agent Skill 源（从代码回写） |
+| 指纹脚本 | `scripts/openspec-verification-fingerprint.py` | 与具体 Agent 无关的 V2 范围指纹工具 |
 | 工作流文档 | [docs/ai-sdd-workflow.md](docs/ai-sdd-workflow.md) | 官方命令场景选择与推荐路径 |
 | 接入与迁移 | [docs/ai-tools-integration.md](docs/ai-tools-integration.md) | 其它项目从官方 OpenSpec 或旧版 ai-tools 接入/升级 |
 | 升级维护 | [docs/openspec-upgrade-plan.md](docs/openspec-upgrade-plan.md) | OpenSpec 版本升级与语义复核清单 |
@@ -97,35 +97,22 @@ TARGET_PROJECT="/absolute/path/to/target-project"
    schema: evidence-driven
    ```
 
-   中文规则可按需从本仓库明确复制到目标项目：
+   中文规则可按需合并到目标项目的 `AGENTS.md`。若目标文件已存在，只替换
+   `AI_TOOLS_OPENSPEC_CHINESE_V1_START/END` 边界内容，不要整文件覆盖：
 
    ```bash
-   mkdir -p "$TARGET_PROJECT/.cursor/rules"
-   cp \
-     "$AI_TOOLS_DIR/.cursor/rules/openspec-chinese.mdc" \
-     "$TARGET_PROJECT/.cursor/rules/openspec-chinese.mdc"
+   # 新项目可直接复制；已有 AGENTS.md 按边界标记合并
+   test -e "$TARGET_PROJECT/AGENTS.md" || cp "$AI_TOOLS_DIR/AGENTS.md" "$TARGET_PROJECT/AGENTS.md"
    ```
 
-   Codex 请把中文约定追加到项目 `AGENTS.md`（不要整文件覆盖）。from-code 的 **skill 是通用 Agent Skill**；本仓库源文件在 `.cursor/skills/`。斜杠命令只为 Cursor 维护。
+   from-code Skill 只安装一份到通用 `.agents/skills/`，Cursor 与 Codex 都发现该路径：
 
    ```bash
-   cd "$TARGET_PROJECT"
-   npx skills add "$AI_TOOLS_DIR" \
-     --skill openspec-update-change-from-code \
-     --agent cursor
-
-   # 需要 Codex 时，把同一份 skill 拷到对应 skills 目录（正文相同）
    mkdir -p "$TARGET_PROJECT/.agents/skills"
    rm -rf "$TARGET_PROJECT/.agents/skills/openspec-update-change-from-code"
    cp -R \
-     "$TARGET_PROJECT/.cursor/skills/openspec-update-change-from-code" \
+     "$AI_TOOLS_DIR/.agents/skills/openspec-update-change-from-code" \
      "$TARGET_PROJECT/.agents/skills/"
-
-   # 仅 Cursor 有本仓库维护的 slash command
-   mkdir -p "$TARGET_PROJECT/.cursor/commands"
-   cp \
-     "$AI_TOOLS_DIR/.cursor/commands/opsx-update-change-from-code.md" \
-     "$TARGET_PROJECT/.cursor/commands/opsx-update-change-from-code.md"
    ```
 
 4. 在目标项目校验自定义 schema：
@@ -137,7 +124,7 @@ TARGET_PROJECT="/absolute/path/to/target-project"
 
 5. 要完成当前 ai-tools 接入，必须继续执行
    [接入文档 5.1 节](docs/ai-tools-integration.md#51-补充-verify-修复闭环与流转门禁)：
-   从本仓库复制 `.cursor/scripts/openspec-verification-fingerprint.py`，向 apply、
+   从本仓库复制 `scripts/openspec-verification-fingerprint.py`，向 apply、
    verify、sync、archive 的官方 command/skill 文件幂等追加
    `AI_TOOLS_VERIFY_GATE_V2` 规则，并向 propose 的官方 command/skill 文件幂等追加
    `AI_TOOLS_PROPOSE_WORKTREE_V1` 规则，并向上述目标文件幂等追加
@@ -203,7 +190,7 @@ apply 与 verify 两个阶段始终串行。阶段内并行不是接入时开关
 常见旁路：
 
 - 已有 change，只调整规划不改代码 → 使用官方 `/opsx-update`。
-- 代码已先于规划变化 → from-code skill（Cursor 另有 `/opsx-update-change-from-code`；有唯一匹配的 active
+- 代码已先于规划变化 → 共用 `openspec-update-change-from-code` skill（有唯一匹配的 active
   change 回写 change；无 change 且只有一份对应 spec 则回写该 spec；有歧义先问）。
 - 只合并 delta specs 到 main specs、不归档 → 使用官方 `/opsx-sync`。
 - 无规范层行为变化 → 在 change 的 `.openspec.yaml` 设置 `skip_specs: true`，不要

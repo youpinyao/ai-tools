@@ -6,7 +6,7 @@
 
 **方案：** 先记录源版本并解析 npm 最新稳定版，再从新 CLI 动态取得官方 schema 和 Cursor 生成物作为唯一基线。官方派生部分从新基线重建，只保留项目允许的自定义差异；随后验证 CLI JSON 契约、文档、目标项目更新流程和回滚路径。
 
-**技术栈：** Node.js/npm、`@fission-ai/openspec` CLI、YAML、Markdown、Cursor Agent Skills、Git、`jq`、`rg`
+**技术栈：** Node.js/npm、`@fission-ai/openspec` CLI、YAML、Markdown、Agent Skills、Git、`jq`、`rg`
 
 ## 全局约束
 
@@ -15,6 +15,7 @@
 - 安装时使用查询得到的精确版本 `@${TARGET_VERSION}`，避免执行过程中 `@latest` 再次漂移。
 - `ai-tools` 根目录不得执行 `openspec init` 或 `openspec update`；官方生成物对照必须在临时目录完成。
 - 不得从目标项目反向复制官方生成物到本仓库，也不得提交官方 `.cursor/skills/openspec-*` 或 `.cursor/commands/opsx-*` 副本。
+- ai-tools 自定义产物只保留 `.agents/skills/openspec-update-change-from-code/`、`AGENTS.md` 标记片段与 `scripts/openspec-verification-fingerprint.py` 三个通用源，不恢复 Cursor 专属副本。
 - `proposal`、`specs`、`design`、`tasks` 必须继承新版官方 `spec-driven`；本地只允许简体中文化、`evidence-driven` 命名、`verification` 制品、apply 前置和验证记录语义等已批准差异。
 - `openspec/config.yaml` 必须继续使用 `schema: evidence-driven`。
 - 目标项目已有 `openspec/config.yaml` 时只合并 `schema` 字段，不得整文件覆盖。
@@ -62,7 +63,7 @@ printf '# OpenSpec 升级运行记录\n\n- run: `%s`\n- source: `%s`\n- target: 
 - 读取：`spec/spec-architecture-openspec-workflow-refactor.md`
 - 读取：`openspec/schemas/evidence-driven/schema.yaml`
 - 读取：`openspec/schemas/evidence-driven/templates/*.md`
-- 读取：`.cursor/skills/openspec-update-change-from-code/SKILL.md`
+- 读取：`.agents/skills/openspec-update-change-from-code/SKILL.md`
 
 - [ ] **1.1 确认工作区和执行边界**
 
@@ -251,8 +252,7 @@ openspec schema validate evidence-driven
 ## 4. 验证 CLI 命令和 JSON 契约
 
 **文件：**
-- 检查或修改：`.cursor/skills/openspec-update-change-from-code/SKILL.md`
-- 检查或修改：`.cursor/commands/opsx-update-change-from-code.md`
+- 检查或修改：`.agents/skills/openspec-update-change-from-code/SKILL.md`
 
 - [ ] **4.1 在临时项目创建 `evidence-driven` 冒烟 change**
 
@@ -322,7 +322,7 @@ openspec status --change "upgrade-contract-smoke" --json |
 
 **文件：**
 - 检查或修改：`.gitignore`
-- 检查或修改：`.cursor/rules/openspec-chinese.mdc`
+- 检查或修改：`AGENTS.md`
 - 检查或修改：`docs/ai-tools-integration.md`
 
 - [ ] **5.1 比较新版生成的 skill/command 清单**
@@ -347,13 +347,13 @@ do
 done
 ```
 
-预期：得到新版实际文件清单，且上述 15 个注入目标都存在。若官方新增、删除或重命名路径，精确更新 `.gitignore` 与 `docs/ai-tools-integration.md` 5.1 检查器；不得忽略 `.cursor/skills/openspec-update-change-from-code/` 和 `.cursor/commands/opsx-update-change-from-code.md`。
+预期：得到新版实际文件清单，且上述 15 个注入目标都存在。若官方新增、删除或重命名路径，精确更新 `.gitignore` 与 `docs/ai-tools-integration.md` 5.1 检查器；不得忽略本仓库唯一的 `.agents/skills/openspec-update-change-from-code/`。
 
 - [ ] **5.2 核对中文规则覆盖范围**
 
-比较 `.cursor/rules/openspec-chinese.mdc` 中列出的阶段、skill 与 Cursor `/opsx-*`、Codex `$openspec-*` 入口是否覆盖新版清单。
+比较 `AGENTS.md` 中列出的阶段、skill 与 Cursor `/opsx-*`、Codex `$openspec-*` 入口是否覆盖新版清单。
 
-预期：规则覆盖新版 OpenSpec 操作及两套入口别名，同时保留 `/opsx-update-change-from-code`。
+预期：规则覆盖新版 OpenSpec 操作及两套官方入口，同时覆盖共用 `openspec-update-change-from-code` skill。
 
 - [ ] **5.3 复核 `AI_TOOLS_VERIFY_GATE_V2`、`AI_TOOLS_PROPOSE_WORKTREE_V1`、`AI_TOOLS_WORKTREE_FINISH_V1` 与 `AI_TOOLS_MULTI_IDE_V1` 追加点**
 
@@ -474,13 +474,20 @@ git ls-files '.cursor/skills/openspec-*' '.cursor/commands/opsx-*' \
   '.agents/skills/openspec-*'
 git check-ignore .cursor/skills/openspec-apply-change/SKILL.md
 git check-ignore .agents/skills/openspec-apply-change/SKILL.md
-if git check-ignore -q .cursor/skills/openspec-update-change-from-code/SKILL.md; then
+test -f .agents/skills/openspec-update-change-from-code/SKILL.md
+test -f AGENTS.md
+test -f scripts/openspec-verification-fingerprint.py
+test ! -e .cursor/commands/opsx-update-change-from-code.md
+test ! -e .cursor/rules/openspec-chinese.mdc
+test ! -e .cursor/scripts/openspec-verification-fingerprint.py
+test ! -e .cursor/skills/openspec-update-change-from-code
+if git check-ignore -q .agents/skills/openspec-update-change-from-code/SKILL.md; then
   echo "错误：from-code skill 不应被忽略" >&2
   exit 1
 fi
 ```
 
-预期：`git ls-files` 只包含 Cursor from-code skill 和 command；Cursor、Codex 官方 apply skill 都被忽略；from-code skill 不被忽略。
+预期：`git ls-files` 只包含 `.agents/skills/` 下的共用 from-code skill；Cursor、Codex 官方 apply skill 都被忽略；from-code skill 不被忽略。
 
 - [ ] **7.4 人工执行差异审查**
 
@@ -629,7 +636,7 @@ esac
 AI_TOOLS_DIR="$(cd "$AI_TOOLS_DIR" && pwd -P)"
 TARGET_PROJECT="$REPRESENTATIVE_TARGET_PROJECT"
 TARGET_PROJECT="$(cd "$TARGET_PROJECT" && pwd -P)"
-FINGERPRINT_SCRIPT="$TARGET_PROJECT/.cursor/scripts/openspec-verification-fingerprint.py"
+FINGERPRINT_SCRIPT="$TARGET_PROJECT/scripts/openspec-verification-fingerprint.py"
 test -f "$FINGERPRINT_SCRIPT"
 
 SCOPED_SMOKE="$(mktemp -d "${TMPDIR:-/tmp}/ai-tools-scoped-smoke.XXXXXX")"

@@ -6,8 +6,8 @@
 
 官方入口因助手而异，本文用阶段名（`explore` / `propose` / `apply` 等）描述流程；
 实际调用请换成当前助手的写法：Cursor `/opsx-*`，Codex `$openspec-*`。
-图中的 `from-code` 是 skill `openspec-update-change-from-code`（通用 Agent Skill）。
-Cursor 另有斜杠命令 `/opsx-update-change-from-code`；Codex 发现同名 skill 后调用。
+图中的 `from-code` 是 Cursor / Codex 共用的
+`openspec-update-change-from-code` Agent Skill，唯一源位于 `.agents/skills/`。
 
 ## 各个场景工作量
 
@@ -16,7 +16,7 @@ change，`update` 用于调整已有规划，`apply` 用于实施任务，`verif
 `archive` 用于结束 change，`sync` 用于在不归档的情况下将 delta specs 合并到
 main specs。手动执行 `sync` 是可选步骤；若归档前尚未同步，`archive` 会提示先同步
 delta specs，再完成归档。图中的 `from-code` 是 skill
-`openspec-update-change-from-code` 的简称（Cursor 斜杠命令为 `/opsx-update-change-from-code`），用于从代码回写已有 active change，
+`openspec-update-change-from-code` 的简称，用于从代码回写已有 active change，
 或在没有 active change 且只有一份对应 main spec 时回写该 spec；目标有歧义时先请用户选择。
 
 ```mermaid
@@ -228,10 +228,10 @@ OpenSpec 1.12.0 的官方 `explore` 会在提出事实性问题前只读检查�
 ### 场景 5：已有代码，且存在 active change
 
 当代码已经发生变化，同时存在对应的 active change 时，使用
-from-code skill（Cursor：`/opsx-update-change-from-code`）比较代码事实与现有制品，将确认需要保留的实现回写
+`openspec-update-change-from-code` skill 比较代码事实与现有制品，将确认需要保留的实现回写
 到 change，再执行验证。
 
-推荐路径：`/opsx-update-change-from-code → verify → archive`。
+推荐路径：`openspec-update-change-from-code → verify → archive`。
 
 该路径适用于“实现领先于规划”的情况，不用于把缺陷合理化。若代码行为不正确，
 仍应修复代码，而不是将错误行为写入 change。
@@ -239,11 +239,11 @@ from-code skill（Cursor：`/opsx-update-change-from-code`）比较代码事实�
 ### 场景 6：已有代码，无 active change，但存在对应 main spec
 
 当代码已经发生变化，没有可更新的 active change，但 `openspec list --specs`
-中已有与实现明确对应的 main spec 时，使用 `/opsx-update-change-from-code`
+中已有与实现明确对应的 main spec 时，使用 `openspec-update-change-from-code`
 直接把确认需要保留的行为回写到该 spec。不要新建空 change，也不要创建缺失的
 capability 或 `spec.md`。
 
-推荐路径：`/opsx-update-change-from-code`（回写已有 spec）。
+推荐路径：`openspec-update-change-from-code`（回写已有 spec）。
 
 该路径只修改已存在的 main spec，不走官方 `/opsx-sync`（sync 是把 change 内
 delta specs 合并到 main specs）。不要把错误实现写进规范：代码行为不正确时应
@@ -256,7 +256,7 @@ delta specs 合并到 main specs）。不要把错误实现写进规范：代码
 当代码已经存在，却没有可更新的 active change，也没有可匹配的现有 main spec
 时，应直接基于可确认的代码事实使用 `propose` 建立完整 change，记录目标、范围
 和验证方式，再通过 `apply` 补齐任务或调整实现，最后执行验证。不要先建立空
-change 再调用 `/opsx-update-change-from-code`：该命令只更新已有 change 制品或
+change 再调用 `openspec-update-change-from-code`：该 skill 只更新已有 change 制品或
 已有 main spec，不负责创建缺失制品。
 `propose` 开始时若已安装 worktree 选择规则，应先选择隔离 worktree 或当前工作区。
 若选择隔离 worktree，该会话在后续命令跑完后默认留下本次 worktree，不得主动询问
@@ -283,7 +283,7 @@ change 再调用 `/opsx-update-change-from-code`：该命令只更新已有 chan
 - 不确定需求或方案时先 `explore`，不要在关键问题未澄清时直接实施。
 - 已有 active change 时优先更新该 change，避免为同一工作重复建立规划。
 - 实现或验证阶段发现规划偏差时，通过 `update` 保持制品与最新决策一致。
-- `/opsx-update-change-from-code` 按已确认的代码事实回写：有唯一对应的 active
+- `openspec-update-change-from-code` 按已确认的代码事实回写：有唯一对应的 active
   change 时只改该 change；没有 change 且只有一份对应 main spec 时只改该 spec。
   归档 change、change 与 spec 冲突、或多份 spec 都能对上时，先请用户选择，不要
   自动执行。不能建立 change、不能创建缺失 spec，也不能替代缺陷修复。

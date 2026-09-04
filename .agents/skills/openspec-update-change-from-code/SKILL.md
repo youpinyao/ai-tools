@@ -1,6 +1,6 @@
 ---
 name: openspec-update-change-from-code
-description: Use when implemented code has drifted from an active OpenSpec change, or when there is no active change but an existing main spec matches the implementation, or the user asks to sync OpenSpec from code, update change artifacts after implementation, 从代码回写 OpenSpec, or runs /opsx-update-change-from-code.
+description: Use when implemented code has drifted from an active OpenSpec change, or when there is no active change but an existing main spec matches the implementation, or the user asks to sync OpenSpec from code, update change artifacts after implementation, or 从代码回写 OpenSpec.
 license: MIT
 compatibility: Requires openspec CLI.
 metadata:

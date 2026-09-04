@@ -8,7 +8,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / ".cursor/scripts/openspec-verification-fingerprint.py"
+SCRIPT = ROOT / "scripts/openspec-verification-fingerprint.py"
 
 
 def run(*args: str, cwd: Path, check: bool = True) -> subprocess.CompletedProcess:

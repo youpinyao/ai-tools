@@ -11,6 +11,10 @@
 - 图谱查询结果必须在涉及实现判断时回到源码或测试复核。
 - 首期采用本地 CLI，以及 Cursor / Codex 官方项目集成。
 
+Graphify 的官方安装器仍会生成平台专属文件；这与 ai-tools 自身的单一产物约定不冲突。
+ai-tools 的中文规则与 from-code Skill 分别只保留在 `AGENTS.md` 标记片段和
+`.agents/skills/openspec-update-change-from-code/`；Graphify 安装或卸载时不得覆盖或删除这些内容。
+
 ## 2. 前置条件
 
 - Python 3.10+
@@ -222,7 +226,7 @@ graphify uninstall --project --platform codex
 graphify hook uninstall
 ```
 
-上述命令会分别移除 Cursor 官方规则、Codex 官方 Skill/`AGENTS.md` 片段、Git hook、merge driver 配置及其 `.gitattributes` 条目。随后删除 `.graphifyignore` 和 `graphify-out/`；若安装过程曾中断，再检查并清理残留的 `.cursor/rules/graphify.mdc` 与 `.codex/skills/graphify/`。移除 Graphify 不影响 OpenSpec change、主规格或历史验证记录。
+上述命令会分别移除 Cursor 官方规则、Codex 官方 Skill/`AGENTS.md` 片段、Git hook、merge driver 配置及其 `.gitattributes` 条目。随后删除 `.graphifyignore` 和 `graphify-out/`；若安装过程曾中断，再检查并清理残留的 `.cursor/rules/graphify.mdc` 与 `.codex/skills/graphify/`。只删除 Graphify 标记片段，不覆盖整个 `AGENTS.md`，也不删除 ai-tools 的 `AI_TOOLS_OPENSPEC_CHINESE_V1_START/END` 片段。移除 Graphify 不影响 OpenSpec change、主规格或历史验证记录。
 
 ## 10. 验收清单
 
