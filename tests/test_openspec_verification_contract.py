@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = ROOT / "openspec/schemas/evidence-driven/templates/verification.md"
 SCHEMA = ROOT / "openspec/schemas/evidence-driven/schema.yaml"
 INTEGRATION = ROOT / ".agents/skills/integrating-ai-tools/reference.md"
+MIGRATION = ROOT / ".agents/skills/migrating-codex-cursor/SKILL.md"
 CURRENT_DOCS = [
     ROOT / "README.md",
     ROOT / "docs/ai-sdd-workflow.md",
@@ -98,6 +99,14 @@ VERIFY_PARALLEL_MARKERS = (
 
 
 class VerificationContractTest(unittest.TestCase):
+    def test_cursor_migration_forbids_commands_and_keeps_one_skill_source(self) -> None:
+        text = MIGRATION.read_text()
+        self.assertIn("Cursor 不保留 command", text)
+        self.assertIn("删除 `.cursor/commands/`", text)
+        self.assertIn("不得用 Cursor command 作为薄适配入口", text)
+        self.assertIn("只保留 `.agents/skills/<name>/` 中的一份 skill", text)
+        self.assertIn("`.cursor/commands/` 不存在或为空", text)
+
     def test_cross_agent_custom_artifacts_have_single_sources(self) -> None:
         canonical = (
             ROOT / ".agents/skills/openspec-update-change-from-code/SKILL.md",
