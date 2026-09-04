@@ -2,8 +2,8 @@
 
 面向 AI 编程助手的 **OpenSpec / AI-SDD 工作流工具包**。本仓库维护
 `evidence-driven` 自定义 schema、简体中文规则、可选的 from-code 旁路及场景文档；
-OpenSpec 官方 Cursor / Codex skills 与命令由 OpenSpec 在目标项目生成，本仓库
-不跟踪、不复制也不定制这些官方生成物。
+OpenSpec 官方 skills 由 OpenSpec 在目标项目的 `.agents/skills/` 生成，作为 Cursor 与
+Codex 共用的唯一来源；不初始化或保留 Cursor commands 与重复 skills。
 
 默认约定：OpenSpec 相关对话与规划产物使用**简体中文**；Cursor 与
 Codex 共用根目录 `AGENTS.md` 中的同一份规则。
@@ -64,20 +64,22 @@ TARGET_PROJECT="/absolute/path/to/target-project"
    test "$(openspec --version)" = "$TARGET_VERSION"
    ```
 
-2. 在目标项目根目录生成或升级 OpenSpec 官方 Cursor、Codex skills（Codex 无 command）。新项目
+2. 在目标项目根目录生成或升级 OpenSpec 官方共享 skills。新项目
    使用 `init`：
 
    ```bash
    cd "$TARGET_PROJECT"
-   openspec init --tools cursor,codex
+   openspec init --tools codex
    ```
 
-   已初始化的目标项目：`openspec update` 只刷新已经配置过的工具。Cursor-only 项目要补 Codex，必须再跑 `openspec init --tools cursor,codex`（会 Refresh 已有 Cursor 文件，随后须重做 5.1 注入）：
+   已初始化的目标项目先刷新，再生成 `.agents/skills/` 唯一来源，并清理旧 OpenSpec Cursor 生成物：
 
    ```bash
    cd "$TARGET_PROJECT"
    openspec update
-   openspec init --tools cursor,codex
+   openspec init --tools codex
+   rm -rf "$TARGET_PROJECT/.cursor/commands/opsx-"*
+   rm -rf "$TARGET_PROJECT/.cursor/skills/openspec-"*
    ```
 
 3. 将本仓库的 schema 复制到目标项目，并在目标配置中启用：
@@ -125,30 +127,30 @@ TARGET_PROJECT="/absolute/path/to/target-project"
 5. 要完成当前 ai-tools 接入，必须继续执行
    [接入文档 5.1 节](.agents/skills/integrating-ai-tools/reference.md#51-补充-verify-修复闭环与流转门禁)：
    从本仓库复制 `scripts/openspec-verification-fingerprint.py`，向 apply、
-   verify、sync、archive 的官方 command/skill 文件幂等追加
-   `AI_TOOLS_VERIFY_GATE_V2` 规则，并向 propose 的官方 command/skill 文件幂等追加
+   verify、sync、archive 的官方 skills 幂等追加
+   `AI_TOOLS_VERIFY_GATE_V2` 规则，并向 propose 的官方 skill 幂等追加
    `AI_TOOLS_PROPOSE_WORKTREE_V1` 规则，并向上述目标文件幂等追加
    `AI_TOOLS_WORKTREE_FINISH_V1` 收尾规则。增强规则同时提供
    apply 子 Agent 派发、独立 verify 子 Agent 派发、防递归标记（
    `AI_TOOLS_DELEGATED_APPLY_V1`、`AI_TOOLS_DELEGATED_VERIFY_V1`）与阶段内并行开关
    （`AI_TOOLS_PARALLEL_DISPATCH_V1`、`AI_TOOLS_PARALLEL_HANDOFF_V1`）：apply 时入口
    Agent 先派发 apply 子 Agent，成功后再派发 verify 子 Agent；用户单独运行
-   `/opsx-verify` 时，入口 Agent 同样派发 verify 子 Agent。入口在自己的会话 skills
+   `$openspec-verify` 时，入口 Agent 同样派发 verify 子 Agent。入口在自己的会话 skills
    目录中查找 `dispatching-parallel-agents`，通过唯一有边界的交接块传递 AVAILABLE
    与绝对 Path，找不到则传递 UNAVAILABLE 并串行；交接或读取失败会阻塞，不得静默
    降级。子 Agent 必须回报「阶段内并行：」行，入口须转述。不得靠扫描磁盘启用并行。
    后续安装该 skill 无需再次替换注入。未安装增强规则时，这些
    派发行为不成立。仅复制 schema 不会自动获得这些流转门禁与子 Agent 编排。
-   也必须注入 propose worktree 选择，否则 `/opsx-propose` 会跳过起始询问，直接在当前
+   也必须注入 propose worktree 选择，否则 `$openspec-propose` 会跳过起始询问，直接在当前
    工作区创建 change。也必须注入隔离 worktree 按需收尾，否则用户事后明确要求合并或
    清理时没有同一套安全步骤；注入后各阶段结束时不得主动询问怎么处理。
 
-官方 `/opsx-*`（Cursor）、`$openspec-*`（Codex）命令及对应 skills 归 OpenSpec 管理；升级后的具体行为应以目标项目
+官方 `$openspec-*` skills 归 OpenSpec 管理；Cursor 与 Codex 共同从 `.agents/skills/` 发现它们。升级后的具体行为应以目标项目
 中当前 OpenSpec 官方生成物为准，不要从本仓库寻找或复制官方模板。当前 CLI 1.12.0
 已确认的命令（以 `openspec --help` 为准，不要猜测未列出的参数）：
 
-- 新项目：`openspec init --tools cursor,codex`
-- 已初始化：`openspec update`（`--force` 可在工具已是最新时仍刷新）。Cursor-only 项目要补 Codex 须再跑 `openspec init --tools cursor,codex`，随后重做 5.1 注入
+- 新项目：`openspec init --tools codex`
+- 已初始化：`openspec update` 后运行 `openspec init --tools codex`，清理 OpenSpec Cursor commands/重复 skills，随后重做 5.1 注入
 - 校验 schema：`openspec schema validate evidence-driven`（schema 子命令仍标为 experimental）
 - 新建 change：`openspec new change "<name>" --schema evidence-driven`
 - JSON：`openspec list --json`、`openspec list --specs --json`、
@@ -183,16 +185,16 @@ apply 与 verify 两个阶段始终串行。阶段内并行不是接入时开关
 读取后才对独立域派发带身份标记的工作者；目录中没有则显式串行，交接或读取失败则
 阻塞，并回报「阶段内并行：」行。
 
-单独运行 `/opsx-verify` 时，入口 Agent 也按同一规则派发独立 verify 子 Agent 执行验证
+单独运行 `$openspec-verify` 时，入口 Agent 也按同一规则派发独立 verify 子 Agent 执行验证
 闭环。未安装增强规则时，propose 起始 worktree 询问、隔离 worktree 按需收尾、apply/verify 子 Agent 派发及 sync/archive 门禁均不成立；
 具体行为仍以目标项目当前 OpenSpec 官方生成物为准。
 
 常见旁路：
 
-- 已有 change，只调整规划不改代码 → 使用官方 `/opsx-update`。
+- 已有 change，只调整规划不改代码 → 使用官方 `$openspec-update`。
 - 代码已先于规划变化 → 共用 `openspec-update-change-from-code` skill（有唯一匹配的 active
   change 回写 change；无 change 且只有一份对应 spec 则回写该 spec；有歧义先问）。
-- 只合并 delta specs 到 main specs、不归档 → 使用官方 `/opsx-sync`。
+- 只合并 delta specs 到 main specs、不归档 → 使用官方 `$openspec-sync`。
 - 无规范层行为变化 → 在 change 的 `.openspec.yaml` 设置 `skip_specs: true`，不要
   捏造空 capability。
 
@@ -227,12 +229,12 @@ verify、archive 与 sync 的具体行为以当前 OpenSpec 官方生成物为�
   delta `## Purpose`。
 - `MODIFIED` requirement 必须复制并修改完整 requirement 块及其全部
   `#### Scenario`。
-- 官方 `/opsx-verify` 只在会话中输出 Completeness / Correctness / Coherence
-  记分卡，不写 `verification.md`。官方 `/opsx-archive` 对未完成制品或任务仅警告
+- 官方 `$openspec-verify` 只在会话中输出 Completeness / Correctness / Coherence
+  记分卡，不写 `verification.md`。官方 `$openspec-archive` 对未完成制品或任务仅警告
   并允许确认继续。项目级 `AI_TOOLS_VERIFY_GATE_V2` 是额外门禁，不是 OpenSpec
   官方行为。该门禁使用 V2 范围指纹：范围内变化构成范围内阻断并使旧结果失效，
   范围外变化只产生范围外告警；若范围外路径实际属于 change，必须扩展范围并复验。正常
-  `/opsx-sync` 生成的 main spec 未纳入声明范围时，不强制重复实现验证。
+  `$openspec-sync` 生成的 main spec 未纳入声明范围时，不强制重复实现验证。
 
 后续升级 OpenSpec 时，应从当前官方 `spec-driven` 基线重新核对这些语义，而不是
 永久假定 1.12.0 的实现细节。

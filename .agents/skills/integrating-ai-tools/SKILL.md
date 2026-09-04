@@ -19,10 +19,10 @@ compatibility: Requires Node.js, npm, OpenSpec CLI, Python 3.8+, and shell acces
 ## 执行约束
 
 - 不在 ai-tools 仓库根目录运行 `openspec init` 或 `openspec update`。
-- 不用本仓库文件覆盖 OpenSpec CLI 生成的官方 skills 或 commands；只按指南追加带稳定标记的增强块。
+- OpenSpec 只初始化 `codex` 工具，Cursor 与 Codex 共用 `.agents/skills/openspec-*`；不得初始化或保留重复的 Cursor commands/skills。
 - 已有 `openspec/config.yaml` 时只合并 `schema` 字段，保留其它配置。
 - 已有 `AGENTS.md` 时只合并或替换 `AI_TOOLS_OPENSPEC_CHINESE_V1` 标记块，不整文件覆盖。
-- 把 `.agents/skills/openspec-update-change-from-code/` 作为 Cursor 与 Codex 共用的唯一 from-code Skill 源。
+- 把 `.agents/skills/` 作为 Cursor 与 Codex 共用的唯一 OpenSpec Skill 源，包括官方 skills 与 from-code Skill。
 - 替换验证门禁时，同步更新 V2 指纹脚本和所有规定的注入目标；不得只改其中一处。
 - 保留目标项目中与本次接入无关的修改。遇到无法安全合并的已有定制时先停止并说明冲突。
 - 不自动提交、归档 active change、合并或清理 worktree，除非用户明确要求。

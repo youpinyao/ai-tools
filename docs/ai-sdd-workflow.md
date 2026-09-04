@@ -4,9 +4,9 @@
 方案调整、实现、验证还是代码回写阶段，再沿流程图选择对应路径。图中的步骤越多，
 通常意味着需要补充或更新的制品越多，整体工作量也越大。
 
-官方入口因助手而异，本文用阶段名（`explore` / `propose` / `apply` 等）描述流程；
-实际调用请换成当前助手的写法：Cursor `/opsx-*`，Codex `$openspec-*`。
-图中的 `from-code` 是 Cursor / Codex 共用的
+本文用阶段名（`explore` / `propose` / `apply` 等）描述流程；Cursor 与 Codex 均从
+`.agents/skills/` 发现唯一一份 `$openspec-*` skills，不再维护 Cursor command。
+图中的 `from-code` 也是 Cursor / Codex 共用的
 `openspec-update-change-from-code` Agent Skill，唯一源位于 `.agents/skills/`。
 
 ## 各个场景工作量
@@ -149,7 +149,7 @@ flowchart TD
   或删除，也不得清理兄弟 worktree。主分支指主工作区当前检出分支。未安装收尾
   块时，用户明确要求也没有这套安全步骤。
 - 安装 `AI_TOOLS_VERIFY_GATE_V2` 后，入口 Agent 负责编排，不直接执行 apply 或 verify
-  主体；apply 子 Agent 成功后才派发独立 verify 子 Agent；单独运行 `/opsx-verify` 时，
+  主体；apply 子 Agent 成功后才派发独立 verify 子 Agent；单独运行 `$openspec-verify` 时，
   入口 Agent 同样派发 verify 子 Agent。verify 先确认可解析的 baseline 与 change
   范围，再执行检查。图中的“仍可继续尝试”表示未达到三轮上限、未连续两轮无进展，
   且不涉及用户决策、权限或凭据、外部服务故障、破坏性操作或范围外修改。满足条件的
@@ -168,8 +168,8 @@ flowchart TD
   受影响制品，再进入 apply。
 - 未安装增强规则时，以上子 Agent 派发、门禁与隔离 worktree 收尾均不成立；`verify`、`sync`、`archive`
   的具体条件与行为仍以目标项目当前 OpenSpec 官方生成物为准。OpenSpec 1.12.0 官方
-  `/opsx-verify` 只输出会话记分卡（Completeness / Correctness / Coherence），不写
-  `verification.md`；官方 `/opsx-archive` 对未完成制品或任务仅警告并允许用户确认
+  `$openspec-verify` 只输出会话记分卡（Completeness / Correctness / Coherence），不写
+  `verification.md`；官方 `$openspec-archive` 对未完成制品或任务仅警告并允许用户确认
   继续。项目级 Verify 门禁不是官方行为。
 - 发布后发现问题时，不修改已归档 change：change 仍为 active 时通过 `update` /
   `apply` 回流，已经归档时建立新 change，进入下一轮规格驱动闭环。
@@ -245,7 +245,7 @@ capability 或 `spec.md`。
 
 推荐路径：`openspec-update-change-from-code`（回写已有 spec）。
 
-该路径只修改已存在的 main spec，不走官方 `/opsx-sync`（sync 是把 change 内
+该路径只修改已存在的 main spec，不走官方 `$openspec-sync`（sync 是把 change 内
 delta specs 合并到 main specs）。不要把错误实现写进规范：代码行为不正确时应
 先修代码。若实现引入了新能力、删除了能力，或无法唯一匹配现有 spec，应请用户
 选择要回写的已有 spec，或改走场景 7；不要在 from-code 中创建规范，也不要在
@@ -270,8 +270,8 @@ change 再调用 `openspec-update-change-from-code`：该 skill 只更新已有 
 ## 独立旁路：同步 delta specs
 
 需要将 active change 内的 delta specs 合并到 main specs、但暂不归档时，可独立使用
-官方 `/opsx-sync`。该命令只同步规格，不会结束 change。手动执行 sync 是可选步骤；
-若直接运行 `/opsx-archive`，archive 会在发现 delta specs 尚未同步时提示先同步，
+官方 `$openspec-sync`。该命令只同步规格，不会结束 change。手动执行 sync 是可选步骤；
+若直接运行 `$openspec-archive`，archive 会在发现 delta specs 尚未同步时提示先同步，
 然后再完成归档。是否需要先执行 `verify`，以及后续何时归档，遵循目标项目当前官方
 生成物。若 sync 发生在隔离 worktree 中，
 跑完后默认留下本次 worktree，不得主动询问怎么处理；仅当用户明确要求时才合并或清理。
@@ -293,7 +293,7 @@ change 再调用 `openspec-update-change-from-code`：该 skill 只更新已有 
   spec 回写使用 `openspec list --specs --json` 或 `openspec context --json` 的
   `root.path`。路径为 `<root>/openspec/specs/<capability-path>/spec.md`，不要假设仓库相对路径。
 - 实现完成后建议核验。安装 `AI_TOOLS_VERIFY_GATE_V2` 后，apply 与单独
-  `/opsx-verify` 均由入口 Agent 派发子 Agent 执行，阶段内并行由入口按会话 skills
+  `$openspec-verify` 均由入口 Agent 派发子 Agent 执行，阶段内并行由入口按会话 skills
   目录以唯一有边界的块交接 `dispatching-parallel-agents`，并通过 Verify 门禁与
   V2 范围指纹约束 sync/archive；范围内阻断，范围外告警。未安装增强规则时，
   `verify`、`sync`、`archive` 的具体条件与行为

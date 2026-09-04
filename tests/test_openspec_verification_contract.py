@@ -127,6 +127,27 @@ class VerificationContractTest(unittest.TestCase):
         self.assertIn("scripts/openspec-verification-fingerprint.py", current)
         self.assertNotIn("Cursor 另有斜杠命令", current)
 
+    def test_openspec_uses_agents_skills_as_the_only_cross_ide_source(self) -> None:
+        current = "\n".join(path.read_text() for path in CURRENT_DOCS)
+        self.assertIn("openspec init --tools codex", current)
+        self.assertNotIn("openspec init --tools cursor,codex", current)
+        self.assertNotIn(".cursor/commands/opsx-{propose,apply,verify,sync,archive}", current)
+        self.assertNotIn(".cursor/skills/openspec-{apply-change", current)
+
+        integration = integration_text()
+        self.assertIn(
+            'rm -rf "$TARGET_PROJECT/.cursor/commands/opsx-"*',
+            integration,
+        )
+        self.assertIn(
+            'rm -rf "$TARGET_PROJECT/.cursor/skills/openspec-"*',
+            integration,
+        )
+        self.assertRegex(
+            integration,
+            re.compile(r"\.agents/skills/.{0,100}唯一", re.DOTALL),
+        )
+
     def test_current_docs_each_define_scoped_v2_responsibilities(self) -> None:
         required_by_doc = {
             "README.md": (
@@ -262,14 +283,6 @@ class VerificationContractTest(unittest.TestCase):
         self.assertTrue(migration.startswith("set -euo pipefail\n"))
 
         gate_paths = (
-            ".cursor/commands/opsx-apply.md",
-            ".cursor/commands/opsx-verify.md",
-            ".cursor/commands/opsx-sync.md",
-            ".cursor/commands/opsx-archive.md",
-            ".cursor/skills/openspec-apply-change/SKILL.md",
-            ".cursor/skills/openspec-verify-change/SKILL.md",
-            ".cursor/skills/openspec-sync-specs/SKILL.md",
-            ".cursor/skills/openspec-archive-change/SKILL.md",
             ".agents/skills/openspec-apply-change/SKILL.md",
             ".agents/skills/openspec-verify-change/SKILL.md",
             ".agents/skills/openspec-sync-specs/SKILL.md",

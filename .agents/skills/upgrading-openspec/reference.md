@@ -141,17 +141,17 @@ cp -R "$TARGET_SCHEMA_DIR" "$UPGRADE_TMP/target-spec-driven-$TARGET_VERSION"
 
 预期：新版目录包含 `schema.yaml` 和官方模板；该目录是本次升级的唯一上游语义来源。
 
-- [ ] **2.3 生成新版 Cursor 官方产物样本**
+- [ ] **2.3 生成新版共享 Skill 样本**
 
 运行：
 
 ```bash
 mkdir -p "$UPGRADE_TMP/tools-generated-$TARGET_VERSION"
 cd "$UPGRADE_TMP/tools-generated-$TARGET_VERSION"
-openspec init --tools cursor,codex
+openspec init --tools codex
 ```
 
-预期：初始化成功。记录实际生成的 `.cursor/skills/openspec-*`、`.cursor/commands/opsx-*` 与 `.agents/skills/openspec-*` 路径，不依赖旧版本名称推断。
+预期：初始化成功，只记录 `.agents/skills/openspec-*` 路径；不得生成 Cursor command 或重复 skill。
 
 - [ ] **2.4 比较新旧官方基线**
 
@@ -318,28 +318,24 @@ openspec status --change "upgrade-contract-smoke" --json |
 
 预期：若目录或 context 字段变化，同步更新 from-code skill 中 archived change 的定位说明。
 
-## 5. 核对 Cursor 官方生成物和本地追加规则
+## 5. 核对共享官方 Skill 和本地追加规则
 
 **文件：**
 - 检查或修改：`.gitignore`
 - 检查或修改：`AGENTS.md`
 - 检查或修改：`.agents/skills/integrating-ai-tools/reference.md`
 
-- [ ] **5.1 比较新版生成的 skill/command 清单**
+- [ ] **5.1 比较新版生成的共享 Skill 清单**
 
 运行：
 
 ```bash
 cd "$UPGRADE_TMP/tools-generated-$TARGET_VERSION"
 printf '%s\n' \
-  .cursor/skills/openspec-* .cursor/commands/opsx-* \
   .agents/skills/openspec-* .agents/skills/.openspec-target
 
 # 5.1 注入目标必须存在（explore/update 不注入，但须出现在 gitignore 对账中）
 for file in \
-  .cursor/commands/opsx-{propose,apply,verify,sync,archive}.md \
-  .cursor/skills/openspec-propose/SKILL.md \
-  .cursor/skills/openspec-{apply-change,verify-change,sync-specs,archive-change}/SKILL.md \
   .agents/skills/openspec-propose/SKILL.md \
   .agents/skills/openspec-{apply-change,verify-change,sync-specs,archive-change}/SKILL.md
 do
@@ -347,13 +343,13 @@ do
 done
 ```
 
-预期：得到新版实际文件清单，且上述 15 个注入目标都存在。若官方新增、删除或重命名路径，精确更新 `.gitignore` 与 `.agents/skills/integrating-ai-tools/reference.md` 5.1 检查器；不得忽略本仓库唯一的 `.agents/skills/openspec-update-change-from-code/`。
+预期：得到新版实际文件清单，且上述 5 个注入目标都存在。若官方新增、删除或重命名路径，精确更新 `.gitignore` 与 `.agents/skills/integrating-ai-tools/reference.md` 5.1 检查器；不得忽略本仓库唯一的 `.agents/skills/openspec-update-change-from-code/`。
 
 - [ ] **5.2 核对中文规则覆盖范围**
 
-比较 `AGENTS.md` 中列出的阶段、skill 与 Cursor `/opsx-*`、Codex `$openspec-*` 入口是否覆盖新版清单。
+比较 `AGENTS.md` 中列出的阶段、skill 与 Cursor 与 Codex 共用的 `$openspec-*` Skill 入口是否覆盖新版清单。
 
-预期：规则覆盖新版 OpenSpec 操作及两套官方入口，同时覆盖共用 `openspec-update-change-from-code` skill。
+预期：规则覆盖新版 OpenSpec 操作及唯一共享入口，同时覆盖共用 `openspec-update-change-from-code` skill。
 
 - [ ] **5.3 复核 `AI_TOOLS_VERIFY_GATE_V2`、`AI_TOOLS_PROPOSE_WORKTREE_V1`、`AI_TOOLS_WORKTREE_FINISH_V1` 与 `AI_TOOLS_MULTI_IDE_V1` 追加点**
 
@@ -470,7 +466,6 @@ fi
 ```bash
 git ls-files '.cursor/skills/openspec-*' '.cursor/commands/opsx-*' \
   '.agents/skills/openspec-*'
-git check-ignore .cursor/skills/openspec-apply-change/SKILL.md
 git check-ignore .agents/skills/openspec-apply-change/SKILL.md
 test -f .agents/skills/openspec-update-change-from-code/SKILL.md
 test -f AGENTS.md
@@ -485,7 +480,7 @@ if git check-ignore -q .agents/skills/openspec-update-change-from-code/SKILL.md;
 fi
 ```
 
-预期：`git ls-files` 只包含 `.agents/skills/` 下的共用 from-code skill；Cursor、Codex 官方 apply skill 都被忽略；from-code skill 不被忽略。
+预期：不存在 OpenSpec Cursor command/skill；`git ls-files` 只包含 `.agents/skills/` 下的共用 from-code skill，官方生成 skills 被忽略。
 
 - [ ] **7.4 人工执行差异审查**
 
@@ -500,7 +495,7 @@ fi
 ## 8. 目标项目升级与冒烟验证
 
 **文件：**
-- 目标项目官方生成物：由 `openspec update` 刷新已配置工具；需要 Cursor / Codex 时再跑 `openspec init --tools cursor,codex`
+- 目标项目官方生成物：由 `openspec update` 刷新已配置工具；统一再跑 `openspec init --tools codex`
 - 目标项目自定义 schema：`openspec/schemas/evidence-driven/`
 - 目标项目配置：`openspec/config.yaml`
 - 目标项目验证门禁文件：以新版实际生成清单和 `.agents/skills/integrating-ai-tools/reference.md` 为准
@@ -516,11 +511,13 @@ fi
 ```bash
 openspec --version
 openspec update
-# 只刷新已配置工具。Cursor-only 项目要补 Codex 必须再跑 init（会 Refresh Cursor，随后须重做 5.1）
-openspec init --tools cursor,codex
+# 刷新后必须用 codex 重建唯一共享 Skill 层并清理 Cursor OpenSpec 生成物
+openspec init --tools codex
+rm -rf "$TARGET_PROJECT/.cursor/commands/opsx-"*
+rm -rf "$TARGET_PROJECT/.cursor/skills/openspec-"*
 ```
 
-预期：官方生成物与目标 CLI 版本一致；需要 Cursor 与 Codex 时，`.cursor/` 与 `.agents/skills/openspec-*` 已存在。
+预期：官方生成物与目标 CLI 版本一致；`.agents/skills/openspec-*` 是唯一 Skill 源，OpenSpec Cursor command/skill 不存在。
 
 - [ ] **8.3 安装升级后的自定义层**
 
@@ -547,11 +544,9 @@ TARGET_PROJECT="$(cd "$TARGET_PROJECT" && pwd -P)"
 RUN_DIR="$(cd "$RUN_DIR" && pwd -P)"
 cd "$TARGET_PROJECT"
 
-# 代表性项目已 init Cursor 与 Codex 时检查这 12 个 Verify 门禁文件；只使用一种助手则缩到已 init 路径。
+# 检查 `.agents/skills/` 中这 4 个 Verify 门禁文件。
 # propose 的 D 块与 MULTI_IDE 标记由接入文档 5.1 检查器覆盖，不在本断言内。
 GATE_FILES=(
-  .cursor/commands/opsx-{apply,verify,sync,archive}.md
-  .cursor/skills/openspec-{apply-change,verify-change,sync-specs,archive-change}/SKILL.md
   .agents/skills/openspec-{apply-change,verify-change,sync-specs,archive-change}/SKILL.md
 )
 
@@ -583,7 +578,7 @@ for verification in openspec/changes/*/verification.md; do
   fi
 done
 test ! -s "$V1_ACTIVE_REPORT" || {
-  echo "以下 active change 必须逐个运行 /opsx-verify 后才能继续："
+  echo "以下 active change 必须逐个运行 $openspec-verify 后才能继续："
   command cat "$V1_ACTIVE_REPORT"
   exit 1
 }
