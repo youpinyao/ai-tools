@@ -25,7 +25,7 @@ compatibility: Requires Node.js, npm, OpenSpec CLI, Python 3.8+, and shell acces
 - 把 `.agents/skills/` 作为 Cursor 与 Codex 共用的唯一 OpenSpec Skill 源，包括官方 skills 与 from-code Skill。
 - 替换验证门禁时，同步更新 V2 指纹脚本和所有规定的注入目标；不得只改其中一处。
 - 保留目标项目中与本次接入无关的修改。遇到无法安全合并的已有定制时先停止并说明冲突。
-- 不自动提交、归档 active change、合并或清理 worktree，除非用户明确要求。
+- 不自动提交或归档 active change，除非用户明确要求。
 
 ## 完成条件
 

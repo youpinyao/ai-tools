@@ -10,17 +10,14 @@
 
 ## 全局约束
 
-- 本文件是可重复执行的计划模板，不记录某次运行的完成状态或结论。每次运行的版本、路径、命令输出、差异分类和验证结论写入独立运行记录。
-- 不得永久假定任何源版本或目标版本；源版本取执行时 `openspec --version`，目标版本由执行者显式指定，未指定时才取 `npm view @fission-ai/openspec version`。
-- 安装时使用查询得到的精确版本 `@${TARGET_VERSION}`，避免执行过程中 `@latest` 再次漂移。
+- 本文件是可重复执行的计划模板，不记录某次运行的完成状态或结论。
+- 源版本取执行时 `openspec --version`；目标版本由执行者指定，未指定时才查询 npm，并固定精确版本。
 - `ai-tools` 根目录不得执行 `openspec init` 或 `openspec update`；官方生成物对照必须在临时目录完成。
-- 不得从目标项目反向复制官方生成物到本仓库，也不得提交官方 `.cursor/skills/openspec-*` 或 `.cursor/commands/opsx-*` 副本。
-- ai-tools 自定义产物只保留 `.agents/skills/openspec-update-change-from-code/`、`AGENTS.md` 标记片段与 `scripts/openspec-verification-fingerprint.py` 三个通用源，不恢复 Cursor 专属副本。
-- `proposal`、`specs`、`design`、`tasks` 必须继承新版官方 `spec-driven`；本地只允许简体中文化、`evidence-driven` 命名、`verification` 制品、apply 前置和验证记录语义等已批准差异。
-- `openspec/config.yaml` 必须继续使用 `schema: evidence-driven`。
-- 目标项目已有 `openspec/config.yaml` 时只合并 `schema` 字段，不得整文件覆盖。
-- 不修改与升级无关的工作区变更；直接在当前分支执行，不新建独立分支或 worktree；用 Git 记录升级前状态，确保基线可恢复。
-- 不自动创建 commit；只有用户明确授权时才在任务检查点提交。
+- 不得从目标项目反向复制官方生成物，也不得恢复 Cursor 专属 OpenSpec 副本。
+- 官方 `spec-driven` 语义优先；本地只保留中文化、`evidence-driven`、`verification`、验证门禁和 from-code 等批准差异。
+- 当前版本不再提供旧 worktree 增强；目标项目升级时必须确定性移除 `AI_TOOLS_PROPOSE_WORKTREE_V1`、`AI_TOOLS_WORKTREE_FINISH_V1` 与 `AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1`，不得让结果取决于生成器是否保留追加正文。
+- 已有配置只合并 `schema` 字段；不覆盖无关设置或工作区修改。
+- 不自动创建 commit。
 
 ## 每次运行的输入与记录
 
@@ -74,7 +71,7 @@ git status --short
 git branch --show-current
 ```
 
-预期：明确记录执行前已有变更与当前分支名；升级直接在当前分支进行，不新建分支或 worktree。升级不得覆盖或混入这些变更。若工作区不干净，暂停并让用户选择如何处理已有变更后再继续。
+预期：记录当前分支和已有修改；升级不得覆盖或混入无关变更。工作区不干净时暂停并让用户选择处理方式。
 
 - [ ] **1.2 固定源版本与目标版本**
 
@@ -334,16 +331,15 @@ cd "$UPGRADE_TMP/tools-generated-$TARGET_VERSION"
 printf '%s\n' \
   .agents/skills/openspec-* .agents/skills/.openspec-target
 
-# 5.1 注入目标必须存在（explore/update 不注入，但须出现在 gitignore 对账中）
+# 5.1 注入目标必须存在（explore/propose/update 不注入）
 for file in \
-  .agents/skills/openspec-propose/SKILL.md \
   .agents/skills/openspec-{apply-change,verify-change,sync-specs,archive-change}/SKILL.md
 do
   test -f "$file" || { echo "missing injection target: $file" >&2; exit 1; }
 done
 ```
 
-预期：得到新版实际文件清单，且上述 5 个注入目标都存在。若官方新增、删除或重命名路径，精确更新 `.gitignore` 与 `.agents/skills/integrating-ai-tools/reference.md` 5.1 检查器；不得忽略本仓库唯一的 `.agents/skills/openspec-update-change-from-code/`。
+预期：得到新版实际文件清单，且上述 4 个注入目标都存在。若官方新增、删除或重命名路径，精确更新 `.gitignore` 与 `.agents/skills/integrating-ai-tools/reference.md` 5.1 检查器；不得忽略本仓库唯一的 `.agents/skills/openspec-update-change-from-code/`。
 
 - [ ] **5.2 核对中文规则覆盖范围**
 
@@ -351,22 +347,9 @@ done
 
 预期：规则覆盖新版 OpenSpec 操作及唯一共享入口，同时覆盖共用 `openspec-update-change-from-code` skill。
 
-- [ ] **5.3 复核 `AI_TOOLS_VERIFY_GATE_V2`、`AI_TOOLS_PROPOSE_WORKTREE_V1`、`AI_TOOLS_WORKTREE_FINISH_V1` 与 `AI_TOOLS_MULTI_IDE_V1` 追加点**
+- [ ] **5.3 复核 `AI_TOOLS_VERIFY_GATE_V2` 与 `AI_TOOLS_MULTI_IDE_V1` 追加点**
 
-阅读新版 propose、apply、verify、sync、archive 的 command 和 skill，逐项判断 `.agents/skills/integrating-ai-tools/reference.md` 第 5.1 节 A/B/C、D 与 E 的追加内容是否仍有有效插入点、是否与新版官方行为冲突。
-
-预期：
-
-- 仍适用的规则更新文件名和措辞；
-- 已由官方实现的重复规则删除或收敛；
-- 无法由新版官方流程保证的规则不得继续宣称为硬门禁；
-- 幂等检查以新版实际文件清单为准。
-- propose 的 worktree 询问仍必须发生在官方 propose 主体与任何制品写入之前；
-- 隔离 worktree 按需收尾仍不得在入口准备结束回复时主动询问（含官方主体失败但本次 worktree 已在）；只在用户明确要求时收尾本次相关路径，且不得自动合并或删除；
-- V2 范围指纹脚本的命令行接口、输出字段和单元测试仍与注入块一致；
-- 目标项目中旧 V1 Verify 块必须标为 `STALE` 并由唯一 V2 完整块替换，不得在旧块后重复追加；
-- V1-only active change 不得自动迁移结果，必须先执行一次 verify，生成新的范围块、结果块与指纹；
-- 注入正文不得再写死仅 Cursor 的入口或「Cursor workspace」；apply/verify 与 propose 的 D 块须带 `AI_TOOLS_MULTI_IDE_V1`。
+阅读新版 apply、verify、sync、archive skills，确认 A/B/C 块仍有有效插入点且不与官方行为冲突。V2 范围指纹接口必须与注入块一致；旧 V1 块标为 `STALE` 并由唯一 V2 完整块替换，不得重复追加。V1-only active change 必须先执行一次 verify，再生成新的范围块、结果块与指纹。
 
 ## 6. 同步当前维护文档
 
@@ -511,13 +494,37 @@ fi
 ```bash
 openspec --version
 openspec update
-# 刷新后必须用 codex 重建唯一共享 Skill 层并清理 Cursor OpenSpec 生成物
+# 旧 worktree 增强没有可靠的结束边界，不能安全地原位裁剪。删除承载它们的
+# 官方 skills 后再重建；只删除当前明确的官方目标，不删除自定义 from-code skill。
+# AI_TOOLS_REMOVE_LEGACY_WORKTREE_SKILLS_V1_START
+for skill_name in \
+  openspec-propose \
+  openspec-apply-change \
+  openspec-verify-change \
+  openspec-sync-specs \
+  openspec-archive-change
+do
+  rm -rf -- "$TARGET_PROJECT/.agents/skills/$skill_name"
+done
+# AI_TOOLS_REMOVE_LEGACY_WORKTREE_SKILLS_V1_END
+# 用 codex 重建唯一共享 Skill 层并清理 Cursor OpenSpec 生成物
 openspec init --tools codex
 rm -rf "$TARGET_PROJECT/.cursor/commands/opsx-"*
 rm -rf "$TARGET_PROJECT/.cursor/skills/openspec-"*
+
+LEGACY_WORKTREE_PATTERN='AI_TOOLS_(PROPOSE_WORKTREE|WORKTREE_FINISH|VERIFY_GATE_NO_FINISH_ASK)'
+for file in \
+  .agents/skills/openspec-{propose,apply-change,verify-change,sync-specs,archive-change}/SKILL.md
+do
+  test -f "$file" || continue
+  if rg -q "$LEGACY_WORKTREE_PATTERN" "$file"; then
+    echo "仍有旧 worktree 增强：$file" >&2
+    exit 1
+  fi
+done
 ```
 
-预期：官方生成物与目标 CLI 版本一致；`.agents/skills/openspec-*` 是唯一 Skill 源，OpenSpec Cursor command/skill 不存在。
+预期：官方生成物与目标 CLI 版本一致；`.agents/skills/openspec-*` 是唯一 Skill 源，OpenSpec Cursor command/skill 不存在，旧 worktree 增强不再残留。
 
 - [ ] **8.3 安装升级后的自定义层**
 
@@ -545,7 +552,6 @@ RUN_DIR="$(cd "$RUN_DIR" && pwd -P)"
 cd "$TARGET_PROJECT"
 
 # 检查 `.agents/skills/` 中这 4 个 Verify 门禁文件。
-# propose 的 D 块与 MULTI_IDE 标记由接入文档 5.1 检查器覆盖，不在本断言内。
 GATE_FILES=(
   .agents/skills/openspec-{apply-change,verify-change,sync-specs,archive-change}/SKILL.md
 )

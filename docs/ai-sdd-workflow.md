@@ -115,10 +115,8 @@ flowchart TD
 
     ArchiveLoop --> SyncCheck{delta specs<br/>是否已同步?}
     SyncCheck -->|否：archive 提示同步| ArchiveSync[归档前同步<br/>delta specs]
-    SyncCheck -->|是| WorktreeFinish{本轮用户明确要求<br/>收尾 worktree?}
-    ArchiveSync --> WorktreeFinish
-    WorktreeFinish -->|是：按需合并或清理| Closed
-    WorktreeFinish -->|否：默认保留| Closed
+    SyncCheck -->|是| Closed
+    ArchiveSync --> Closed
     Closed[change 已结束<br/>适用的规格变化已沉淀]
     Closed --> PostRelease{发布后验证是否发现问题?}
     PostRelease -->|否| NewBaseline([形成下一轮基线，等待后续需求])
@@ -136,18 +134,6 @@ flowchart TD
   之间的制品依赖，要求 `apply` 在 `verification.md` 已存在后实施，并跟踪
   `tasks.md`；紧凑的 `verification.md` 负责保存范围、需求与检查的对应关系、代码
   审查和剩余风险。每轮复验更新原检查行，只保留当前权威证据，不追加完整历史。
-- 安装 `AI_TOOLS_PROPOSE_WORKTREE_V1` 后，每次 `propose` 都必须先询问使用隔离
-  worktree 还是当前工作区；询问和 worktree 准备发生在创建 change 或写入制品之前。
-  选择隔离 worktree 时每次 propose 都必须新建独立 worktree，即使已处于
-  linked worktree 也不得复用当前目录；必须先把会话工作区根目录切到新路径，
-  切不过去则停止。原生 worktree 可以在仓库外；手工创建才锚定主工作区父目录，
-  禁止嵌套。未安装 `AI_TOOLS_PROPOSE_WORKTREE_V1` 时，`propose` 仍以目标项目
-  当前 OpenSpec 官方生成物为准。安装 `AI_TOOLS_WORKTREE_FINISH_V1` 后，入口
-  Agent 准备结束回复时不得询问隔离 worktree 怎么处理；默认留下本会话创建的
-  路径，或主工作区下项目 worktree 父目录中的当前路径。仅当本轮用户明确要求
-  合并或清理时才执行收尾。有未提交改动须先经用户明确同意提交。不得自动合并
-  或删除，也不得清理兄弟 worktree。主分支指主工作区当前检出分支。未安装收尾
-  块时，用户明确要求也没有这套安全步骤。
 - 安装 `AI_TOOLS_VERIFY_GATE_V2` 后，入口 Agent 负责编排，不直接执行 apply 或 verify
   主体；apply 子 Agent 成功后才派发独立 verify 子 Agent；单独运行 `$openspec-verify` 时，
   入口 Agent 同样派发 verify 子 Agent。verify 先确认可解析的 baseline 与 change
@@ -166,7 +152,7 @@ flowchart TD
   不使 implementation verification 失效；后续没有新增变化时，archive 入口直接复核
   已有门禁与 V2 范围指纹，不重复实现验证。若要继续实施或改变范围，先通过 `update` 调整
   受影响制品，再进入 apply。
-- 未安装增强规则时，以上子 Agent 派发、门禁与隔离 worktree 收尾均不成立；`verify`、`sync`、`archive`
+- 未安装增强规则时，以上子 Agent 派发与门禁均不成立；`verify`、`sync`、`archive`
   的具体条件与行为仍以目标项目当前 OpenSpec 官方生成物为准。OpenSpec 1.12.0 官方
   `$openspec-verify` 只输出会话记分卡（Completeness / Correctness / Coherence），不写
   `verification.md`；官方 `$openspec-archive` 对未完成制品或任务仅警告并允许用户确认
@@ -185,10 +171,6 @@ OpenSpec 1.12.0 的官方 `explore` 会在提出事实性问题前只读检查�
 官方 `propose` 在起草制品时会先读取项目 `context` / `rules`，并按需只读检查实现、测试、
 配置与文档，以实际发现确定 scope、approach 和 tasks；若规划根与代码项目分离或源码不可用，
 应明确目标或说明限制，而不是留下泛化的“探索代码库”实施任务。
-`propose` 开始时若已安装 worktree 选择规则，应先选择隔离 worktree 或当前工作区。
-若选择隔离 worktree，后续命令跑完后默认留下本次 worktree，不得主动询问怎么处理；
-仅当用户明确要求时才合并或清理。
-
 推荐路径：`explore → propose → apply → verify → archive`。
 
 该场景步骤最多，但能在实施前消除关键歧义，适合影响范围较大、存在多种实现方案，
@@ -258,10 +240,6 @@ delta specs 合并到 main specs）。不要把错误实现写进规范：代码
 和验证方式，再通过 `apply` 补齐任务或调整实现，最后执行验证。不要先建立空
 change 再调用 `openspec-update-change-from-code`：该 skill 只更新已有 change 制品或
 已有 main spec，不负责创建缺失制品。
-`propose` 开始时若已安装 worktree 选择规则，应先选择隔离 worktree 或当前工作区。
-若选择隔离 worktree，该会话在后续命令跑完后默认留下本次 worktree，不得主动询问
-怎么处理；仅当用户明确要求时才合并或清理。
-
 推荐路径：`propose（基于代码事实）→ apply → verify → archive`。
 
 新建 change 时应以可确认的代码事实为依据，同时区分“当前已经实现的行为”和
@@ -273,8 +251,7 @@ change 再调用 `openspec-update-change-from-code`：该 skill 只更新已有 
 官方 `$openspec-sync`。该命令只同步规格，不会结束 change。手动执行 sync 是可选步骤；
 若直接运行 `$openspec-archive`，archive 会在发现 delta specs 尚未同步时提示先同步，
 然后再完成归档。是否需要先执行 `verify`，以及后续何时归档，遵循目标项目当前官方
-生成物。若 sync 发生在隔离 worktree 中，
-跑完后默认留下本次 worktree，不得主动询问怎么处理；仅当用户明确要求时才合并或清理。
+生成物。
 安装 V2 门禁后，sync 会复核 V2 范围指纹；同步生成的 main spec 若未纳入声明
 范围，只产生范围外告警，不要求重复实现验证。范围内变化仍构成范围内阻断。
 
@@ -299,6 +276,3 @@ change 再调用 `openspec-update-change-from-code`：该 skill 只更新已有 
   `verify`、`sync`、`archive` 的具体条件与行为
   遵循目标项目当前 OpenSpec 官方生成物（1.12.0 官方 verify 仅为会话记分卡，官方
   archive 允许确认绕过）。
-- 隔离 worktree 跑完后默认留下现场。安装 `AI_TOOLS_WORKTREE_FINISH_V1` 后，
-  入口 Agent 不得主动询问是否合并到主分支并清理；仅当用户明确要求时才执行。
-  未同意提交时不得合并或删除。长期手工 worktree 不在收尾范围。

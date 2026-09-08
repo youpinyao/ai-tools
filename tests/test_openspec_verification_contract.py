@@ -81,7 +81,6 @@ APPLY_PARALLEL_MARKERS = (
     "AI_TOOLS_PARALLEL_SKILL_UNAVAILABLE_V1",
     "AI_TOOLS_PARALLEL_SKILL_READ_FAILED_V1",
     "AI_TOOLS_WORKER_APPLY_V1",
-    "AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1",
     "AI_TOOLS_MULTI_IDE_V1",
 )
 VERIFY_PARALLEL_MARKERS = (
@@ -93,9 +92,9 @@ VERIFY_PARALLEL_MARKERS = (
     "AI_TOOLS_PARALLEL_SKILL_UNAVAILABLE_V1",
     "AI_TOOLS_PARALLEL_SKILL_READ_FAILED_V1",
     "AI_TOOLS_WORKER_VERIFY_V1",
-    "AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1",
     "AI_TOOLS_MULTI_IDE_V1",
 )
+FLOW_GATE_MARKERS = ("AI_TOOLS_VERIFY_FLOW_GATE_V1",)
 
 
 class VerificationContractTest(unittest.TestCase):
@@ -195,9 +194,7 @@ class VerificationContractTest(unittest.TestCase):
                 with self.subTest(path=relative_path, pattern=pattern):
                     self.assertRegex(text, re.compile(pattern, re.DOTALL))
 
-    def test_current_docs_reject_legacy_workspace_and_finish_prompt_semantics(
-        self,
-    ) -> None:
+    def test_current_docs_reject_legacy_workspace_semantics(self) -> None:
         for path in CURRENT_DOCS:
             text = path.read_text()
             if path == INTEGRATION:
@@ -221,19 +218,88 @@ class VerificationContractTest(unittest.TestCase):
                         re.compile(r"(?:不回退|不再|不得|禁止|删除|移除|旧).{0,40}$"),
                     )
 
-        workflow = (ROOT / "docs/ai-sdd-workflow.md").read_text()
-        self.assertIn("本轮用户明确要求", workflow)
-        self.assertIn("默认保留", workflow)
-        self.assertNotRegex(
-            workflow,
-            re.compile(
-                r"WorktreeFinish[^\n]*\|[^|\n]*询问[^|\n]*(?:合并|清理)",
-            ),
+    def test_current_docs_do_not_install_openspec_worktree_enhancements(self) -> None:
+        for path in CURRENT_DOCS:
+            text = path.read_text()
+            with self.subTest(path=path.relative_to(ROOT).as_posix()):
+                self.assertNotRegex(
+                    text,
+                    re.compile(
+                        r"(?m)^<!-- AI_TOOLS_(?:PROPOSE_WORKTREE|WORKTREE_FINISH)"
+                    ),
+                )
+
+    def test_upgrade_plan_deterministically_removes_legacy_worktree_blocks(
+        self,
+    ) -> None:
+        text = (ROOT / ".agents/skills/upgrading-openspec/reference.md").read_text()
+        for required in (
+            "AI_TOOLS_PROPOSE_WORKTREE_V1",
+            "AI_TOOLS_WORKTREE_FINISH_V1",
+            "AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1",
+            "旧 worktree 增强",
+            "不再提供",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, text)
+
+        start = "# AI_TOOLS_REMOVE_LEGACY_WORKTREE_SKILLS_V1_START"
+        end = "# AI_TOOLS_REMOVE_LEGACY_WORKTREE_SKILLS_V1_END"
+        self.assertIn(start, text)
+        self.assertIn(end, text)
+        cleanup = section(text, start + "\n", end)
+        official = (
+            "openspec-propose",
+            "openspec-apply-change",
+            "openspec-verify-change",
+            "openspec-sync-specs",
+            "openspec-archive-change",
         )
-        self.assertNotRegex(
-            workflow,
-            re.compile(r"(?<!不得)(?<!不应)主动询问.{0,40}(?:合并|清理|收尾)"),
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory)
+            skills = target / ".agents/skills"
+            for name in official:
+                path = skills / name
+                path.mkdir(parents=True)
+                (path / "SKILL.md").write_text("legacy worktree block")
+            from_code = skills / "openspec-update-change-from-code"
+            from_code.mkdir()
+            sentinel = from_code / "SKILL.md"
+            sentinel.write_text("keep from-code")
+
+            result = subprocess.run(
+                ["bash", "-eu", "-c", cleanup],
+                env={**os.environ, "TARGET_PROJECT": str(target)},
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            for name in official:
+                with self.subTest(name=name):
+                    self.assertFalse((skills / name).exists())
+            self.assertEqual(sentinel.read_text(), "keep from-code")
+
+    def test_exact_version_upgrade_also_cleans_legacy_worktree_blocks(self) -> None:
+        text = integration_text()
+        exact_upgrade = section(
+            text,
+            "团队执行升级时应记录并固定 `npm view`",
+            "### 7.2 升级 ai-tools 自定义层",
         )
+        self.assertIn(
+            'rm -rf -- "$TARGET_PROJECT/.agents/skills/$skill_name"',
+            exact_upgrade,
+        )
+        self.assertIn("openspec-update-change-from-code", exact_upgrade)
+
+    def test_integration_docs_distinguish_builtin_review_from_extra_approval(
+        self,
+    ) -> None:
+        text = integration_text()
+        self.assertIn("当前 verification 已内置完整 diff 代码审查", text)
+        self.assertIn("未处理的 Critical/Important", text)
+        self.assertIn("独立审批人", text)
 
     def test_upgrade_plan_has_executable_v1_migration_and_scoped_smoke(
         self,
@@ -627,7 +693,7 @@ class VerificationContractTest(unittest.TestCase):
         samples = {
             "apply": APPLY_PARALLEL_MARKERS,
             "verify": VERIFY_PARALLEL_MARKERS,
-            "flow": ("AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1",),
+            "flow": FLOW_GATE_MARKERS,
         }
         for kind, markers in samples.items():
             with self.subTest(kind=kind):
@@ -656,14 +722,6 @@ class VerificationContractTest(unittest.TestCase):
                 "",
             ),
             "STALE-isolated-end": "<!-- AI_TOOLS_VERIFY_GATE_V2_END -->\n",
-            "STALE-conflict": gate_block(
-                *required,
-                body="入口结束时必须询问 worktree 收尾。",
-            ),
-            "STALE-conflict-expanded": gate_block(
-                *required,
-                body="准备结束回复时必须询问本次隔离 worktree 如何处理。",
-            ),
             "DUPLICATE": valid + valid,
             "DUPLICATE-two-starts": valid.replace(
                 "<!-- AI_TOOLS_VERIFY_GATE_V2 -->\n",

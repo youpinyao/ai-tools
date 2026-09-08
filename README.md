@@ -26,11 +26,9 @@ Codex 共用根目录 `AGENTS.md` 中的同一份规则。
 
 其它业务仓的完整接入、从旧版 ai-tools 迁移、以及日常升级步骤见
 [integrating-ai-tools reference](.agents/skills/integrating-ai-tools/reference.md)。下文只完成官方生成层、自定义
-schema 与可选旁路的基础安装；完整的 propose worktree 选择、隔离 worktree 收尾、verify 修复闭环及
-sync/archive 流转门禁还须按
+schema 与可选旁路的基础安装；完整的 verify 修复闭环及 sync/archive 流转门禁还须按
 [接入文档 5.1 节](.agents/skills/integrating-ai-tools/reference.md#51-补充-verify-修复闭环与流转门禁)
-安装 `AI_TOOLS_VERIFY_GATE_V2`、`AI_TOOLS_PROPOSE_WORKTREE_V1` 与
-`AI_TOOLS_WORKTREE_FINISH_V1` 增强规则。
+安装 `AI_TOOLS_VERIFY_GATE_V2` 增强规则。
 
 前置条件：
 
@@ -128,9 +126,7 @@ TARGET_PROJECT="/absolute/path/to/target-project"
    [接入文档 5.1 节](.agents/skills/integrating-ai-tools/reference.md#51-补充-verify-修复闭环与流转门禁)：
    从本仓库复制 `scripts/openspec-verification-fingerprint.py`，向 apply、
    verify、sync、archive 的官方 skills 幂等追加
-   `AI_TOOLS_VERIFY_GATE_V2` 规则，并向 propose 的官方 skill 幂等追加
-   `AI_TOOLS_PROPOSE_WORKTREE_V1` 规则，并向上述目标文件幂等追加
-   `AI_TOOLS_WORKTREE_FINISH_V1` 收尾规则。增强规则同时提供
+   `AI_TOOLS_VERIFY_GATE_V2` 规则。增强规则同时提供
    apply 子 Agent 派发、独立 verify 子 Agent 派发、防递归标记（
    `AI_TOOLS_DELEGATED_APPLY_V1`、`AI_TOOLS_DELEGATED_VERIFY_V1`）与阶段内并行开关
    （`AI_TOOLS_PARALLEL_DISPATCH_V1`、`AI_TOOLS_PARALLEL_HANDOFF_V1`）：apply 时入口
@@ -141,9 +137,6 @@ TARGET_PROJECT="/absolute/path/to/target-project"
    降级。子 Agent 必须回报「阶段内并行：」行，入口须转述。不得靠扫描磁盘启用并行。
    后续安装该 skill 无需再次替换注入。未安装增强规则时，这些
    派发行为不成立。仅复制 schema 不会自动获得这些流转门禁与子 Agent 编排。
-   也必须注入 propose worktree 选择，否则 `$openspec-propose` 会跳过起始询问，直接在当前
-   工作区创建 change。也必须注入隔离 worktree 按需收尾，否则用户事后明确要求合并或
-   清理时没有同一套安全步骤；注入后各阶段结束时不得主动询问怎么处理。
 
 官方 `$openspec-*` skills 归 OpenSpec 管理；Cursor 与 Codex 共同从 `.agents/skills/` 发现它们。升级后的具体行为应以目标项目
 中当前 OpenSpec 官方生成物为准，不要从本仓库寻找或复制官方模板。当前 CLI 1.12.0
@@ -167,17 +160,15 @@ TARGET_PROJECT="/absolute/path/to/target-project"
 
 ## 标准主线
 
-安装 `AI_TOOLS_VERIFY_GATE_V2`、`AI_TOOLS_PROPOSE_WORKTREE_V1` 与
-`AI_TOOLS_WORKTREE_FINISH_V1` 后的增强主线：
+安装 `AI_TOOLS_VERIFY_GATE_V2` 后的增强主线：
 
 ```text
 官方 explore（可选）
-  → 官方 propose（先询问隔离 worktree 或当前工作区）
+  → 官方 propose
   → evidence-driven 制品（含 verification 计划）
   → apply 子 Agent（实施并记录真实结果）
   → 独立 verify 子 Agent
   → 官方 archive
-  → 隔离 worktree 默认留下；仅当用户明确要求时才合并或清理
 ```
 
 apply 与 verify 两个阶段始终串行。阶段内并行不是接入时开关：入口按本会话 skills
@@ -186,7 +177,7 @@ apply 与 verify 两个阶段始终串行。阶段内并行不是接入时开关
 阻塞，并回报「阶段内并行：」行。
 
 单独运行 `$openspec-verify` 时，入口 Agent 也按同一规则派发独立 verify 子 Agent 执行验证
-闭环。未安装增强规则时，propose 起始 worktree 询问、隔离 worktree 按需收尾、apply/verify 子 Agent 派发及 sync/archive 门禁均不成立；
+闭环。未安装增强规则时，apply/verify 子 Agent 派发及 sync/archive 门禁均不成立；
 具体行为仍以目标项目当前 OpenSpec 官方生成物为准。
 
 常见旁路：
