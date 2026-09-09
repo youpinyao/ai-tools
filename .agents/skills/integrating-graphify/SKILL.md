@@ -16,7 +16,7 @@ compatibility: Requires Python 3.10+, uv or pipx, Graphify CLI, and shell access
 
 ## 执行约束
 
-- 不覆盖或删除 ai-tools 的 `AGENTS.md` 中文标记块和 `.agents/skills/openspec-update-change-from-code/`。
+- 不覆盖或删除 `AGENTS.md` 中的 `AI_TOOLS_OPENSPEC_CONVERSATION_CHINESE_V1` 标记块、`openspec/config.yaml` 中的 `AI_TOOLS_OPENSPEC_CHINESE_V1` 标记块和 `.agents/skills/openspec-update-change-from-code/`。
 - 敏感仓库默认收紧提取范围：维护 `.graphifyignore`，优先 `--code-only` 或明确的本地模型后端。
 - 将 `.env`、密钥、证书、客户数据和导出数据排除在图谱之外。
 - 图谱查询只提供调查线索；涉及实现、架构或验证结论时回读源码、OpenSpec 制品和测试。

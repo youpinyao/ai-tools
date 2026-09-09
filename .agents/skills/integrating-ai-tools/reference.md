@@ -18,7 +18,8 @@
 └── ai-tools 自定义层（从本仓库复制或安装）
     ├── openspec/schemas/evidence-driven/
     ├── openspec/config.yaml 中的 schema: evidence-driven
-    ├── AGENTS.md 中的「OpenSpec 中文」标记片段 （可选；Cursor / Codex 共用）
+    ├── AGENTS.md 中的对话级中文标记片段
+    ├── openspec/config.yaml 的 context 中的制品级中文标记片段
     ├── .agents/skills/openspec-update-change-from-code/ （可选；唯一 Skill 源）
     └── scripts/openspec-verification-fingerprint.py   （通用指纹脚本）
 ```
@@ -37,7 +38,7 @@
 - apply 子 Agent 完成实施和首次完整 diff 审查后，再由独立 verify 子 Agent 验证。
 - sync/archive 入口强制复核 Verify 门禁与 V2 范围指纹。
 - 当前不再提供 propose 起始 worktree 选择或隔离 worktree 收尾增强；旧项目升级时必须重建对应官方 skills，确定性移除旧增强块。
-- 可选的简体中文规则与 from-code skill。
+- `AGENTS.md` 约束对话语言，`openspec/config.yaml` 的 `context` 注入制品规则；可选 from-code skill。
 
 ### 1.2 相对旧版 ai-tools，你不再从本仓库获得什么
 
@@ -134,9 +135,13 @@ cp -R \
   "$AI_TOOLS_DIR/openspec/schemas/evidence-driven" \
   openspec/schemas/
 
-# 4) 启用 schema（新建或合并，勿盲目整文件覆盖）
+# 4) 启用 schema 并合并分层中文规则（新建或合并，勿盲目整文件覆盖）
 # openspec/config.yaml 至少包含：
 #   schema: evidence-driven
+#   context 中的 AI_TOOLS_OPENSPEC_CHINESE_V1 标记块
+# 已有 context 时只替换或插入该制品规则标记块。
+# AGENTS.md 插入或替换 AI_TOOLS_OPENSPEC_CONVERSATION_CHINESE_V1 对话规则标记块；
+# 若仍有旧 AI_TOOLS_OPENSPEC_CHINESE_V1 标记块，只删除旧片段，保留文件其余内容。
 
 # 5) 校验
 openspec schema validate evidence-driven
@@ -145,10 +150,6 @@ openspec schema validate evidence-driven
 可选：
 
 ```bash
-# 中文规则：无 AGENTS.md 时直接复制；已有时只合并
-# AI_TOOLS_OPENSPEC_CHINESE_V1_START/END 边界内容，不要整文件覆盖。
-test -e AGENTS.md || cp "$AI_TOOLS_DIR/AGENTS.md" AGENTS.md
-
 # from-code：Cursor / Codex 共用同一份项目 Skill。
 mkdir -p .agents/skills
 rm -rf .agents/skills/openspec-update-change-from-code
@@ -184,8 +185,11 @@ cp -R \
   "$AI_TOOLS_DIR/openspec/schemas/evidence-driven" \
   openspec/schemas/
 
-# 3) 合并配置：只改 schema 字段，保留 context / rules / operations 等项目配置
+# 3) 合并配置：只改 schema 与制品中文 context 标记块，保留其余 context / rules / operations
 # schema: evidence-driven
+# context 中插入或替换 AI_TOOLS_OPENSPEC_CHINESE_V1 标记块
+# AGENTS.md 插入或替换 AI_TOOLS_OPENSPEC_CONVERSATION_CHINESE_V1 标记块
+# 若仍有旧 AI_TOOLS_OPENSPEC_CHINESE_V1 标记块，只删除旧片段，不要删整份文件
 
 # 4) 校验
 openspec schema validate evidence-driven
@@ -558,9 +562,8 @@ cp -R \
 # 4) 确认 config
 # schema: evidence-driven
 
-# 5) 重装共用旁路与中文规则（若仍需要）
-# 已有 AGENTS.md 时只合并本仓库的边界标记片段。
-test -e AGENTS.md || cp "$AI_TOOLS_DIR/AGENTS.md" AGENTS.md
+# 5) 重装共用旁路；同步 AGENTS.md 对话规则与 config.yaml 制品规则（若仍需要）
+# 勿整文件覆盖任一文件；旧 AI_TOOLS_OPENSPEC_CHINESE_V1 AGENTS 片段只删除该片段。
 mkdir -p .agents/skills
 rm -rf .agents/skills/openspec-update-change-from-code
 cp -R "$AI_TOOLS_DIR/.agents/skills/openspec-update-change-from-code" .agents/skills/
@@ -664,8 +667,9 @@ cp -R \
   "$AI_TOOLS_DIR/openspec/schemas/evidence-driven" \
   "$TARGET_PROJECT/openspec/schemas/"
 
-# 按需更新共用中文规则。已有 AGENTS.md 时只替换标记片段。
-test -e "$TARGET_PROJECT/AGENTS.md" || cp "$AI_TOOLS_DIR/AGENTS.md" "$TARGET_PROJECT/AGENTS.md"
+# 把制品规则并入目标 config.yaml 的 context（AI_TOOLS_OPENSPEC_CHINESE_V1）。
+# 把对话规则并入 AGENTS.md（AI_TOOLS_OPENSPEC_CONVERSATION_CHINESE_V1）。
+# 已有标记块时只替换该块；旧 AGENTS 中文块只删除旧片段，保留其余内容。
 
 # Cursor / Codex 共用唯一 from-code Skill。
 mkdir -p "$TARGET_PROJECT/.agents/skills"
@@ -685,7 +689,7 @@ cd "$TARGET_PROJECT"
 openspec schema validate evidence-driven
 ```
 
-**禁止**用本仓库完整 `openspec/config.yaml` 覆盖目标配置；只合并 `schema: evidence-driven`。
+**禁止**用本仓库完整文件覆盖目标配置；`config.yaml` 只合并 `schema: evidence-driven` 与制品规则标记块，`AGENTS.md` 只合并对话规则标记块。
 
 ai-tools 自定义层升级后必须同次复制 V2 范围指纹脚本并重新运行 5.1 节检查器。旧 V1 或缺少当前委派、并行交接、工作者和 `AI_TOOLS_MULTI_IDE_V1` 标记的块均为 `STALE`，必须用当前 A/B/C 节完整块替换。
 

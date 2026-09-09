@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 import os
 import re
 import shutil
@@ -110,6 +111,7 @@ class VerificationContractTest(unittest.TestCase):
         canonical = (
             ROOT / ".agents/skills/openspec-update-change-from-code/SKILL.md",
             ROOT / "AGENTS.md",
+            ROOT / "openspec/config.yaml",
             ROOT / "scripts/openspec-verification-fingerprint.py",
         )
         for path in canonical:
@@ -127,13 +129,81 @@ class VerificationContractTest(unittest.TestCase):
                 self.assertFalse(path.exists())
 
         agents = (ROOT / "AGENTS.md").read_text()
-        self.assertEqual(agents.count("AI_TOOLS_OPENSPEC_CHINESE_V1_START"), 1)
-        self.assertEqual(agents.count("AI_TOOLS_OPENSPEC_CHINESE_V1_END"), 1)
+        self.assertEqual(
+            agents.count("AI_TOOLS_OPENSPEC_CONVERSATION_CHINESE_V1_START"),
+            1,
+        )
+        self.assertEqual(
+            agents.count("AI_TOOLS_OPENSPEC_CONVERSATION_CHINESE_V1_END"),
+            1,
+        )
+        self.assertIn("对话、澄清、进度汇报和总结", agents)
+        self.assertIn("Commit / PR", agents)
+
+        config = (ROOT / "openspec/config.yaml").read_text()
+        self.assertEqual(config.count("AI_TOOLS_OPENSPEC_CHINESE_V1_START"), 1)
+        self.assertEqual(config.count("AI_TOOLS_OPENSPEC_CHINESE_V1_END"), 1)
+        self.assertIn("语言：中文（简体）", config)
+        self.assertNotIn("对话", config)
+        self.assertNotIn("Commit / PR", config)
 
         current = "\n".join(path.read_text() for path in CURRENT_DOCS)
         self.assertIn(".agents/skills/openspec-update-change-from-code", current)
         self.assertIn("scripts/openspec-verification-fingerprint.py", current)
+        self.assertIn("AI_TOOLS_OPENSPEC_CHINESE_V1_START", current)
+        self.assertIn(
+            "AI_TOOLS_OPENSPEC_CONVERSATION_CHINESE_V1_START",
+            current,
+        )
         self.assertNotIn("Cursor 另有斜杠命令", current)
+        self.assertNotIn('cp "$AI_TOOLS_DIR/AGENTS.md"', current)
+
+    def test_openspec_config_context_is_injected_into_artifact_instructions(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory)
+            shutil.copytree(
+                ROOT / "openspec/schemas/evidence-driven",
+                target / "openspec/schemas/evidence-driven",
+            )
+            shutil.copy2(
+                ROOT / "openspec/config.yaml",
+                target / "openspec/config.yaml",
+            )
+            subprocess.run(
+                [
+                    "openspec",
+                    "new",
+                    "change",
+                    "context-contract-smoke",
+                    "--schema",
+                    "evidence-driven",
+                ],
+                cwd=target,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            result = subprocess.run(
+                [
+                    "openspec",
+                    "instructions",
+                    "proposal",
+                    "--change",
+                    "context-contract-smoke",
+                    "--json",
+                ],
+                cwd=target,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        payload = json.loads(result.stdout)
+        context = payload["context"]
+        self.assertIn("AI_TOOLS_OPENSPEC_CHINESE_V1_START", context)
+        self.assertIn("制品正文使用简体中文", context)
 
     def test_openspec_uses_agents_skills_as_the_only_cross_ide_source(self) -> None:
         current = "\n".join(path.read_text() for path in CURRENT_DOCS)

@@ -5,16 +5,18 @@
 OpenSpec 官方 skills 由 OpenSpec 在目标项目的 `.agents/skills/` 生成，作为 Cursor 与
 Codex 共用的唯一来源；不初始化或保留 Cursor commands 与重复 skills。
 
-默认约定：OpenSpec 相关对话与规划产物使用**简体中文**；Cursor 与
-Codex 共用根目录 `AGENTS.md` 中的同一份规则。
+默认约定：OpenSpec 相关对话与规划产物使用**简体中文**。根目录 `AGENTS.md`
+提供对话级约束；`openspec/config.yaml` 的 `context` 由 OpenSpec 注入制品
+instruction，负责制品正文与机器敏感结构。
 
 ## 仓库包含什么
 
 | 内容 | 路径 | 说明 |
 |------|------|------|
 | Schema | `openspec/schemas/evidence-driven/` | 官方 `spec-driven` 的中文派生，增加 `verification` 制品 |
-| 配置 | `openspec/config.yaml` | 默认使用 `schema: evidence-driven` |
-| 中文规则 | `AGENTS.md` | Cursor / Codex 共用的简体中文约定，带幂等合并边界标记 |
+| 配置 | `openspec/config.yaml` | 默认 `schema: evidence-driven`，并以 `context` 注入制品中文规则 |
+| 对话规则 | `AGENTS.md` | 覆盖对话、澄清、进度、总结及 Commit / PR；带独立幂等边界标记 |
+| 制品规则 | `openspec/config.yaml` 的 `context` | 官方制品注入路径；带 `AI_TOOLS_OPENSPEC_CHINESE_V1` 幂等边界标记 |
 | 可选 Skill | `.agents/skills/openspec-update-change-from-code/` | Cursor / Codex 共用的唯一 Agent Skill 源（从代码回写） |
 | 指纹脚本 | `scripts/openspec-verification-fingerprint.py` | 与具体 Agent 无关的 V2 范围指纹工具 |
 | 工作流文档 | [docs/ai-sdd-workflow.md](docs/ai-sdd-workflow.md) | 官方命令场景选择与推荐路径 |
@@ -89,21 +91,27 @@ TARGET_PROJECT="/absolute/path/to/target-project"
      "$TARGET_PROJECT/openspec/schemas/"
    ```
 
-   然后编辑目标项目的 `openspec/config.yaml`：若文件已存在，只合并或设置下面的
-   字段，保留项目原有的其他配置；若文件不存在，再创建它。不要用本仓库的完整
-   `openspec/config.yaml` 盲目覆盖目标配置。
+   然后编辑目标项目的 `openspec/config.yaml`：若文件已存在，只合并 `schema` 与
+   `AI_TOOLS_OPENSPEC_CHINESE_V1` 标记块，保留项目原有的其他配置（含其余
+   `context` / `rules` / `operations`）；若文件不存在，再创建它。不要用本仓库的完整
+   `openspec/config.yaml` 盲目覆盖目标配置。制品规则正文以本仓库
+   `openspec/config.yaml` 的标记块为准。
 
    ```yaml
    schema: evidence-driven
+
+   context: |
+     # AI_TOOLS_OPENSPEC_CHINESE_V1_START
+     语言：中文（简体）
+     ...
+     # AI_TOOLS_OPENSPEC_CHINESE_V1_END
    ```
 
-   中文规则可按需合并到目标项目的 `AGENTS.md`。若目标文件已存在，只替换
-   `AI_TOOLS_OPENSPEC_CHINESE_V1_START/END` 边界内容，不要整文件覆盖：
-
-   ```bash
-   # 新项目可直接复制；已有 AGENTS.md 按边界标记合并
-   test -e "$TARGET_PROJECT/AGENTS.md" || cp "$AI_TOOLS_DIR/AGENTS.md" "$TARGET_PROJECT/AGENTS.md"
-   ```
+   已有 `context` 时，只替换或插入该标记块，不要清空其它上下文。若目标
+   `AGENTS.md` 仍有旧 `AI_TOOLS_OPENSPEC_CHINESE_V1` 标记块，删除该旧片段；
+   同时插入或替换本仓库 `AGENTS.md` 中的
+   `AI_TOOLS_OPENSPEC_CONVERSATION_CHINESE_V1` 标记块。目标已有其它
+   `AGENTS.md` 内容时必须保留，不得整文件覆盖。
 
    from-code Skill 只安装一份到通用 `.agents/skills/`，Cursor 与 Codex 都发现该路径：
 

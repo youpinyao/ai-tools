@@ -16,7 +16,7 @@
 - 不得从目标项目反向复制官方生成物，也不得恢复 Cursor 专属 OpenSpec 副本。
 - 官方 `spec-driven` 语义优先；本地只保留中文化、`evidence-driven`、`verification`、验证门禁和 from-code 等批准差异。
 - 当前版本不再提供旧 worktree 增强；目标项目升级时必须确定性移除 `AI_TOOLS_PROPOSE_WORKTREE_V1`、`AI_TOOLS_WORKTREE_FINISH_V1` 与 `AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1`，不得让结果取决于生成器是否保留追加正文。
-- 已有配置只合并 `schema` 字段；不覆盖无关设置或工作区修改。
+- 已有配置只合并 `schema`、`AGENTS.md` 的对话规则标记块与 `config.yaml` 的制品规则标记块；不覆盖无关设置或工作区修改。
 - 不自动创建 commit。
 
 ## 每次运行的输入与记录
@@ -253,15 +253,17 @@ openspec schema validate evidence-driven
 
 - [ ] **4.1 在临时项目创建 `evidence-driven` 冒烟 change**
 
-将本仓库 `openspec/schemas/evidence-driven/` 复制到临时项目，只合并 `schema: evidence-driven`，然后运行：
+将本仓库 `openspec/schemas/evidence-driven/` 和规范配置复制到临时项目，然后运行：
 
 ```bash
 cd "$UPGRADE_TMP/tools-generated-$TARGET_VERSION"
 mkdir -p openspec/schemas
 cp -R "$AI_TOOLS_DIR/openspec/schemas/evidence-driven" openspec/schemas/
-printf 'schema: evidence-driven\n' > openspec/config.yaml
+cp "$AI_TOOLS_DIR/openspec/config.yaml" openspec/config.yaml
 openspec schema validate evidence-driven
 openspec new change "upgrade-contract-smoke" --schema evidence-driven
+openspec instructions proposal --change "upgrade-contract-smoke" --json |
+  jq -e '.context | contains("AI_TOOLS_OPENSPEC_CHINESE_V1_START")'
 ```
 
 预期：schema 校验和 change 创建均成功。执行前必须设置 `AI_TOOLS_DIR` 为本仓库绝对路径。
@@ -320,6 +322,7 @@ openspec status --change "upgrade-contract-smoke" --json |
 **文件：**
 - 检查或修改：`.gitignore`
 - 检查或修改：`AGENTS.md`
+- 检查或修改：`openspec/config.yaml`
 - 检查或修改：`.agents/skills/integrating-ai-tools/reference.md`
 
 - [ ] **5.1 比较新版生成的共享 Skill 清单**
@@ -343,9 +346,10 @@ done
 
 - [ ] **5.2 核对中文规则覆盖范围**
 
-比较 `AGENTS.md` 中列出的阶段、skill 与 Cursor 与 Codex 共用的 `$openspec-*` Skill 入口是否覆盖新版清单。
+确认 `AGENTS.md` 的对话级规则覆盖所有 OpenSpec 相关交互；再比较
+`openspec/config.yaml` 的制品级规则与新版 artifact 清单，确认正文、状态及机器敏感结构均有明确约束。
 
-预期：规则覆盖新版 OpenSpec 操作及唯一共享入口，同时覆盖共用 `openspec-update-change-from-code` skill。
+预期：对话规则不依赖逐项枚举入口，制品规则覆盖新版 artifact；两层规则同时适用于官方共享 skills 与共用 `openspec-update-change-from-code` skill。
 
 - [ ] **5.3 复核 `AI_TOOLS_VERIFY_GATE_V2` 与 `AI_TOOLS_MULTI_IDE_V1` 追加点**
 
@@ -452,6 +456,9 @@ git ls-files '.cursor/skills/openspec-*' '.cursor/commands/opsx-*' \
 git check-ignore .agents/skills/openspec-apply-change/SKILL.md
 test -f .agents/skills/openspec-update-change-from-code/SKILL.md
 test -f AGENTS.md
+grep -q 'AI_TOOLS_OPENSPEC_CONVERSATION_CHINESE_V1_START' AGENTS.md
+test -f openspec/config.yaml
+grep -q 'AI_TOOLS_OPENSPEC_CHINESE_V1_START' openspec/config.yaml
 test -f scripts/openspec-verification-fingerprint.py
 test ! -e .cursor/commands/opsx-update-change-from-code.md
 test ! -e .cursor/rules/openspec-chinese.mdc

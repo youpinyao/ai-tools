@@ -1,2 +1,14 @@
 # openspec/config.yaml
 schema: evidence-driven
+
+context: |
+  # AI_TOOLS_OPENSPEC_CHINESE_V1_START
+  语言：中文（简体）
+  在 OpenSpec 相关工作中生成的制品必须使用简体中文。
+  - proposal、design、tasks、specs、verification 等 Change 制品正文使用简体中文。
+  - 状态、任务勾选、验证结论和归档说明使用简体中文。
+  - 专有名词、代码标识符、CLI 命令、路径和 schema 名可保留原文。
+  - 新建制品直接用中文撰写，不要先写英文再翻译。
+  - 更新已有英文制品时，按用户意图改为中文，或保持文件既有语言风格并在汇报中说明。
+  - 仅机器解析的 spec 结构标题（如 ADDED Requirements、Requirement、Scenario）和 SHALL/MUST 关键词保留英文；其它制品标题遵循模板语言。
+  # AI_TOOLS_OPENSPEC_CHINESE_V1_END
