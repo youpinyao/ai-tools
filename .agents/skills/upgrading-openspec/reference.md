@@ -353,7 +353,7 @@ done
 
 - [ ] **5.3 复核 `AI_TOOLS_VERIFY_GATE_V2` 与 `AI_TOOLS_MULTI_IDE_V1` 追加点**
 
-阅读新版 apply、verify、sync、archive skills，确认 A/B/C 块仍有有效插入点且不与官方行为冲突。V2 范围指纹接口必须与注入块一致；旧 V1 块标为 `STALE` 并由唯一 V2 完整块替换，不得重复追加。V1-only active change 必须先执行一次 verify，再生成新的范围块、结果块与指纹。
+阅读新版 apply、verify、sync、archive skills，确认 A/B/C 块仍有有效插入点且不与官方行为冲突。apply/verify 块必须包含 `AI_TOOLS_STANDALONE_APPLY_V1` / `AI_TOOLS_STANDALONE_VERIFY_V1` 与 `AI_TOOLS_DISPATCH_FALLBACK_V1`：全新任务直接调用阶段时由当前 Agent 执行；已有流程仍优先派发；仅当子 Agent 尚未开始时派发失败才允许降级，已启动后的失败不得从头重做，verify 降级须记录独立性下降。V2 范围指纹接口必须与注入块一致；旧 V1 块标为 `STALE` 并由唯一 V2 完整块替换，不得重复追加。V1-only active change 必须先执行一次 verify，再生成新的范围块、结果块与指纹。
 
 ## 6. 同步当前维护文档
 

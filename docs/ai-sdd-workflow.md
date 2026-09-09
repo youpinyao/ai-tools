@@ -86,12 +86,12 @@ flowchart TD
     Specs --> Tasks[tasks]
     Design --> Tasks
     Tasks --> VerificationPlan[verification 计划]
-    VerificationPlan --> ApplyLoop[apply 子 Agent]
-    ApplyLoop --> VerifyLoop[独立 verify 子 Agent]
+    VerificationPlan --> ApplyLoop[apply 执行者<br/>全新任务当前执行，否则优先子 Agent]
+    ApplyLoop --> VerifyLoop[verify 执行者<br/>已有流程优先独立子 Agent]
     FromCodeChange --> VerifyLoop
     FromCodeSpec --> SpecDone([main spec 已按代码回写])
     VerifyLoop --> Repairable{阻塞可安全修复且<br/>仍可继续尝试?}
-    Repairable -->|是| RepairInVerify[verify 子 Agent 修复并完整复验]
+    Repairable -->|是| RepairInVerify[verify 执行者修复并完整复验]
     RepairInVerify --> VerifyLoop
     Repairable -->|否| VerifyResult{最终验证结果}
 
@@ -134,12 +134,14 @@ flowchart TD
   之间的制品依赖，要求 `apply` 在 `verification.md` 已存在后实施，并跟踪
   `tasks.md`；紧凑的 `verification.md` 负责保存范围、需求与检查的对应关系、代码
   审查和剩余风险。每轮复验更新原检查行，只保留当前权威证据，不追加完整历史。
-- 安装 `AI_TOOLS_VERIFY_GATE_V2` 后，入口 Agent 负责编排，不直接执行 apply 或 verify
-  主体；apply 子 Agent 成功后才派发独立 verify 子 Agent；单独运行 `$openspec-verify` 时，
-  入口 Agent 同样派发 verify 子 Agent。verify 先确认可解析的 baseline 与 change
+- 安装 `AI_TOOLS_VERIFY_GATE_V2` 后，全新任务直接调用 apply 或 verify 时由当前 Agent
+  执行；已有流程进入 apply 时入口优先派发 apply 子 Agent，成功后才优先派发独立
+  verify 子 Agent。阶段派发只有在子 Agent 尚未开始时失败才由当前 Agent 降级执行；
+  已启动后的失败须先检查状态和已有改动，不得从头重做。verify 派发降级时在
+  `verification.md` 记录独立性下降。verify 先确认可解析的 baseline 与 change
   范围，再执行检查。图中的“仍可继续尝试”表示未达到三轮上限、未连续两轮无进展，
   且不涉及用户决策、权限或凭据、外部服务故障、破坏性操作或范围外修改。满足条件的
-  阻塞由 verify 子 Agent 直接修复并完整复验；每次修改代码后都针对修复后的完整
+  阻塞由 verify 执行者直接修复并完整复验；每次修改代码后都针对修复后的完整
   diff 重新执行代码审查并更新 verification。不能继续修复的问题再按类型回到
   `apply`、`update` 或补充检查。阶段内并行由入口按会话 skills 目录交接
   `dispatching-parallel-agents`：使用唯一有边界的块传递 AVAILABLE 与绝对 Path，

@@ -75,6 +75,8 @@ def fenced_bash(text: str, start: str, end: str) -> str:
 
 APPLY_PARALLEL_MARKERS = (
     "AI_TOOLS_DELEGATED_APPLY_V1",
+    "AI_TOOLS_STANDALONE_APPLY_V1",
+    "AI_TOOLS_DISPATCH_FALLBACK_V1",
     "AI_TOOLS_PARALLEL_DISPATCH_V1",
     "AI_TOOLS_PARALLEL_HANDOFF_V1_START",
     "AI_TOOLS_PARALLEL_HANDOFF_V1_END",
@@ -86,6 +88,8 @@ APPLY_PARALLEL_MARKERS = (
 )
 VERIFY_PARALLEL_MARKERS = (
     "AI_TOOLS_DELEGATED_VERIFY_V1",
+    "AI_TOOLS_STANDALONE_VERIFY_V1",
+    "AI_TOOLS_DISPATCH_FALLBACK_V1",
     "AI_TOOLS_PARALLEL_DISPATCH_V1",
     "AI_TOOLS_PARALLEL_HANDOFF_V1_START",
     "AI_TOOLS_PARALLEL_HANDOFF_V1_END",
@@ -263,6 +267,21 @@ class VerificationContractTest(unittest.TestCase):
             for pattern in required_by_doc[relative_path]:
                 with self.subTest(path=relative_path, pattern=pattern):
                     self.assertRegex(text, re.compile(pattern, re.DOTALL))
+
+    def test_current_docs_define_standalone_and_dispatch_fallback_semantics(
+        self,
+    ) -> None:
+        for path in CURRENT_DOCS:
+            text = path.read_text()
+            relative_path = path.relative_to(ROOT).as_posix()
+            for phrase in (
+                "全新任务",
+                "当前 Agent",
+                "尚未开始",
+                "不得从头重做",
+            ):
+                with self.subTest(path=relative_path, phrase=phrase):
+                    self.assertIn(phrase, text)
 
     def test_current_docs_reject_legacy_workspace_semantics(self) -> None:
         for path in CURRENT_DOCS:
@@ -758,6 +777,43 @@ class VerificationContractTest(unittest.TestCase):
                 with self.subTest(kind=kind, required=required):
                     self.assertIn(required, block)
             self.assertNotIn("且含 `Path:`", block)
+
+    def test_stage_dispatch_supports_standalone_execution_and_safe_fallback(
+        self,
+    ) -> None:
+        text = integration_text()
+        blocks = re.findall(
+            r"(?ms)^<!-- AI_TOOLS_VERIFY_GATE_V2 -->\n"
+            r".*?"
+            r"^<!-- AI_TOOLS_VERIFY_GATE_V2_END -->$",
+            text,
+        )
+        self.assertEqual(len(blocks), 3)
+        apply_block, verify_block, _ = blocks
+
+        for marker, block in (
+            ("AI_TOOLS_STANDALONE_APPLY_V1", apply_block),
+            ("AI_TOOLS_STANDALONE_VERIFY_V1", verify_block),
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, block)
+                self.assertIn("全新任务", block)
+                self.assertIn("当前 Agent 直接执行", block)
+
+        for kind, block in (("apply", apply_block), ("verify", verify_block)):
+            with self.subTest(kind=kind):
+                self.assertIn("AI_TOOLS_DISPATCH_FALLBACK_V1", block)
+                self.assertIn("尚未开始", block)
+                self.assertIn("当前 Agent 降级执行", block)
+                self.assertIn("已经开始", block)
+                self.assertIn("不得从头重做", block)
+
+        self.assertIn("验证独立性：已降级", apply_block)
+        self.assertIn("验证独立性：已降级", verify_block)
+        self.assertIn("所有实施者均尚未开始", apply_block)
+        self.assertIn("已有实施者启动", apply_block)
+        self.assertIn("所有调查者均尚未开始", verify_block)
+        self.assertIn("已有调查者启动", verify_block)
 
     def test_gate_checker_validates_required_markers_inside_each_block(self) -> None:
         samples = {

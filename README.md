@@ -137,9 +137,11 @@ TARGET_PROJECT="/absolute/path/to/target-project"
    `AI_TOOLS_VERIFY_GATE_V2` 规则。增强规则同时提供
    apply 子 Agent 派发、独立 verify 子 Agent 派发、防递归标记（
    `AI_TOOLS_DELEGATED_APPLY_V1`、`AI_TOOLS_DELEGATED_VERIFY_V1`）与阶段内并行开关
-   （`AI_TOOLS_PARALLEL_DISPATCH_V1`、`AI_TOOLS_PARALLEL_HANDOFF_V1`）：apply 时入口
-   Agent 先派发 apply 子 Agent，成功后再派发 verify 子 Agent；用户单独运行
-   `$openspec-verify` 时，入口 Agent 同样派发 verify 子 Agent。入口在自己的会话 skills
+   （`AI_TOOLS_PARALLEL_DISPATCH_V1`、`AI_TOOLS_PARALLEL_HANDOFF_V1`）。全新任务直接
+   调用 apply 或 verify 时由当前 Agent 执行；已有流程进入 apply 时入口优先派发 apply
+   子 Agent，成功后再优先派发独立 verify 子 Agent。阶段派发在子 Agent 尚未开始时
+   失败，可由当前 Agent 降级执行；已启动后的失败须先检查状态和改动，不得从头重做。
+   入口在自己的会话 skills
    目录中查找 `dispatching-parallel-agents`，通过唯一有边界的交接块传递 AVAILABLE
    与绝对 Path，找不到则传递 UNAVAILABLE 并串行；交接或读取失败会阻塞，不得静默
    降级。子 Agent 必须回报「阶段内并行：」行，入口须转述。不得靠扫描磁盘启用并行。
@@ -174,8 +176,8 @@ TARGET_PROJECT="/absolute/path/to/target-project"
 官方 explore（可选）
   → 官方 propose
   → evidence-driven 制品（含 verification 计划）
-  → apply 子 Agent（实施并记录真实结果）
-  → 独立 verify 子 Agent
+  → apply 执行者（全新任务为当前 Agent，否则优先子 Agent）
+  → verify 执行者（已有流程优先独立子 Agent）
   → 官方 archive
 ```
 
@@ -184,8 +186,10 @@ apply 与 verify 两个阶段始终串行。阶段内并行不是接入时开关
 读取后才对独立域派发带身份标记的工作者；目录中没有则显式串行，交接或读取失败则
 阻塞，并回报「阶段内并行：」行。
 
-单独运行 `$openspec-verify` 时，入口 Agent 也按同一规则派发独立 verify 子 Agent 执行验证
-闭环。未安装增强规则时，apply/verify 子 Agent 派发及 sync/archive 门禁均不成立；
+全新任务中单独运行 `$openspec-verify` 时由当前 Agent 直接执行验证闭环；已有流程触发
+verify 时仍优先派发独立 verify 子 Agent。派发在子 Agent 尚未开始时失败才允许降级，
+且 verify 降级须在 `verification.md` 记录独立性下降。未安装增强规则时，apply/verify
+子 Agent 派发及 sync/archive 门禁均不成立；
 具体行为仍以目标项目当前 OpenSpec 官方生成物为准。
 
 常见旁路：
