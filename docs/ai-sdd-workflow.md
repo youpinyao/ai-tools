@@ -148,12 +148,8 @@ flowchart TD
   或传递 UNAVAILABLE 并串行；交接畸形或读取失败会阻塞，不得静默降级。子 Agent
   回报「阶段内并行：」行。后续安装无需再替换注入。自行扫描磁盘上的 `SKILL.md`
   不足以为可用。
-- `sync` 或 `archive` 入口会检查验证状态为通过、阻塞项为无，并复核 V2 范围指纹。
-  范围内变化构成范围内阻断；范围外变化只产生范围外告警。若范围外路径属于
-  当前 change，必须扩展范围并复验。正常 sync 生成的 main spec 未纳入声明范围时，
-  不使 implementation verification 失效；后续没有新增变化时，archive 入口直接复核
-  已有门禁与 V2 范围指纹，不重复实现验证。若要继续实施或改变范围，先通过 `update` 调整
-  受影响制品，再进入 apply。
+- `sync` 或 `archive` 入口只检查 `verification.md` 的结构化结论：验证状态为通过、
+  阻塞项为无。它们不比较验证完成后的代码或证据变化，也不重复实现验证。
 - 未安装增强规则时，以上子 Agent 派发与门禁均不成立；`verify`、`sync`、`archive`
   的具体条件与行为仍以目标项目当前 OpenSpec 官方生成物为准。OpenSpec 1.12.0 官方
   `$openspec-verify` 只输出会话记分卡（Completeness / Correctness / Coherence），不写
@@ -254,8 +250,7 @@ change 再调用 `openspec-update-change-from-code`：该 skill 只更新已有 
 若直接运行 `$openspec-archive`，archive 会在发现 delta specs 尚未同步时提示先同步，
 然后再完成归档。是否需要先执行 `verify`，以及后续何时归档，遵循目标项目当前官方
 生成物。
-安装 V2 门禁后，sync 会复核 V2 范围指纹；同步生成的 main spec 若未纳入声明
-范围，只产生范围外告警，不要求重复实现验证。范围内变化仍构成范围内阻断。
+安装 V2 门禁后，sync 只复核验证状态为通过且阻塞项为无，不重复实现验证。
 
 ## 使用原则
 
@@ -274,7 +269,7 @@ change 再调用 `openspec-update-change-from-code`：该 skill 只更新已有 
 - 实现完成后建议核验。安装 `AI_TOOLS_VERIFY_GATE_V2` 后，apply 与单独
   `$openspec-verify` 均由入口 Agent 派发子 Agent 执行，阶段内并行由入口按会话 skills
   目录以唯一有边界的块交接 `dispatching-parallel-agents`，并通过 Verify 门禁与
-  V2 范围指纹约束 sync/archive；范围内阻断，范围外告警。未安装增强规则时，
+  结构化验证结论约束 sync/archive。未安装增强规则时，
   `verify`、`sync`、`archive` 的具体条件与行为
   遵循目标项目当前 OpenSpec 官方生成物（1.12.0 官方 verify 仅为会话记分卡，官方
   archive 允许确认绕过）。

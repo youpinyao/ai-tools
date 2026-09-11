@@ -353,7 +353,7 @@ done
 
 - [ ] **5.3 复核 `AI_TOOLS_VERIFY_GATE_V2` 与 `AI_TOOLS_MULTI_IDE_V1` 追加点**
 
-阅读新版 apply、verify、sync、archive skills，确认 A/B/C 块仍有有效插入点且不与官方行为冲突。apply/verify 块必须包含 `AI_TOOLS_STANDALONE_APPLY_V1` / `AI_TOOLS_STANDALONE_VERIFY_V1` 与 `AI_TOOLS_DISPATCH_FALLBACK_V1`：全新任务直接调用阶段时由当前 Agent 执行；已有流程仍优先派发；仅当子 Agent 尚未开始时派发失败才允许降级，已启动后的失败不得从头重做，verify 降级须记录独立性下降。V2 范围指纹接口必须与注入块一致；旧 V1 块标为 `STALE` 并由唯一 V2 完整块替换，不得重复追加。V1-only active change 必须先执行一次 verify，再生成新的范围块、结果块与指纹。
+阅读新版 apply、verify、sync、archive skills，确认 A/B/C 块仍有有效插入点且不与官方行为冲突。apply/verify 块必须包含 `AI_TOOLS_STANDALONE_APPLY_V1` / `AI_TOOLS_STANDALONE_VERIFY_V1` 与 `AI_TOOLS_DISPATCH_FALLBACK_V1`：全新任务直接调用阶段时由当前 Agent 执行；已有流程仍优先派发；仅当子 Agent 尚未开始时派发失败才允许降级，已启动后的失败不得从头重做，verify 降级须记录独立性下降。旧 V1 块标为 `STALE` 并由唯一 V2 完整块替换，不得重复追加。V1-only active change 必须先执行一次 verify，再生成新的结果块。
 
 ## 6. 同步当前维护文档
 
@@ -383,12 +383,11 @@ test "$(openspec --version)" = "$TARGET_VERSION"
 
 以新版 CLI help、官方 schema 和临时生成物为证据更新 init/update、propose/apply/verify/sync/archive、schema validate 和 JSON 示例。删除新版不再支持的参数或行为。
 
-- [ ] **6.4 同步范围验证语言**
+- [ ] **6.4 同步验证门禁语言**
 
-当前维护文档必须统一使用“V2 范围指纹”“范围内阻断”“范围外告警”，并说明正常
-sync 生成的 main spec 未纳入声明范围时不强制重复实现验证。搜索
+当前维护文档必须统一说明 sync/archive 只检查状态为通过、阻塞项为无。搜索
 `README.md`、`docs/ai-sdd-workflow.md`、`.agents/skills/integrating-ai-tools/reference.md` 与本计划，
-不得残留旧版 Verify 门禁标记或全工作区指纹表述。历史记录允许保留当时的 V1
+不得残留旧版 Verify 门禁标记或已删除的变化复核表述。历史记录允许保留当时的 V1
 事实，不做批量改写。
 
 - [ ] **6.5 更新架构规格验收基线**
@@ -415,8 +414,8 @@ openspec schema validate evidence-driven
 ```bash
 rg -n 'id: verification|requires: \[verification\]|tracks: tasks\.md' \
   openspec/schemas/evidence-driven/schema.yaml
-python3 -m unittest tests.test_openspec_verification_fingerprint -v
 python3 -m unittest tests.test_openspec_verification_contract -v
+python3 -m unittest tests.test_openspec_verification_state_gate -v
 python3 - <<'PY'
 from pathlib import Path
 
@@ -443,8 +442,8 @@ else
 fi
 ```
 
-预期：schema、V2 脚本接口与契约测试全部通过；紧凑模板严格为四个章节且不超过
-30 行；当前维护文档无旧版 Verify 门禁标记或全工作区指纹表述。若 `SOURCE_VERSION` 与
+预期：schema 与契约测试全部通过；紧凑模板严格为四个章节且不超过
+30 行；当前维护文档无旧版 Verify 门禁标记或已删除的变化复核表述。若 `SOURCE_VERSION` 与
 `TARGET_VERSION` 不同，最后一组在当前维护文档中无命中；若版本相同，则人工核对
 命中上下文是否准确。
 
@@ -459,10 +458,8 @@ test -f AGENTS.md
 grep -q 'AI_TOOLS_OPENSPEC_CONVERSATION_CHINESE_V1_START' AGENTS.md
 test -f openspec/config.yaml
 grep -q 'AI_TOOLS_OPENSPEC_CHINESE_V1_START' openspec/config.yaml
-test -f scripts/openspec-verification-fingerprint.py
 test ! -e .cursor/commands/opsx-update-change-from-code.md
 test ! -e .cursor/rules/openspec-chinese.mdc
-test ! -e .cursor/scripts/openspec-verification-fingerprint.py
 test ! -e .cursor/skills/openspec-update-change-from-code
 if git check-ignore -q .agents/skills/openspec-update-change-from-code/SKILL.md; then
   echo "错误：from-code skill 不应被忽略" >&2
@@ -537,8 +534,9 @@ done
 
 只覆盖目标项目的 `openspec/schemas/evidence-driven/`，合并 `openspec/config.yaml`
 中的 `schema: evidence-driven`，再按更新后的接入文档补齐缺失的规则。先运行接入文档
-5.1 节检查器；对报告为 `STALE (V1-only gate)` 的文件，用对应 A/B/C 节的 V2 完整块
-原位替换旧块，禁止在旧块后追加。替换后直接运行以下断言：
+5.1 节检查器；对所有 `STALE` 文件，用对应 A/B/C 节的当前 V2 完整块原位替换旧块，
+包括 V1-only 门禁和缺少 `AI_TOOLS_STATE_GATE_V1` 的旧 V2 指纹块；禁止在旧块后追加。
+替换后直接运行以下断言：
 
 ```bash
 set -euo pipefail
@@ -557,6 +555,11 @@ TARGET_PROJECT="$REPRESENTATIVE_TARGET_PROJECT"
 TARGET_PROJECT="$(cd "$TARGET_PROJECT" && pwd -P)"
 RUN_DIR="$(cd "$RUN_DIR" && pwd -P)"
 cd "$TARGET_PROJECT"
+
+# 删除旧版本曾安装的两个指纹脚本位置；不影响 scripts/ 中其它工具。
+rm -f -- \
+  "$TARGET_PROJECT/scripts/openspec-verification-fingerprint.py" \
+  "$TARGET_PROJECT/.cursor/scripts/openspec-verification-fingerprint.py"
 
 # 检查 `.agents/skills/` 中这 4 个 Verify 门禁文件。
 GATE_FILES=(
@@ -579,28 +582,32 @@ for name in sys.argv[1:]:
         raise SystemExit("{} must contain one V2 start".format(name))
     if text.count(end) != 1:
         raise SystemExit("{} must contain one V2 end".format(name))
+    block = text.split(start, 1)[1].split(end, 1)[0]
+    if "AI_TOOLS_STATE_GATE_V1" not in block:
+        raise SystemExit("{} still contains a legacy fingerprint gate".format(name))
 PY
 
-V1_ACTIVE_REPORT="$RUN_DIR/v1-active-changes.txt"
-V1_ACTIVE_PATTERN='AI_TOOLS_VERIFICATION_(SCOPE|RESULT)_V[1]_(START|END)'
-: > "$V1_ACTIVE_REPORT"
+LEGACY_VERIFICATION_REPORT="$RUN_DIR/legacy-verification-changes.txt"
+LEGACY_VERIFICATION_PATTERN='AI_TOOLS_VERIFICATION_SCOPE_V[12]_(START|END)|范围摘要：|内容指纹：|AI_TOOLS_VERIFICATION_RESULT_V1_(START|END)'
+: > "$LEGACY_VERIFICATION_REPORT"
 for verification in openspec/changes/*/verification.md; do
   test -f "$verification" || continue
-  if rg -q "$V1_ACTIVE_PATTERN" "$verification"; then
-    printf '%s\n' "$verification" >> "$V1_ACTIVE_REPORT"
+  if rg -q "$LEGACY_VERIFICATION_PATTERN" "$verification"; then
+    printf '%s\n' "$verification" >> "$LEGACY_VERIFICATION_REPORT"
   fi
 done
-test ! -s "$V1_ACTIVE_REPORT" || {
-  echo "以下 active change 必须逐个运行 $openspec-verify 后才能继续："
-  command cat "$V1_ACTIVE_REPORT"
+test ! -s "$LEGACY_VERIFICATION_REPORT" || {
+  echo '以下 active change 含旧验证结构，必须逐个运行 $openspec-verify 后才能继续：'
+  command cat "$LEGACY_VERIFICATION_REPORT"
   exit 1
 }
 ```
 
-预期：目标项目自有配置未被整文件覆盖；V2 范围指纹脚本已复制并通过语法检查；
-每个目标文件中 `AI_TOOLS_VERIFY_GATE_V2` 完整块恰好一个。旧 V1 块必须替换而不是
-重复追加；若 active change 只有 V1 结果，先执行一次 verify 迁移到 V2，不得自动
-沿用旧通过状态。第一次运行可能因 `$V1_ACTIVE_REPORT` 非空而退出 1；逐个完成 verify
+预期：目标项目自有配置未被整文件覆盖；每个目标文件中
+`AI_TOOLS_VERIFY_GATE_V2` 完整块恰好一个。旧 V1 块必须替换而不是
+重复追加；若 active change 含 V1 结果、V1/V2 范围块或旧摘要字段，先执行一次 verify
+清理并生成当前结果块，不得自动沿用旧通过状态。第一次运行可能因
+`$LEGACY_VERIFICATION_REPORT` 非空而退出 1；逐个完成 verify
 后重跑必须退出 0，报告为空。该独立片段全程启用 `set -euo pipefail`；目标项目、
 运行记录目录、任一目标文件或 V2 块断言失败都会立即以非零退出，不得继续执行并被
 末尾命令掩盖。
@@ -622,152 +629,6 @@ openspec validate "openspec-upgrade-smoke" --type change --strict
 - change 可创建并产生新版预期的制品图；
 - status 和 apply instructions 能解析；
 - 未填写制品时 strict validate 应返回明确的未完成错误，而不是崩溃或 schema 解析错误。
-
-然后执行以下可重复的范围指纹冒烟。目录由 `mktemp` 建在仓库外；脚本使用目标项目
-8.3 已复制的版本，结束时由 `trap` 清理：
-
-```bash
-set -euo pipefail
-
-: "${AI_TOOLS_DIR:?先执行“每次运行的输入与记录”初始化}"
-: "${REPRESENTATIVE_TARGET_PROJECT:?设置为 8.1 已选代表性目标项目的绝对路径}"
-case "$AI_TOOLS_DIR" in
-  /*) ;;
-  *) echo "AI_TOOLS_DIR 必须是绝对路径" >&2; exit 1 ;;
-esac
-case "$REPRESENTATIVE_TARGET_PROJECT" in
-  /*) ;;
-  *) echo "REPRESENTATIVE_TARGET_PROJECT 必须是绝对路径" >&2; exit 1 ;;
-esac
-AI_TOOLS_DIR="$(cd "$AI_TOOLS_DIR" && pwd -P)"
-TARGET_PROJECT="$REPRESENTATIVE_TARGET_PROJECT"
-TARGET_PROJECT="$(cd "$TARGET_PROJECT" && pwd -P)"
-FINGERPRINT_SCRIPT="$TARGET_PROJECT/scripts/openspec-verification-fingerprint.py"
-test -f "$FINGERPRINT_SCRIPT"
-
-SCOPED_SMOKE="$(mktemp -d "${TMPDIR:-/tmp}/ai-tools-scoped-smoke.XXXXXX")"
-trap 'rm -rf "$SCOPED_SMOKE"' EXIT
-SCOPED_SMOKE="$(cd "$SCOPED_SMOKE" && pwd -P)"
-case "$SCOPED_SMOKE" in
-  "$AI_TOOLS_DIR"|"$AI_TOOLS_DIR"/*|"$TARGET_PROJECT"|"$TARGET_PROJECT"/*)
-    echo "临时项目必须位于 ai-tools 和目标项目之外" >&2
-    exit 1
-    ;;
-esac
-
-git -C "$SCOPED_SMOKE" init -q
-mkdir -p \
-  "$SCOPED_SMOKE/src" \
-  "$SCOPED_SMOKE/openspec/changes/scoped-smoke"
-printf 'VALUE = 1\n' > "$SCOPED_SMOKE/src/app.py"
-printf 'baseline\n' > "$SCOPED_SMOKE/notes.md"
-git -C "$SCOPED_SMOKE" add src/app.py notes.md
-git -C "$SCOPED_SMOKE" \
-  -c user.name='OpenSpec Smoke' \
-  -c user.email='openspec-smoke@example.invalid' \
-  commit -qm 'baseline'
-BASELINE="$(git -C "$SCOPED_SMOKE" rev-parse HEAD)"
-VERIFICATION="$SCOPED_SMOKE/openspec/changes/scoped-smoke/verification.md"
-
-cat > "$VERIFICATION" <<EOF
-## 范围
-<!-- AI_TOOLS_VERIFICATION_SCOPE_V2_START -->
-baseline: $BASELINE
-include:
-- src/
-- openspec/changes/scoped-smoke/
-exclude:
-- none
-<!-- AI_TOOLS_VERIFICATION_SCOPE_V2_END -->
-## 检查
-- smoke | command | PASS | 初始范围指纹
-## 代码审查
-- 范围：src/ 与当前 change
-- 结论：PASS
-## 风险与回滚
-- 风险：无
-- 回滚：删除临时目录
-<!-- AI_TOOLS_VERIFICATION_RESULT_V2_START -->
-## Verify 门禁
-- 状态：通过
-- 阻塞项：无
-- 范围摘要：PENDING_SCOPE
-- 内容指纹：PENDING_CONTENT
-<!-- AI_TOOLS_VERIFICATION_RESULT_V2_END -->
-EOF
-
-run_fingerprint() {
-  (
-    cd "$SCOPED_SMOKE"
-    python3 "$FINGERPRINT_SCRIPT" "$VERIFICATION"
-  )
-}
-value_of() {
-  printf '%s\n' "$1" | awk -F= -v key="$2" '$1 == key {print $2; exit}'
-}
-
-baseline_output="$(run_fingerprint)"
-baseline_exit=$?
-test "$baseline_exit" -eq 0
-scope_digest="$(value_of "$baseline_output" scope_digest)"
-content_digest="$(value_of "$baseline_output" content_digest)"
-test -n "$scope_digest"
-test -n "$content_digest"
-
-python3 - "$VERIFICATION" "$scope_digest" "$content_digest" <<'PY'
-from pathlib import Path
-import sys
-
-path = Path(sys.argv[1])
-text = path.read_text()
-text = text.replace("PENDING_SCOPE", sys.argv[2])
-text = text.replace("PENDING_CONTENT", sys.argv[3])
-path.write_text(text)
-PY
-
-check_gate() {
-  output="$(run_fingerprint)" || return
-  printf '%s\n' "$output"
-  actual_scope="$(value_of "$output" scope_digest)"
-  actual_content="$(value_of "$output" content_digest)"
-  test "$actual_scope" = "$scope_digest"
-  test "$actual_content" = "$content_digest"
-}
-
-printf 'outside\n' >> "$SCOPED_SMOKE/notes.md"
-outside_output="$(check_gate 2>&1)"
-outside_exit=$?
-test "$outside_exit" -eq 0
-outside_scope_digest="$(value_of "$outside_output" scope_digest)"
-outside_content_digest="$(value_of "$outside_output" content_digest)"
-test "$outside_scope_digest" = "$scope_digest"
-test "$outside_content_digest" = "$content_digest"
-test "$(value_of "$outside_output" outside_changes)" -eq 1
-test "$(value_of "$outside_output" outside_path)" = "notes.md"
-
-printf 'VALUE = 2\n' > "$SCOPED_SMOKE/src/app.py"
-set +e
-inside_output="$(check_gate 2>&1)"
-inside_exit=$?
-set -e
-inside_scope_digest="$(value_of "$inside_output" scope_digest)"
-inside_content_digest="$(value_of "$inside_output" content_digest)"
-test -n "$inside_scope_digest"
-test -n "$inside_content_digest"
-test "$inside_scope_digest" = "$scope_digest"
-test "$inside_content_digest" != "$content_digest"
-test "$inside_exit" -ne 0
-
-rm -rf "$SCOPED_SMOKE"
-trap - EXIT
-```
-
-预期：初始化、baseline commit 和首次脚本调用均退出 0。只修改 `notes.md` 时
-`outside_exit=0`，范围摘要与内容指纹均不变，并输出一个 `outside_path=notes.md`
-告警；修改 `src/app.py` 后内容指纹变化，`check_gate` 因摘要不匹配而使
-`inside_exit` 非 0，表示范围内阻断。除该预期失败调用外，`set -euo pipefail`
-保持启用，任一变量、目录边界、Git commit、首次指纹或摘要断言失败都会立即停止。
-最后只删除本步骤创建的仓库外临时目录。
 
 - [ ] **8.5 清理冒烟 change**
 
@@ -820,8 +681,8 @@ git diff -- README.md docs/ openspec/ .cursor/ .agents/skills/ spec/
 - [ ] `openspec schema validate evidence-driven` 通过。
 - [ ] from-code skill 依赖的 CLI 命令、JSON 字段和 archive 定位已验证或完成适配。
 - [ ] `.gitignore`、中文规则和接入门禁与新版官方生成物一致。
-- [ ] V2 范围指纹脚本接口、单元测试及紧凑模板四章节/30 行预算全部通过。
-- [ ] 当前维护文档已统一为范围内阻断、范围外告警且无 V1 Verify 门禁；历史计划仍保留其原始版本事实。
-- [ ] 至少一个隔离的目标项目完成 update、schema 校验、V1 → V2 替换及范围内/范围外冒烟测试。
+- [ ] 结构化验证门禁、单元测试及紧凑模板四章节/30 行预算全部通过。
+- [ ] 当前维护文档已统一为状态/阻塞项门禁且无 V1 Verify 门禁；历史计划仍保留其原始版本事实。
+- [ ] 至少一个隔离的目标项目完成 update、schema 校验、旧验证结构清理及状态门禁冒烟测试。
 - [ ] 完整 diff 已审查，未处理的 Critical 或 Important 为零。
 - [ ] `$RUN_LOG` 包含真实执行证据、未执行项和剩余风险。

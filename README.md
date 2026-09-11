@@ -18,7 +18,6 @@ instruction，负责制品正文与机器敏感结构。
 | 对话规则 | `AGENTS.md` | 覆盖对话、澄清、进度、总结及 Commit / PR；带独立幂等边界标记 |
 | 制品规则 | `openspec/config.yaml` 的 `context` | 官方制品注入路径；带 `AI_TOOLS_OPENSPEC_CHINESE_V1` 幂等边界标记 |
 | 可选 Skill | `.agents/skills/openspec-update-change-from-code/` | Cursor / Codex 共用的唯一 Agent Skill 源（从代码回写） |
-| 指纹脚本 | `scripts/openspec-verification-fingerprint.py` | 与具体 Agent 无关的 V2 范围指纹工具 |
 | 工作流文档 | [docs/ai-sdd-workflow.md](docs/ai-sdd-workflow.md) | 官方命令场景选择与推荐路径 |
 | 接入与迁移 | [integrating-ai-tools](.agents/skills/integrating-ai-tools/reference.md) | 其它项目从官方 OpenSpec 或旧版 ai-tools 接入/升级 |
 | 升级维护 | [upgrading-openspec](.agents/skills/upgrading-openspec/reference.md) | OpenSpec 版本升级与语义复核清单 |
@@ -36,7 +35,6 @@ schema 与可选旁路的基础安装；完整的 verify 修复闭环及 sync/ar
 
 - Node.js ≥ 20.19.0，并可使用 npm 安装 OpenSpec CLI。
 - 支持 [Agent Skills](https://agentskills.io) 的 AI 编程助手（默认 Cursor、Codex）。
-- 若安装完整验证闭环，还需 Python 3.8+ 计算确定性 V2 范围指纹。
 
 以下命令中的 `AI_TOOLS_DIR` 是本仓库的绝对路径，`TARGET_PROJECT` 是目标项目的
 绝对路径：
@@ -132,8 +130,7 @@ TARGET_PROJECT="/absolute/path/to/target-project"
 
 5. 要完成当前 ai-tools 接入，必须继续执行
    [接入文档 5.1 节](.agents/skills/integrating-ai-tools/reference.md#51-补充-verify-修复闭环与流转门禁)：
-   从本仓库复制 `scripts/openspec-verification-fingerprint.py`，向 apply、
-   verify、sync、archive 的官方 skills 幂等追加
+   向 apply、verify、sync、archive 的官方 skills 幂等追加
    `AI_TOOLS_VERIFY_GATE_V2` 规则。增强规则同时提供
    apply 子 Agent 派发、独立 verify 子 Agent 派发、防递归标记（
    `AI_TOOLS_DELEGATED_APPLY_V1`、`AI_TOOLS_DELEGATED_VERIFY_V1`）与阶段内并行开关
@@ -235,9 +232,8 @@ verify、archive 与 sync 的具体行为以当前 OpenSpec 官方生成物为�
 - 官方 `$openspec-verify` 只在会话中输出 Completeness / Correctness / Coherence
   记分卡，不写 `verification.md`。官方 `$openspec-archive` 对未完成制品或任务仅警告
   并允许确认继续。项目级 `AI_TOOLS_VERIFY_GATE_V2` 是额外门禁，不是 OpenSpec
-  官方行为。该门禁使用 V2 范围指纹：范围内变化构成范围内阻断并使旧结果失效，
-  范围外变化只产生范围外告警；若范围外路径实际属于 change，必须扩展范围并复验。正常
-  `$openspec-sync` 生成的 main spec 未纳入声明范围时，不强制重复实现验证。
+  官方行为。该门禁只读取 `verification.md` 中当前的结构化结论：状态必须为“通过”，
+  阻塞项必须为“无”。
 
 后续升级 OpenSpec 时，应从当前官方 `spec-driven` 基线重新核对这些语义，而不是
 永久假定 1.12.0 的实现细节。

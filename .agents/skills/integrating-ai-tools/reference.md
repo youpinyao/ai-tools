@@ -21,13 +21,12 @@
     ├── AGENTS.md 中的对话级中文标记片段
     ├── openspec/config.yaml 的 context 中的制品级中文标记片段
     ├── .agents/skills/openspec-update-change-from-code/ （可选；唯一 Skill 源）
-    └── scripts/openspec-verification-fingerprint.py   （通用指纹脚本）
 ```
 
 | 层级 | 谁维护 | 内容 |
 |------|--------|------|
 | 官方生成层 | OpenSpec CLI | explore / propose / update / apply / verify / archive / sync |
-| 自定义层 | ai-tools | `evidence-driven`、验证闭环与流转门禁、V2 范围指纹、中文规则、from-code |
+| 自定义层 | ai-tools | `evidence-driven`、验证闭环与流转门禁、中文规则、from-code |
 
 **不要**初始化或保留 `.cursor/commands/opsx-*` 与 `.cursor/skills/openspec-*`。应由 `openspec init --tools codex` / `openspec update` 在 `.agents/skills/` 生成唯一官方层，再按本文向 apply、verify、sync、archive skills 追加项目规则。
 
@@ -36,7 +35,7 @@
 - 默认 schema：`evidence-driven`，并增加持久化的 `verification.md`。
 - `tasks → verification`，且 `apply` 依赖 `verification`。
 - apply 子 Agent 完成实施和首次完整 diff 审查后，再由独立 verify 子 Agent 验证。
-- sync/archive 入口强制复核 Verify 门禁与 V2 范围指纹。
+- sync/archive 入口强制复核 Verify 门禁。
 - 当前不再提供 propose 起始 worktree 选择或隔离 worktree 收尾增强；旧项目升级时必须重建对应官方 skills，确定性移除旧增强块。
 - `AGENTS.md` 约束对话语言，`openspec/config.yaml` 的 `context` 注入制品规则；可选 from-code skill。
 
@@ -52,7 +51,6 @@
 ## 2. 前置条件
 
 - Node.js 满足 OpenSpec CLI 要求（官方要求 Node.js ≥ 20.19.0）。
-- Python 3.8+（用于计算 verify、sync、archive 共用的确定性 V2 范围指纹）。
 - 支持从 `.agents/skills/` 发现 [Agent Skills](https://agentskills.io) 的 Cursor 或 Codex。统一运行 `openspec init --tools codex`，两种助手共享生成的 skills，不创建 Cursor command。
 - 能在目标项目根目录执行 shell。
 
@@ -201,23 +199,7 @@ openspec schema validate evidence-driven
 
 目标文件合计 **4** 个，全部位于 `.agents/skills/openspec-*`。Cursor 与 Codex 发现同一份 Skill，不存在 skill 双入口或跨目录副本。
 
-apply、verify、sync、archive 先执行官方 Store selection 与 **Steps** 第 1 步以选定 change，再在第 2 步之前放置 A/B/C 块。V2 范围指纹脚本放在项目 `scripts/`，两种助手都执行同一路径，不要按 IDE 再复制一份。
-
-#### V2 范围指纹脚本
-
-从 ai-tools 同次复制脚本与升级注入块，不再把脚本源码内嵌到业务仓文档：
-
-```bash
-mkdir -p "$TARGET_PROJECT/scripts"
-cp "$AI_TOOLS_DIR/scripts/openspec-verification-fingerprint.py" \
-  "$TARGET_PROJECT/scripts/openspec-verification-fingerprint.py"
-
-# 无副作用语法解析检查；不会生成 __pycache__
-python3 -c 'import ast, pathlib, sys; ast.parse(pathlib.Path(sys.argv[1]).read_text())' \
-  "$TARGET_PROJECT/scripts/openspec-verification-fingerprint.py"
-```
-
-脚本版本与 `AI_TOOLS_VERIFY_GATE_V2` 注入块必须同次升级。V2 范围指纹只对范围块声明的路径计算内容指纹；范围内变化构成范围内阻断并使旧结果失效，范围外变化由 `outside_path` 输出为范围外告警，不会把指纹扩大到声明范围之外。若范围外路径实际属于当前 change，必须扩展范围并复验。
+apply、verify、sync、archive 先执行官方 Store selection 与 **Steps** 第 1 步以选定 change，再在第 2 步之前放置 A/B/C 块。
 
 #### A. Apply：直接执行、派发实施与验证
 
@@ -231,7 +213,9 @@ python3 -c 'import ast, pathlib, sys; ast.parse(pathlib.Path(sys.argv[1]).read_t
 <!-- AI_TOOLS_VERIFY_GATE_V2 -->
 ## Apply 直接执行、子 Agent 实施与强制验证
 
-若当前会话已按本节派发过 apply 子 Agent，本节视为已执行，不得因 command 与 skill 同处一个上下文而重复派发。入口 Agent 负责等待已启动的阶段子 Agent、必要时按下方规则降级、检查 Verify 门禁和范围指纹。官方 apply 在 `state: "all_done"` 或任务全部完成后会建议 `$openspec-archive`；在 Verify 门禁通过前，不得按该官方文案建议 sync 或 archive。
+本块使用状态门禁（`AI_TOOLS_STATE_GATE_V1`）。
+
+若当前会话已按本节派发过 apply 子 Agent，本节视为已执行，不得因 command 与 skill 同处一个上下文而重复派发。入口 Agent 负责等待已启动的阶段子 Agent、必要时按下方规则降级并检查 Verify 门禁。官方 apply 在 `state: "all_done"` 或任务全部完成后会建议 `$openspec-archive`；在 Verify 门禁通过前，不得按该官方文案建议 sync 或 archive。
 
 “全新任务”（`AI_TOOLS_STANDALONE_APPLY_V1`）必须同时满足：当前 Agent 不是由其它 Agent 创建，用户在本任务首个实质请求中直接调用 apply，且此前未在本任务中为该 change 执行 propose、update、apply 或 verify。不得用上下文长短、模型猜测或是否刚读取 skill 代替这三个条件。满足时由当前 Agent 直接执行官方 apply 主体；不满足且没有委派/工作者标记时，才作为已有流程的入口编排者。
 
@@ -242,7 +226,7 @@ python3 -c 'import ast, pathlib, sys; ast.parse(pathlib.Path(sys.argv[1]).read_t
 1. 若提示文本显式包含 `AI_TOOLS_WORKER_APPLY_V1`，当前 Agent 是 apply 实施者，不是入口也不是 apply 阶段子 Agent：
    - 只实施任务给出的独立 task 域和拟改路径；
    - 不得派发 apply / verify 阶段子 Agent，不得再派实施者或调查者；
-   - 不得勾选 `tasks.md`，不得写 `verification.md`、门禁块或计算指纹；
+   - 不得勾选 `tasks.md`，不得写 `verification.md` 或门禁块；
    - 不得执行 git add、commit、stash 或其它索引 / HEAD 写入；
    - 即使提示中还出现 `AI_TOOLS_DELEGATED_APPLY_V1` 或 `AI_TOOLS_DELEGATED_VERIFY_V1`，仍按实施者执行；
    - 完成后把结果或阻塞返回 apply 子 Agent，不得向用户提问。
@@ -282,10 +266,9 @@ python3 -c 'import ast, pathlib, sys; ast.parse(pathlib.Path(sys.argv[1]).read_t
      ```
    - apply 派发在子 Agent 尚未开始时失败，则当前 Agent 降级执行官方 apply 主体和首次完整 diff 代码审查；若子 Agent 已经开始或可能已修改文件，则按上方安全规则检查并接续，无法确认时停止。apply 子 Agent 返回失败或阻塞时不得启动 verify。其成功返回中的「阶段内并行：」行必须转述给用户，不得省略。
    - apply 成功后派发另一个独立 verify 子 Agent，在任务中加入 `AI_TOOLS_DELEGATED_VERIFY_V1`，要求其使用 `openspec-verify-change` skill 执行 verify。并行交接按同一规则再做一次（查找会话 skills 目录 → 写入 AVAILABLE+Path 或 UNAVAILABLE）。verify 派发在子 Agent 尚未开始时失败，则当前 Agent 降级执行 verify，并在 `verification.md` 的代码审查结论后记录 `验证独立性：已降级（<派发失败原因>）`。
-   - 等待 verify 子 Agent 返回，转述其「阶段内并行：」行，再检查唯一 V2 范围块、结果块及当前范围指纹。
-5. apply 执行者不计算摘要；其仍须对完整实现 diff 做首次代码审查。verify 完成后，当前入口读取恰好一个 `AI_TOOLS_VERIFICATION_SCOPE_V2_START` 范围块和一个 `AI_TOOLS_VERIFICATION_RESULT_V2_START` 结果块，运行 `python3 scripts/openspec-verification-fingerprint.py "<当前 change 的 verification.md 路径>"`，并将输出的 `scope_digest`、`content_digest` 分别与“范围摘要”“内容指纹”比较。
-6. 仅当状态为“通过”、阻塞项为“无”、两个摘要一致且脚本成功时，当前入口才可结束 apply 并建议 sync 或 archive。范围内变化、状态阻塞、摘要不匹配、脚本失败或 verify 执行失败均阻止完成；change 保持 active，必须报告具体原因，且不得建议 sync 或 archive。
-7. `outside_changes` 大于 0 时逐项汇报 `outside_path`，但范围外变化只告警，不改变通过状态；若入口判断某路径属于当前 change，则停止完成、扩展范围并复验。
+   - 等待 verify 子 Agent 返回，转述其「阶段内并行：」行，再检查唯一结果块。
+5. apply 执行者仍须对完整实现 diff 做首次代码审查。verify 完成后，当前入口读取恰好一个 `AI_TOOLS_VERIFICATION_RESULT_V2_START` 结果块。
+6. 仅当状态为“通过”、阻塞项为“无”时，当前入口才可结束 apply 并建议 sync 或 archive。状态阻塞或 verify 执行失败均阻止完成；change 保持 active，必须报告具体原因，且不得建议 sync 或 archive。
 <!-- AI_TOOLS_VERIFY_GATE_V2_END -->
 ```
 
@@ -295,13 +278,15 @@ python3 -c 'import ast, pathlib, sys; ast.parse(pathlib.Path(sys.argv[1]).read_t
 
 - `.agents/skills/openspec-verify-change/SKILL.md`
 
-插入位置：官方 Store selection 和 **Steps** 第 1 步（Select the change）之后、第 2 步（Check status to understand the schema）之前。1.12.0 官方 verify 只在会话中输出 Completeness / Correctness / Coherence 记分卡，不写 `verification.md`、不修复、不算指纹；官方「Ready for archive」不是本项目持久化门禁，不得替代下方闭环。
+插入位置：官方 Store selection 和 **Steps** 第 1 步（Select the change）之后、第 2 步（Check status to understand the schema）之前。1.12.0 官方 verify 只在会话中输出 Completeness / Correctness / Coherence 记分卡，不写 `verification.md`、不修复；官方「Ready for archive」不是本项目持久化门禁，不得替代下方闭环。
 
 ```markdown
 <!-- AI_TOOLS_VERIFY_GATE_V2 -->
 ## Verify 入口编排与验证阻塞修复闭环
 
-若当前会话已派发过 verify 子 Agent（无论由本节还是 Apply 节触发），本节视为已执行，不得因 command 与 skill 同处一个上下文而重复派发。入口 Agent 只等待该子 Agent 并读取、汇报最终门禁，不得执行官方 verify 主体。官方 verify 的会话记分卡（CRITICAL / WARNING / SUGGESTION）和「Ready for archive」文案不是本项目硬门禁，不得替代下方闭环；必须写入 `verification.md` 并计算指纹。
+本块使用状态门禁（`AI_TOOLS_STATE_GATE_V1`）。
+
+若当前会话已派发过 verify 子 Agent（无论由本节还是 Apply 节触发），本节视为已执行，不得因 command 与 skill 同处一个上下文而重复派发。入口 Agent 只等待该子 Agent并读取、汇报最终门禁，不得执行官方 verify 主体。官方 verify 的会话记分卡（CRITICAL / WARNING / SUGGESTION）和「Ready for archive」文案不是本项目硬门禁，不得替代下方闭环；必须写入 `verification.md`。
 
 “全新任务”（`AI_TOOLS_STANDALONE_VERIFY_V1`）必须同时满足：当前 Agent 不是由其它 Agent 创建，用户在本任务首个实质请求中直接调用 verify，且此前未在本任务中为该 change 执行 propose、update、apply 或 verify。不得用上下文长短、模型猜测或是否刚读取 skill 代替这三个条件。满足时由当前 Agent 直接执行完整验证闭环；不满足且没有委派/工作者标记时，才作为已有流程的入口编排者。
 
@@ -312,7 +297,7 @@ python3 -c 'import ast, pathlib, sys; ast.parse(pathlib.Path(sys.argv[1]).read_t
 1. 若提示文本显式包含 `AI_TOOLS_WORKER_VERIFY_V1`，当前 Agent 是 verify 调查者，不是入口也不是 verify 阶段子 Agent：
    - 只做任务给出的独立失败域或只读检查域；
    - 不得派发 apply / verify 阶段子 Agent，不得再派实施者或调查者；
-   - 不得写 `verification.md`、门禁块或计算指纹；
+   - 不得写 `verification.md` 或门禁块；
    - 不得执行 git add、commit、stash 或其它索引 / HEAD 写入；
    - 即使提示中还出现 `AI_TOOLS_DELEGATED_APPLY_V1` 或 `AI_TOOLS_DELEGATED_VERIFY_V1`，仍按调查者执行；
    - 完成后把结果或阻塞返回 verify 子 Agent，不得向用户提问。
@@ -324,7 +309,7 @@ python3 -c 'import ast, pathlib, sys; ast.parse(pathlib.Path(sys.argv[1]).read_t
    - 交接无效时不得执行官方 verify 主体、不得自行查找 skill、不得降级串行；立即返回 `阶段内并行：交接无效（<具体原因>）` 并阻塞本阶段。
    - AVAILABLE 时必须读取该绝对路径，并确认所读 skill 的 metadata name 恰为 `dispatching-parallel-agents`。Path 落在插件缓存不得作为拒绝理由；这是入口交接，不是自行扫描磁盘。Path 不可读、读取工具失败、内容缺失或 name 不匹配时，按 `AI_TOOLS_PARALLEL_SKILL_READ_FAILED_V1` 处理：不得执行官方 verify 主体、不得降级串行，立即返回 `阶段内并行：skill 读取失败（<具体原因>）` 并阻塞本阶段。
    - UNAVAILABLE 时由 verify 子 Agent 独自完成下方验证闭环，不得为并行派发调查者。不得 glob 磁盘或插件缓存、不得猜测 SKILL.md 路径、不得把规则正文里的 skill 名当成已可用、不得联网安装。
-   - skill 已读取：仅对只读、互不干扰的检查或独立失败域，在同一轮派发调查者。每个调查者任务必须包含 `AI_TOOLS_WORKER_VERIFY_V1`，且不得包含 `AI_TOOLS_DELEGATED_APPLY_V1`、`AI_TOOLS_DELEGATED_VERIFY_V1`、`AI_TOOLS_PARALLEL_SKILL_AVAILABLE_V1` 或 `AI_TOOLS_PARALLEL_SKILL_UNAVAILABLE_V1`。调查者返回后，verify 子 Agent 汇合结论；以本阶段开始时的路径集合为基线，若两名及以上调查者改动了同一相对路径，则视为重叠，由 verify 子 Agent 串行重做冲突项。无法还原该基线或无法分离已混写内容时，停止并把阻塞返回入口 Agent，不得写通过门禁。需要安全修复时，仅当修复域独立且无共享状态才可按该 skill 并行修改互不重叠的路径；否则由 verify 子 Agent 串行修复。每一轮修复后的完整复验、完整 diff 审查、门禁与指纹仍由 verify 子 Agent 串行收口。同一轮内对独立域的并行修复只计 1 轮；必须等该轮全部修复返回并由 verify 子 Agent 做完整复验后，才可进入下一轮。
+   - skill 已读取：仅对只读、互不干扰的检查或独立失败域，在同一轮派发调查者。每个调查者任务必须包含 `AI_TOOLS_WORKER_VERIFY_V1`，且不得包含 `AI_TOOLS_DELEGATED_APPLY_V1`、`AI_TOOLS_DELEGATED_VERIFY_V1`、`AI_TOOLS_PARALLEL_SKILL_AVAILABLE_V1` 或 `AI_TOOLS_PARALLEL_SKILL_UNAVAILABLE_V1`。调查者返回后，verify 子 Agent 汇合结论；以本阶段开始时的路径集合为基线，若两名及以上调查者改动了同一相对路径，则视为重叠，由 verify 子 Agent 串行重做冲突项。无法还原该基线或无法分离已混写内容时，停止并把阻塞返回入口 Agent，不得写通过门禁。需要安全修复时，仅当修复域独立且无共享状态才可按该 skill 并行修改互不重叠的路径；否则由 verify 子 Agent 串行修复。每一轮修复后的完整复验、完整 diff 审查与门禁仍由 verify 子 Agent 串行收口。同一轮内对独立域的并行修复只计 1 轮；必须等该轮全部修复返回并由 verify 子 Agent 做完整复验后，才可进入下一轮。
    - 阶段内并行派发工具不可用：仅当本轮所有调查者均尚未开始时，由 verify 子 Agent 退回本阶段官方串行；已有调查者启动或可能修改文件时按上方派发失败规则检查和接续，不得直接重做。不得改由入口执行官方 verify 主体。
    - 共享状态、会改同一路径或同一制品、修 A 可能带上 B、或拿不准时：不并行。
    - 调查者缺少必要上下文：由 verify 子 Agent 补齐后重派或改串行，不得让调查者猜测 change。
@@ -336,31 +321,20 @@ python3 -c 'import ast, pathlib, sys; ast.parse(pathlib.Path(sys.argv[1]).read_t
 1. 实际执行验证并检查代码、测试及 change 制品。发现可安全修复的阻塞项时，按第 3 步已判定的方式修复（verify 子 Agent 串行修复，或对独立修复域派带 `AI_TOOLS_WORKER_VERIFY_V1` 的调查者），并重新运行受影响的检查和完整 verify。
 2. 最多执行 3 轮“验证—修复—重新验证”。同一轮内并行修复只计 1 轮。同一阻塞连续两轮无进展时提前停止。
 3. 遇到需要用户决策、缺少权限或凭据、外部服务故障、破坏性操作，或超出当前 change 范围的修改时，不得自行处理，停止并报告。
-4. 根据当前 change 的实现 baseline 与完整 diff 生成候选 include/exclude。基线提交（`baseline`）必须解析为提交；包含路径（`include`）至少覆盖当前 change 目录和全部属于该 change 的代码、测试与制品路径，目录前缀以 `/` 结尾；排除路径（`exclude`）只排除 include 下明确无关的路径，没有排除项时写 `none`。无法区分当前 change 与既有无关改动时停止并询问，不得把 V2 范围指纹扩大到声明范围之外。
+4. 根据当前 change 的实现 baseline 与完整 diff 确认验证范围。无法区分当前 change 与既有无关改动时停止并询问。
 5. 将实际检查写回 `verification.md` 的统一检查表；复验时只更新统一表中的原行，不追加每轮历史。结果证据只保留退出码、摘要和报告路径。verify 子 Agent 每次修改代码后，必须针对修复后的完整 diff 重新执行代码审查并更新原审查行；存在未处理的 Critical/Important 时不得通过。
-6. 最终写入恰好一个范围块和一个结果块。先写 `PENDING`，并删除旧 V1 结果块：
-
-   <!-- AI_TOOLS_VERIFICATION_SCOPE_V2_START -->
-   baseline: <完整提交 SHA>
-   include:
-   - openspec/changes/<change-name>/
-   - <属于当前 change 的代码或测试路径>
-   exclude:
-   - none
-   <!-- AI_TOOLS_VERIFICATION_SCOPE_V2_END -->
+6. 最终写入恰好一个结果块，并删除旧 V1 结果块、所有
+   `AI_TOOLS_VERIFICATION_SCOPE_V1/V2` 块以及旧结果块中的“范围摘要”“内容指纹”字段：
 
    <!-- AI_TOOLS_VERIFICATION_RESULT_V2_START -->
    ## Verify 门禁
    - 状态：通过
    - 阻塞项：无
-   - 范围摘要：PENDING
-   - 内容指纹：PENDING
    <!-- AI_TOOLS_VERIFICATION_RESULT_V2_END -->
 
-7. 运行 `python3 scripts/openspec-verification-fingerprint.py "<当前 change 的 verification.md 路径>"`，将 `scope_digest` 和 `content_digest` 分别回填为“范围摘要”和“内容指纹”；再次运行后两个输出必须与记录值一致。V2 结果字段为“状态、阻塞项、范围摘要、内容指纹”。
-8. 未通过时仍保留唯一 V2 范围块，将结果状态写为“阻塞”、列出具体阻塞项，并把两个摘要写为“无效”；不得保留旧“通过”结果。范围外变化只产生范围外告警，写入汇报，不将状态改为阻塞；范围内摘要不匹配构成范围内阻断。若判断属于 change，则扩展范围并复验。
+7. 未通过时将结果状态写为“阻塞”并列出具体阻塞项，不得保留旧“通过”结果。
 
-单独运行 `$openspec-verify` 时也执行以上步骤；其两个摘要仍由后续 sync/archive 入口重新计算并复核。
+单独运行 `$openspec-verify` 时也执行以上步骤。
 
 <!-- AI_TOOLS_VERIFY_GATE_V2_END -->
 ```
@@ -372,19 +346,19 @@ python3 -c 'import ast, pathlib, sys; ast.parse(pathlib.Path(sys.argv[1]).read_t
 - `.agents/skills/openspec-sync-specs/SKILL.md`
 - `.agents/skills/openspec-archive-change/SKILL.md`
 
-插入位置：官方 Store selection 和 **Steps** 第 1 步选定 change 之后、第 2 步之前。sync 在第 2 步 Resolve change context 前检查；archive 则在第 1 步选定 change 后、读取 advisory `openspec instructions archive --json` 前检查。1.12.0 官方 sync 已使用 `artifactPaths.specs.existingOutputPaths`、specs rules 快照和 `openspec validate --specs` 约束 main spec 合并，archive 也会在内联 sync 后复核 delta，但两者均不检查 `verification.md` 或范围指纹，因此 C 块不与这些官方行为重复。官方 archive 对未完成制品或任务仍仅警告并允许用户确认继续，且 archive instructions 仍是不得阻断归档的 advisory 输入；这些官方行为不能替代本项目 Verify 门禁规则。
+插入位置：官方 Store selection 和 **Steps** 第 1 步选定 change 之后、第 2 步之前。sync 在第 2 步 Resolve change context 前检查；archive 则在第 1 步选定 change 后、读取 advisory `openspec instructions archive --json` 前检查。1.12.0 官方 sync 已使用 `artifactPaths.specs.existingOutputPaths`、specs rules 快照和 `openspec validate --specs` 约束 main spec 合并，archive 也会在内联 sync 后复核 delta，但两者均不检查 `verification.md` 的结构化结论，因此 C 块不与这些官方行为重复。官方 archive 对未完成制品或任务仍仅警告并允许用户确认继续，且 archive instructions 仍是不得阻断归档的 advisory 输入；这些官方行为不能替代本项目 Verify 门禁规则。
 
 ```markdown
 <!-- AI_TOOLS_VERIFY_GATE_V2 -->
 ## Verification 流转门禁（AI_TOOLS_VERIFY_FLOW_GATE_V1）
 
-官方第 1 步选定 change 后、执行第 2 步及任何 sync 写入或 archive advisory 查询前，必须读取当前 change 的 `verification.md`，并要求恰好一个 V2 范围块和结果块。运行 `python3 scripts/openspec-verification-fingerprint.py "<当前 change 的 verification.md 路径>"`；只有状态为“通过”、阻塞项为“无”，且记录的范围摘要、内容指纹与当前 `scope_digest`、`content_digest` 完全一致时才可继续。范围摘要或内容指纹不一致构成范围内阻断。
+本块使用状态门禁（`AI_TOOLS_STATE_GATE_V1`）。
+
+官方第 1 步选定 change 后、执行第 2 步及任何 sync 写入或 archive advisory 查询前，必须读取当前 change 的 `verification.md`，并要求恰好一个 V2 结果块。只有状态为“通过”、阻塞项为“无”时才可继续。
 
 本门禁发生在官方 sync / archive 主体之前。官方 archive 对未完成制品或任务仅警告并允许用户确认继续，且 `openspec instructions archive --json` 被标明为不得阻断归档的 advisory 输入；上述官方行为不得用来绕过本门禁。
 
-V1-only active change 必须先执行一次 verify，不得自动转换。V2 块缺失或重复、状态不是“通过”、阻塞项不是“无”、任一摘要不匹配、脚本失败或范围内变化时立即停止，不得通过用户确认绕过，也不得在 archive 前重复实现验证来代替已持久化门禁。
-
-正常 sync 更新未纳入范围的 main spec 时只产生范围外告警，不强制复验；sync 完成后再次运行脚本并汇报 `outside_path`，只要两个摘要仍匹配即可结束。archive 同样汇报范围外路径但 archive 前不重复实现验证。若范围外路径应属于当前 change，则扩展范围并复验。官方 spec validate 失败仍按官方主体处理，不能由 V2 告警改写成成功。
+V1-only active change 必须先执行一次 verify，不得自动转换。V2 结果块缺失或重复、状态不是“通过”或阻塞项不是“无”时立即停止，不得通过用户确认绕过，也不得在 archive 前重复实现验证来代替已持久化门禁。sync / archive 不比较验证完成后的代码或证据变化；官方 spec validate 失败仍按官方主体处理，不能由本门禁改写成成功。
 
 <!-- AI_TOOLS_VERIFY_GATE_V2_END -->
 ```
@@ -448,6 +422,7 @@ if len(ends) != 1 or ends[0].start() < starts[0].end():
 block = text[starts[0].end():ends[0].start()]
 required_by_kind = {
     "apply": (
+        "AI_TOOLS_STATE_GATE_V1",
         "AI_TOOLS_DELEGATED_APPLY_V1",
         "AI_TOOLS_STANDALONE_APPLY_V1",
         "AI_TOOLS_DISPATCH_FALLBACK_V1",
@@ -461,6 +436,7 @@ required_by_kind = {
         "AI_TOOLS_MULTI_IDE_V1",
     ),
     "verify": (
+        "AI_TOOLS_STATE_GATE_V1",
         "AI_TOOLS_DELEGATED_VERIFY_V1",
         "AI_TOOLS_STANDALONE_VERIFY_V1",
         "AI_TOOLS_DISPATCH_FALLBACK_V1",
@@ -473,7 +449,7 @@ required_by_kind = {
         "AI_TOOLS_WORKER_VERIFY_V1",
         "AI_TOOLS_MULTI_IDE_V1",
     ),
-    "flow": ("AI_TOOLS_VERIFY_FLOW_GATE_V1",),
+    "flow": ("AI_TOOLS_STATE_GATE_V1", "AI_TOOLS_VERIFY_FLOW_GATE_V1"),
 }
 missing = [marker for marker in required_by_kind[kind] if marker not in block]
 if missing:
@@ -488,7 +464,7 @@ PY
 done
 ```
 
-每个 V2 注入必须以独立注释行 `<!-- AI_TOOLS_VERIFY_GATE_V2 -->` 开始，以独立注释行 `<!-- AI_TOOLS_VERIFY_GATE_V2_END -->` 结束；检查器只读取这两个边界之间的正文，不接受行内伪标记，也不允许文档其它位置代打 required。`MISSING` 表示既没有 V2/V1 独立起始标记，也没有孤立 V2 结束标记；`DUPLICATE` 表示 V2 起止标记重复；`STALE` 包括 V1-only、V1/V2 混写、孤立 start 或 end 等边界不完整或块内 required 缺失。出现 V1 时标为 `STALE`，必须以 V2 完整块替换，不得再次追加。
+每个 V2 注入必须以独立注释行 `<!-- AI_TOOLS_VERIFY_GATE_V2 -->` 开始，以独立注释行 `<!-- AI_TOOLS_VERIFY_GATE_V2_END -->` 结束；检查器只读取这两个边界之间的正文，不接受行内伪标记，也不允许文档其它位置代打 required。`MISSING` 表示既没有 V2/V1 独立起始标记，也没有孤立 V2 结束标记；`DUPLICATE` 表示 V2 起止标记重复；`STALE` 包括 V1-only、V1/V2 混写、缺少 `AI_TOOLS_STATE_GATE_V1` 的旧 V2 指纹正文、孤立 start 或 end 等边界不完整或块内 required 缺失。出现 V1 或缺少状态门禁标记时标为 `STALE`，必须以当前 V2 完整块替换，不得再次追加。
 
 apply 块内必须同时包含当前 APPLY delegated、standalone、dispatch fallback、parallel、handoff 起止边界、AVAILABLE/UNAVAILABLE/READ_FAILED、worker 与 `AI_TOOLS_MULTI_IDE_V1` 标记；verify 块内必须包含对应的 VERIFY 标记；sync/archive 块内必须包含 `AI_TOOLS_VERIFY_FLOW_GATE_V1`，防止只有边界、没有流转检查正文的空块被误判为 `OK`。缺少 Superpowers 或缺少 `dispatching-parallel-agents` 不得标为 `STALE`。`NOFILE` 表示官方文件不存在，应先恢复官方生成层。
 
@@ -524,7 +500,7 @@ evidence-driven: proposal → specs/design → tasks → verification → apply
 ### 6.1 迁移原则
 
 1. 官方层归还 OpenSpec CLI 管理，删除本地分叉的官方生成物。
-2. 自定义层只保留 `evidence-driven`、验证闭环与流转门禁、V2 指纹、中文规则和 from-code。
+2. 自定义层只保留 `evidence-driven`、验证闭环与流转门禁、中文规则和 from-code。
 3. 不把旧分叉文件整体合并进新版官方模板；只追加带幂等标记的当前规则。
 4. 删除前保留分支或补丁，以便核对旧定制。
 
@@ -543,8 +519,10 @@ cp .cursor/commands/opsx-apply.md /tmp/ai-tools-legacy-backup/ 2>/dev/null || tr
 git rm -r --ignore-unmatch .cursor/commands/opsx-* .cursor/skills/openspec-*
 rm -rf "$TARGET_PROJECT/.cursor/commands/opsx-"*
 rm -rf "$TARGET_PROJECT/.cursor/skills/openspec-"*
-git rm --ignore-unmatch .cursor/rules/openspec-chinese.mdc \
-  .cursor/scripts/openspec-verification-fingerprint.py
+git rm --ignore-unmatch .cursor/rules/openspec-chinese.mdc
+rm -f -- \
+  "$TARGET_PROJECT/scripts/openspec-verification-fingerprint.py" \
+  "$TARGET_PROJECT/.cursor/scripts/openspec-verification-fingerprint.py"
 
 # 2) 升级 CLI 并重新生成官方层
 npm install --global @fission-ai/openspec@latest
@@ -595,7 +573,7 @@ openspec list --json
 |--------|--------|
 | 仓库内维护的官方 skill/command 分叉 | 删除，改由 OpenSpec CLI 生成 |
 | Cursor 专属 commands/skills | 删除，统一使用 `.agents/skills/` |
-| `evidence-driven`、`verification.md`、V2 门禁与指纹 | 保留 |
+| `evidence-driven`、`verification.md`、V2 门禁 | 保留 |
 | 中文规则、from-code | 可保留 |
 | propose 起始 worktree 选择、隔离 worktree 收尾 | 不再提供；升级时重建对应官方 skills，并移除 `AI_TOOLS_PROPOSE_WORKTREE_V1`、`AI_TOOLS_WORKTREE_FINISH_V1` 与 `AI_TOOLS_VERIFY_GATE_NO_FINISH_ASK_V1` 旧增强 |
 
@@ -691,13 +669,10 @@ rm -rf "$TARGET_PROJECT/.agents/skills/openspec-update-change-from-code"
 cp -R "$AI_TOOLS_DIR/.agents/skills/openspec-update-change-from-code" \
   "$TARGET_PROJECT/.agents/skills/"
 
-mkdir -p "$TARGET_PROJECT/scripts"
-cp "$AI_TOOLS_DIR/scripts/openspec-verification-fingerprint.py" \
-  "$TARGET_PROJECT/scripts/openspec-verification-fingerprint.py"
-
-# 无副作用语法解析检查；不会生成 __pycache__
-python3 -c 'import ast, pathlib, sys; ast.parse(pathlib.Path(sys.argv[1]).read_text())' \
-  "$TARGET_PROJECT/scripts/openspec-verification-fingerprint.py"
+# 删除旧版本曾安装的范围指纹脚本。
+rm -f -- \
+  "$TARGET_PROJECT/scripts/openspec-verification-fingerprint.py" \
+  "$TARGET_PROJECT/.cursor/scripts/openspec-verification-fingerprint.py"
 
 cd "$TARGET_PROJECT"
 openspec schema validate evidence-driven
@@ -705,7 +680,7 @@ openspec schema validate evidence-driven
 
 **禁止**用本仓库完整文件覆盖目标配置；`config.yaml` 只合并 `schema: evidence-driven` 与制品规则标记块，`AGENTS.md` 只合并对话规则标记块。
 
-ai-tools 自定义层升级后必须同次复制 V2 范围指纹脚本并重新运行 5.1 节检查器。旧 V1 或缺少当前委派、并行交接、工作者和 `AI_TOOLS_MULTI_IDE_V1` 标记的块均为 `STALE`，必须用当前 A/B/C 节完整块替换。
+ai-tools 自定义层升级后必须重新运行 5.1 节检查器。旧 V1 或缺少当前委派、并行交接、工作者和 `AI_TOOLS_MULTI_IDE_V1` 标记的块均为 `STALE`，必须用当前 A/B/C 节完整块替换。
 
 ### 7.3 本仓库（ai-tools）自身注意事项
 
@@ -740,7 +715,7 @@ ai-tools 自定义层升级后必须同次复制 V2 范围指纹脚本并重新�
 - active change：`openspec/changes/<name>/`
 - 归档：`<planningHome.changesDir>/archive/`（仓库内通常是 `openspec/changes/archive/`）
 
-Cursor 与 Codex 共用的 `$openspec-propose` skill 由 `.agents/skills/` 中的官方生成物提供。1.12.0 的生成 workflow 除更新 `generatedBy` 外有两项上游语义变化：`explore` 在提出事实性问题前只读检查相关 OpenSpec 制品、源码、测试、文档与配置，按决策依赖逐项澄清；`propose` 在起草制品时先读取 `context` / `rules`，再按需只读检查相关实现、测试、配置与文档，用实际发现落实 scope、approach 与 tasks。其余 apply、update、verify、sync、archive 正文相对 1.11.0 无语义变化。1.12.0 官方 verify 只输出 Completeness / Correctness / Coherence 会话记分卡，不写 `verification.md`。官方 sync 以 `artifactPaths.specs.existingOutputPaths` 为 delta 路径来源，合并后运行 `openspec validate --specs`；archive 在内联 sync 后复核 delta，对未完成制品或任务仅警告并允许确认继续。项目级 `AI_TOOLS_VERIFY_GATE_V2` 使用 V2 范围指纹（范围内阻断、范围外告警），不是官方行为。
+Cursor 与 Codex 共用的 `$openspec-propose` skill 由 `.agents/skills/` 中的官方生成物提供。1.12.0 的生成 workflow 除更新 `generatedBy` 外有两项上游语义变化：`explore` 在提出事实性问题前只读检查相关 OpenSpec 制品、源码、测试、文档与配置，按决策依赖逐项澄清；`propose` 在起草制品时先读取 `context` / `rules`，再按需只读检查相关实现、测试、配置与文档，用实际发现落实 scope、approach 与 tasks。其余 apply、update、verify、sync、archive 正文相对 1.11.0 无语义变化。1.12.0 官方 verify 只输出 Completeness / Correctness / Coherence 会话记分卡，不写 `verification.md`。官方 sync 以 `artifactPaths.specs.existingOutputPaths` 为 delta 路径来源，合并后运行 `openspec validate --specs`；archive 在内联 sync 后复核 delta，对未完成制品或任务仅警告并允许确认继续。项目级 `AI_TOOLS_VERIFY_GATE_V2` 检查结构化验证结论，不是官方行为。
 
 ## 8. 验收清单
 
@@ -751,8 +726,8 @@ Cursor 与 Codex 共用的 `$openspec-propose` skill 由 `.agents/skills/` 中�
 - [ ] `.agents/skills/` 是唯一官方 Skill 源。
 - [ ] apply/verify/sync/archive 各有且只有一个完整的 `AI_TOOLS_VERIFY_GATE_V2` 块。
 - [ ] apply/verify 的委派、并行交接、工作者和 `AI_TOOLS_MULTI_IDE_V1` 标记完整。
-- [ ] sync/archive 会复核通过状态、无阻塞和当前 V2 范围指纹。
-- [ ] 指纹脚本、中文规则和 from-code skill 按约定安装。
+- [ ] sync/archive 会复核通过状态与无阻塞。
+- [ ] 中文规则和 from-code skill 按约定安装。
 
 冒烟命令示例：
 
@@ -776,7 +751,7 @@ openspec validate "smoke-ai-tools-integration" --type change --strict --json
 
 ### 接入后官方 verify 变「弱」了？
 
-verify 主体仍跟随官方生成物。OpenSpec 1.12.0 官方 verify 只在会话中输出 Completeness / Correctness / Coherence 记分卡，不写 `verification.md`。增强规则要求全新任务直接调用 `$openspec-verify` 时由当前 Agent 执行；已有流程衔接 verify 时优先派发独立 verify 子 Agent。派发仅在子 Agent 尚未开始时失败才降级到当前 Agent，并把验证独立性下降写入 `verification.md`。verify 执行者仅对可安全、在当前 change 范围内且不需要用户决策的阻塞直接修复并重新验证（最多 3 轮）；其余情况停止并报告。结构化结论写回 verification，sync/archive 会在各自入口强制检查该结论（V2 范围指纹：范围内阻断、范围外告警）。当前 verification 已要求完整 diff 代码审查，并以未处理的 Critical/Important 阻断流转。若还需要独立审批人、第二次审查或 archive 阶段的额外审批门禁，应另加项目规则或独立 skill。
+verify 主体仍跟随官方生成物。OpenSpec 1.12.0 官方 verify 只在会话中输出 Completeness / Correctness / Coherence 记分卡，不写 `verification.md`。增强规则要求全新任务直接调用 `$openspec-verify` 时由当前 Agent 执行；已有流程衔接 verify 时优先派发独立 verify 子 Agent。派发仅在子 Agent 尚未开始时失败才降级到当前 Agent，并把验证独立性下降写入 `verification.md`。verify 执行者仅对可安全、在当前 change 范围内且不需要用户决策的阻塞直接修复并重新验证（最多 3 轮）；其余情况停止并报告。结构化结论写回 verification，sync/archive 会在各自入口强制检查该结论（状态为通过、阻塞项为无）。当前 verification 已要求完整 diff 代码审查，并以未处理的 Critical/Important 阻断流转。若还需要独立审批人、第二次审查或 archive 阶段的额外审批门禁，应另加项目规则或独立 skill。
 
 ### 安装增强规则后还要再装 Superpowers 吗？注入要不要再替换？
 

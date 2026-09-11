@@ -23,10 +23,9 @@ compatibility: Requires Node.js, npm, OpenSpec CLI, Python 3.8+, and shell acces
 - 已有 `openspec/config.yaml` 时只合并 `schema` 与制品级 `AI_TOOLS_OPENSPEC_CHINESE_V1` 标记块，保留其它配置（含其余 `context` / `rules` / `operations`）。
 - 对话级中文规则只合并到 `AGENTS.md` 的 `AI_TOOLS_OPENSPEC_CONVERSATION_CHINESE_V1` 标记块；若目标仍有旧 `AI_TOOLS_OPENSPEC_CHINESE_V1` 标记块，只删除该旧片段，保留文件其余内容。
 - 把 `.agents/skills/` 作为 Cursor 与 Codex 共用的唯一 OpenSpec Skill 源，包括官方 skills 与 from-code Skill。
-- 替换验证门禁时，同步更新 V2 指纹脚本和所有规定的注入目标；不得只改其中一处。
 - 保留目标项目中与本次接入无关的修改。遇到无法安全合并的已有定制时先停止并说明冲突。
 - 不自动提交或归档 active change，除非用户明确要求。
 
 ## 完成条件
 
-逐项执行接入指南的验收清单，至少确认：CLI 版本、`evidence-driven` schema、目标项目配置、官方生成层、自定义层、验证门禁、指纹脚本和冒烟 change 均符合预期。报告采用“所选路径、安装或修改、验证结果、保留项、阻塞或剩余风险”的结构，不把未执行的检查写成成功。
+逐项执行接入指南的验收清单，至少确认：CLI 版本、`evidence-driven` schema、目标项目配置、官方生成层、自定义层、验证门禁和冒烟 change 均符合预期。报告采用“所选路径、安装或修改、验证结果、保留项、阻塞或剩余风险”的结构，不把未执行的检查写成成功。

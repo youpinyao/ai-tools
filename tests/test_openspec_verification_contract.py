@@ -74,6 +74,7 @@ def fenced_bash(text: str, start: str, end: str) -> str:
 
 
 APPLY_PARALLEL_MARKERS = (
+    "AI_TOOLS_STATE_GATE_V1",
     "AI_TOOLS_DELEGATED_APPLY_V1",
     "AI_TOOLS_STANDALONE_APPLY_V1",
     "AI_TOOLS_DISPATCH_FALLBACK_V1",
@@ -87,6 +88,7 @@ APPLY_PARALLEL_MARKERS = (
     "AI_TOOLS_MULTI_IDE_V1",
 )
 VERIFY_PARALLEL_MARKERS = (
+    "AI_TOOLS_STATE_GATE_V1",
     "AI_TOOLS_DELEGATED_VERIFY_V1",
     "AI_TOOLS_STANDALONE_VERIFY_V1",
     "AI_TOOLS_DISPATCH_FALLBACK_V1",
@@ -99,7 +101,7 @@ VERIFY_PARALLEL_MARKERS = (
     "AI_TOOLS_WORKER_VERIFY_V1",
     "AI_TOOLS_MULTI_IDE_V1",
 )
-FLOW_GATE_MARKERS = ("AI_TOOLS_VERIFY_FLOW_GATE_V1",)
+FLOW_GATE_MARKERS = ("AI_TOOLS_STATE_GATE_V1", "AI_TOOLS_VERIFY_FLOW_GATE_V1")
 
 
 class VerificationContractTest(unittest.TestCase):
@@ -116,7 +118,6 @@ class VerificationContractTest(unittest.TestCase):
             ROOT / ".agents/skills/openspec-update-change-from-code/SKILL.md",
             ROOT / "AGENTS.md",
             ROOT / "openspec/config.yaml",
-            ROOT / "scripts/openspec-verification-fingerprint.py",
         )
         for path in canonical:
             with self.subTest(path=path):
@@ -127,6 +128,7 @@ class VerificationContractTest(unittest.TestCase):
             ROOT / ".cursor/commands/opsx-update-change-from-code.md",
             ROOT / ".cursor/rules/openspec-chinese.mdc",
             ROOT / ".cursor/scripts/openspec-verification-fingerprint.py",
+            ROOT / "scripts/openspec-verification-fingerprint.py",
         )
         for path in legacy:
             with self.subTest(path=path):
@@ -153,7 +155,6 @@ class VerificationContractTest(unittest.TestCase):
 
         current = "\n".join(path.read_text() for path in CURRENT_DOCS)
         self.assertIn(".agents/skills/openspec-update-change-from-code", current)
-        self.assertIn("scripts/openspec-verification-fingerprint.py", current)
         self.assertIn("AI_TOOLS_OPENSPEC_CHINESE_V1_START", current)
         self.assertIn(
             "AI_TOOLS_OPENSPEC_CONVERSATION_CHINESE_V1_START",
@@ -230,43 +231,11 @@ class VerificationContractTest(unittest.TestCase):
             re.compile(r"\.agents/skills/.{0,100}唯一", re.DOTALL),
         )
 
-    def test_current_docs_each_define_scoped_v2_responsibilities(self) -> None:
-        required_by_doc = {
-            "README.md": (
-                r"AI_TOOLS_VERIFY_GATE_V2",
-                r"V2 范围指纹",
-                r"范围内变化.{0,40}阻断",
-                r"范围外变化.{0,40}告警",
-                r"sync.{0,80}main spec.{0,40}不强制重复实现验证",
-            ),
-            "docs/ai-sdd-workflow.md": (
-                r"AI_TOOLS_VERIFY_GATE_V2",
-                r"V2 范围指纹",
-                r"范围内变化.{0,40}阻断",
-                r"范围外变化.{0,40}告警",
-                r"sync.{0,100}main spec.{0,60}不.{0,20}重复实现验证",
-            ),
-            ".agents/skills/integrating-ai-tools/reference.md": (
-                r"AI_TOOLS_VERIFY_GATE_V2",
-                r"V2 范围指纹",
-                r"范围内变化.{0,40}阻断",
-                r"范围外变化.{0,40}告警",
-                r"正常 sync.{0,100}main spec.{0,60}不强制复验",
-            ),
-            ".agents/skills/upgrading-openspec/reference.md": (
-                r"AI_TOOLS_VERIFY_GATE_V2",
-                r"V2 范围指纹",
-                r"范围内阻断",
-                r"范围外告警",
-                r"sync.{0,100}main spec.{0,60}不强制重复实现验证",
-            ),
-        }
+    def test_current_docs_define_state_gate_responsibilities(self) -> None:
         for path in CURRENT_DOCS:
             text = path.read_text()
-            relative_path = path.relative_to(ROOT).as_posix()
-            for pattern in required_by_doc[relative_path]:
-                with self.subTest(path=relative_path, pattern=pattern):
-                    self.assertRegex(text, re.compile(pattern, re.DOTALL))
+            with self.subTest(path=path.relative_to(ROOT).as_posix()):
+                self.assertIn("AI_TOOLS_VERIFY_GATE_V2", text)
 
     def test_current_docs_define_standalone_and_dispatch_fallback_semantics(
         self,
@@ -296,16 +265,6 @@ class VerificationContractTest(unittest.TestCase):
             compact = re.sub(r"""[`'"\s+]""", "", text)
             with self.subTest(path=path.name, contract="legacy gate"):
                 self.assertNotIn("AI_TOOLS_VERIFY_GATE_V1", compact)
-            legacy_workspace = re.compile(
-                r"(?:统一|确定性|记录的|整个|完整|全)(?:的)?工作区(?:内容)?指纹"
-            )
-            for match in legacy_workspace.finditer(compact):
-                context = compact[max(0, match.start() - 40):match.start()]
-                with self.subTest(path=path.name, phrase=match.group(0)):
-                    self.assertRegex(
-                        context,
-                        re.compile(r"(?:不回退|不再|不得|禁止|删除|移除|旧).{0,40}$"),
-                    )
 
     def test_current_docs_do_not_install_openspec_worktree_enhancements(self) -> None:
         for path in CURRENT_DOCS:
@@ -390,44 +349,21 @@ class VerificationContractTest(unittest.TestCase):
         self.assertIn("未处理的 Critical/Important", text)
         self.assertIn("独立审批人", text)
 
-    def test_upgrade_plan_has_executable_v1_migration_and_scoped_smoke(
-        self,
-    ) -> None:
-        text = (ROOT / ".agents/skills/upgrading-openspec/reference.md").read_text()
-        required_commands = (
-            'SCOPED_SMOKE="$(mktemp -d',
-            "trap 'rm -rf \"$SCOPED_SMOKE\"' EXIT",
-            'git -C "$SCOPED_SMOKE" init',
-            'git -C "$SCOPED_SMOKE" add',
-            "commit -qm 'baseline'",
-            'BASELINE="$(git -C "$SCOPED_SMOKE" rev-parse HEAD)"',
-            "AI_TOOLS_VERIFICATION_SCOPE_V2_START",
-            "AI_TOOLS_VERIFICATION_RESULT_V2_START",
-            'python3 "$FINGERPRINT_SCRIPT" "$VERIFICATION"',
-            'test "$outside_scope_digest" = "$scope_digest"',
-            'test "$outside_content_digest" = "$content_digest"',
-            'test -n "$inside_content_digest"',
-            'test "$inside_content_digest" != "$content_digest"',
-            'test "$outside_exit" -eq 0',
-            'test "$inside_exit" -ne 0',
-            "V1-only active change",
-        )
-        for command in required_commands:
-            with self.subTest(command=command):
-                self.assertIn(command, text)
-        self.assertRegex(text, re.compile(r"V2 完整块.{0,40}替换"))
-        self.assertRegex(text, re.compile(r"(?:禁止|不得).{0,20}追加"))
 
     def test_upgrade_plan_v1_detector_matches_real_marker_sample(self) -> None:
         text = (ROOT / ".agents/skills/upgrading-openspec/reference.md").read_text()
-        match = re.search(r"^V1_ACTIVE_PATTERN='([^']+)'$", text, re.MULTILINE)
+        match = re.search(
+            r"^LEGACY_VERIFICATION_PATTERN='([^']+)'$",
+            text,
+            re.MULTILINE,
+        )
         self.assertIsNotNone(match)
         assert match is not None
         pattern = match.group(1)
-        self.assertNotIn("[[]1[]]", pattern)
+        self.assertIn("SCOPE_V[12]", pattern)
         with tempfile.TemporaryDirectory() as directory:
             sample = Path(directory) / "verification.md"
-            marker = "AI_TOOLS_VERIFICATION_SCOPE_" + "V1_START"
+            marker = "AI_TOOLS_VERIFICATION_RESULT_" + "V1_START"
             sample.write_text("<!-- {} -->\n".format(marker))
             result = subprocess.run(
                 ["rg", "-q", pattern, str(sample)],
@@ -454,7 +390,7 @@ class VerificationContractTest(unittest.TestCase):
         )
         valid_gate = (
             "<!-- AI_TOOLS_VERIFY_GATE_V2 -->\n"
-            "current\n"
+            "current AI_TOOLS_STATE_GATE_V1\n"
             "<!-- AI_TOOLS_VERIFY_GATE_V2_END -->\n"
         )
 
@@ -490,7 +426,20 @@ class VerificationContractTest(unittest.TestCase):
                 )
 
             reset_target()
+            for relative in (
+                "scripts/openspec-verification-fingerprint.py",
+                ".cursor/scripts/openspec-verification-fingerprint.py",
+            ):
+                path = target / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("legacy")
             self.assertEqual(invoke().returncode, 0)
+            self.assertFalse(
+                (target / "scripts/openspec-verification-fingerprint.py").exists()
+            )
+            self.assertFalse(
+                (target / ".cursor/scripts/openspec-verification-fingerprint.py").exists()
+            )
 
             reset_target()
             legacy = "<!-- AI_TOOLS_VERIFY_GATE_" + "V1 -->\n"
@@ -511,98 +460,38 @@ class VerificationContractTest(unittest.TestCase):
             self.assertNotEqual(invoke().returncode, 0)
 
             reset_target()
+            (target / gate_paths[0]).write_text(
+                valid_gate.replace(
+                    "current AI_TOOLS_STATE_GATE_V1",
+                    "python3 scripts/openspec-verification-fingerprint.py",
+                )
+            )
+            legacy_gate = invoke()
+            self.assertNotEqual(legacy_gate.returncode, 0)
+            self.assertIn("legacy fingerprint gate", legacy_gate.stderr)
+
+            reset_target()
             verification = target / "openspec/changes/legacy/verification.md"
             verification.parent.mkdir(parents=True)
             marker = "AI_TOOLS_VERIFICATION_RESULT_" + "V1_START"
             verification.write_text("<!-- {} -->\n".format(marker))
             active = invoke()
             self.assertNotEqual(active.returncode, 0)
-            report = run_dir / "v1-active-changes.txt"
+            self.assertNotIn("unbound variable", active.stderr)
+            self.assertIn("含旧验证结构", active.stdout)
+            report = run_dir / "legacy-verification-changes.txt"
+            self.assertIn(str(verification.relative_to(target)), report.read_text())
+            self.assertIn(str(verification.relative_to(target)), active.stdout)
+
+            reset_target()
+            verification.parent.mkdir(parents=True)
+            verification.write_text(
+                "<!-- AI_TOOLS_VERIFICATION_SCOPE_V2_START -->\n"
+            )
+            active = invoke()
+            self.assertNotEqual(active.returncode, 0)
             self.assertIn(str(verification.relative_to(target)), report.read_text())
 
-    def test_upgrade_plan_smoke_executes_and_restores_fail_fast(self) -> None:
-        text = (ROOT / ".agents/skills/upgrading-openspec/reference.md").read_text()
-        smoke = fenced_bash(
-            text,
-            "然后执行以下可重复的范围指纹冒烟",
-            "预期：初始化、baseline commit",
-        )
-        self.assertTrue(smoke.startswith("set -euo pipefail\n"))
-        required_input = smoke.index(': "${REPRESENTATIVE_TARGET_PROJECT:?')
-        absolute_check = smoke.index('case "$REPRESENTATIVE_TARGET_PROJECT" in')
-        definition = smoke.index('TARGET_PROJECT="$REPRESENTATIVE_TARGET_PROJECT"')
-        script_check = smoke.index('test -f "$FINGERPRINT_SCRIPT"')
-        first_use = smoke.index('SCOPED_SMOKE="$(mktemp -d')
-        self.assertLess(required_input, absolute_check)
-        self.assertLess(absolute_check, definition)
-        self.assertLess(definition, script_check)
-        self.assertLess(script_check, first_use)
-
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            target = root / "target"
-            script = target / "scripts/openspec-verification-fingerprint.py"
-            script.parent.mkdir(parents=True)
-            shutil.copy2(
-                ROOT / "scripts/openspec-verification-fingerprint.py",
-                script,
-            )
-            environment = os.environ.copy()
-            environment.update({
-                "AI_TOOLS_DIR": str(ROOT),
-                "REPRESENTATIVE_TARGET_PROJECT": str(target),
-            })
-            success = subprocess.run(
-                ["bash", "-c", smoke],
-                cwd=ROOT,
-                env=environment,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-            self.assertEqual(success.returncode, 0, success.stderr)
-
-            missing_script = root / "missing-script-target"
-            missing_script.mkdir()
-            invalid_environment = dict(environment)
-            invalid_environment["REPRESENTATIVE_TARGET_PROJECT"] = str(
-                missing_script
-            )
-            failure = subprocess.run(
-                ["bash", "-c", smoke],
-                cwd=ROOT,
-                env=invalid_environment,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-            self.assertNotEqual(failure.returncode, 0)
-
-            relative_environment = dict(environment)
-            relative_environment["REPRESENTATIVE_TARGET_PROJECT"] = "relative"
-            relative = subprocess.run(
-                ["bash", "-c", smoke],
-                cwd=ROOT,
-                env=relative_environment,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-            self.assertNotEqual(relative.returncode, 0)
-
-            poisoned = smoke.replace(
-                '\nrm -rf "$SCOPED_SMOKE"\ntrap - EXIT',
-                '\nfalse\nrm -rf "$SCOPED_SMOKE"\ntrap - EXIT',
-            )
-            restored = subprocess.run(
-                ["bash", "-c", poisoned],
-                cwd=ROOT,
-                env=environment,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-            self.assertNotEqual(restored.returncode, 0)
 
     def test_template_is_compact_and_uses_v2_blocks(self) -> None:
         text = TEMPLATE.read_text()
@@ -614,7 +503,7 @@ class VerificationContractTest(unittest.TestCase):
             "## 风险与回滚",
         ])
         self.assertLessEqual(len(text.splitlines()), 30)
-        self.assertIn("AI_TOOLS_VERIFICATION_SCOPE_V2_START", text)
+        self.assertNotIn("AI_TOOLS_VERIFICATION_SCOPE", text)
         self.assertNotIn("AI_TOOLS_VERIFICATION_RESULT_V1", text)
         self.assertNotIn("## 自动化验证", text)
         self.assertNotIn("## 实际执行结果", text)
@@ -623,57 +512,23 @@ class VerificationContractTest(unittest.TestCase):
         text = SCHEMA.read_text()
         self.assertIn("引用 requirement、scenario 或 task ID", text)
         self.assertIn("更新原检查行", text)
-        self.assertIn("范围外变化只告警", text)
+        self.assertIn("确认本次验证范围", text)
         self.assertNotIn("权威状态仅在“实际执行结果”", text)
 
-    def test_integration_uses_v2_gate_and_copies_script(self) -> None:
+    def test_integration_uses_v2_state_gate(self) -> None:
         text = integration_text()
         self.assertIn("AI_TOOLS_VERIFY_GATE_V2", text)
-        self.assertIn("AI_TOOLS_VERIFICATION_SCOPE_V2_START", text)
         self.assertIn("AI_TOOLS_VERIFICATION_RESULT_V2_START", text)
-        complete_install = (
-            r'mkdir -p "\$TARGET_PROJECT/scripts"\n'
-            r'cp "\$AI_TOOLS_DIR/scripts/'
-            r'openspec-verification-fingerprint\.py" \\\n'
-            r'  "\$TARGET_PROJECT/scripts/'
-            r'openspec-verification-fingerprint\.py".*?'
-            r"ast\.parse.*?\n"
-            r'  "\$TARGET_PROJECT/scripts/'
-            r'openspec-verification-fingerprint\.py"'
-        )
-        install_sections = {
-            "首次接入": section(
-                text,
-                "#### V2 范围指纹脚本",
-                "#### A. Apply",
-            ),
-            "日常升级": section(
-                text,
-                "### 7.2 升级 ai-tools 自定义层",
-                "### 7.3 本仓库",
-            ),
-        }
-        for name, install in install_sections.items():
-            with self.subTest(name=name):
-                self.assertRegex(install, re.compile(complete_install, re.DOTALL))
-                self.assertIn("不会生成 __pycache__", install)
-        self.assertIn("必须同次升级", install_sections["首次接入"])
+        self.assertIn("状态为“通过”", text)
+        self.assertIn("阻塞项为“无”", text)
         self.assertNotIn("AI_TOOLS_VERIFY_GATE_V1", text)
         self.assertNotIn("AI_TOOLS_VERIFICATION_RESULT_V1_START", text)
 
-    def test_integration_defines_scoped_v2_gate_behavior(self) -> None:
+    def test_integration_defines_verification_behavior(self) -> None:
         text = integration_text()
         for required in (
-            "基线提交",
-            "包含路径",
-            "排除路径",
-            "状态、阻塞项、范围摘要、内容指纹",
-            "范围内变化",
-            "范围外变化",
-            "告警",
-            "扩展范围并复验",
+            "确认验证范围",
             "无法区分当前 change 与既有无关改动时",
-            "不得把 V2 范围指纹扩大到声明范围之外",
             "更新统一表中的原行",
             "退出码、摘要和报告路径",
         ):
@@ -684,20 +539,16 @@ class VerificationContractTest(unittest.TestCase):
         for required in (
             "V1-only active change",
             "先执行一次 verify",
-            "未纳入范围的 main spec",
-            "只产生范围外告警",
-            "archive 前不重复实现验证",
-            "出现 V1 时标为 `STALE`",
-            "以 V2 完整块替换",
+            "sync / archive 不比较验证完成后的代码或证据变化",
+            "出现 V1 或缺少状态门禁标记时标为 `STALE`",
+            "以当前 V2 完整块替换",
             "不得再次追加",
         ):
             self.assertIn(required, text)
 
-    def test_integration_has_balanced_unique_scope_and_result_blocks(self) -> None:
+    def test_integration_has_one_result_block(self) -> None:
         text = integration_text()
         for marker in (
-            "AI_TOOLS_VERIFICATION_SCOPE_V2_START",
-            "AI_TOOLS_VERIFICATION_SCOPE_V2_END",
             "AI_TOOLS_VERIFICATION_RESULT_V2_START",
             "AI_TOOLS_VERIFICATION_RESULT_V2_END",
         ):
@@ -831,6 +682,29 @@ class VerificationContractTest(unittest.TestCase):
                     self.assertTrue(
                         classify_gate(kind, incomplete).startswith("STALE"),
                     )
+
+    def test_gate_checker_rejects_legacy_fingerprint_v2_blocks(self) -> None:
+        legacy_body = (
+            "python3 scripts/openspec-verification-fingerprint.py\n"
+            "AI_TOOLS_VERIFICATION_SCOPE_V2_START\n"
+            "scope_digest content_digest 范围摘要： 内容指纹：\n"
+        )
+        samples = {
+            "apply": APPLY_PARALLEL_MARKERS,
+            "verify": VERIFY_PARALLEL_MARKERS,
+            "flow": FLOW_GATE_MARKERS,
+        }
+        for kind, markers in samples.items():
+            with self.subTest(kind=kind):
+                legacy_markers = tuple(
+                    marker for marker in markers
+                    if marker != "AI_TOOLS_STATE_GATE_V1"
+                )
+                status = classify_gate(
+                    kind,
+                    gate_block(*legacy_markers, body=legacy_body),
+                )
+                self.assertTrue(status.startswith("STALE"), status)
 
     def test_gate_checker_classifies_invalid_gate_shapes(self) -> None:
         required = APPLY_PARALLEL_MARKERS
