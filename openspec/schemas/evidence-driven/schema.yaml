@@ -226,6 +226,9 @@ apply:
   requires: [verification]
   tracks: tasks.md
   instruction: |
+    开始实现前，阅读当前可用 skill 的 description 与 rule 的 description/适用范围，
+    调用所有匹配的 skill 并遵循其工作流，同时遵循所有匹配的 rule。不要仅凭名称判断；
+    执行期间任务性质变化时重新判断适用项，指令冲突且无法按既定优先级消解时暂停澄清。
     阅读上下文文件，逐项完成待办任务，完成后立即勾选。
     更新 verification.md 的统一检查表与代码审查章节，记录真实命令、结果与失败原因。
     代码审查须实际阅读完整 diff，结论仅在“代码审查”章节维护；存在未处理的 Critical 或 Important 时不得记为通过。

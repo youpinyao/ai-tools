@@ -76,6 +76,7 @@ def fenced_bash(text: str, start: str, end: str) -> str:
 APPLY_GATE_MARKERS = (
     "AI_TOOLS_STATE_GATE_V1",
     "AI_TOOLS_DIRECT_APPLY_V1",
+    "AI_TOOLS_APPLY_SKILL_RULE_DISCOVERY_V1",
 )
 VERIFY_GATE_MARKERS = (
     "AI_TOOLS_STATE_GATE_V1",
@@ -384,17 +385,24 @@ class VerificationContractTest(unittest.TestCase):
             ".agents/skills/openspec-archive-change/SKILL.md",
         )
         markers_by_path = {
-            gate_paths[0]: "AI_TOOLS_DIRECT_APPLY_V1",
-            gate_paths[1]: "AI_TOOLS_DIRECT_VERIFY_V1",
-            gate_paths[2]: "AI_TOOLS_VERIFY_FLOW_GATE_V1",
-            gate_paths[3]: "AI_TOOLS_VERIFY_FLOW_GATE_V1",
+            gate_paths[0]: (
+                "AI_TOOLS_DIRECT_APPLY_V1",
+                "AI_TOOLS_APPLY_SKILL_RULE_DISCOVERY_V1",
+            ),
+            gate_paths[1]: ("AI_TOOLS_DIRECT_VERIFY_V1",),
+            gate_paths[2]: ("AI_TOOLS_VERIFY_FLOW_GATE_V1",),
+            gate_paths[3]: ("AI_TOOLS_VERIFY_FLOW_GATE_V1",),
         }
 
         def valid_gate(relative: str) -> str:
             return (
                 "<!-- AI_TOOLS_VERIFY_GATE_V2 -->\n"
                 "current AI_TOOLS_STATE_GATE_V1\n"
-                f"current {markers_by_path[relative]}\n"
+                + "".join(
+                    f"current {marker}\n"
+                    for marker in markers_by_path[relative]
+                )
+                +
                 "<!-- AI_TOOLS_VERIFY_GATE_V2_END -->\n"
             )
 
@@ -486,6 +494,17 @@ class VerificationContractTest(unittest.TestCase):
             missing_direct = invoke()
             self.assertNotEqual(missing_direct.returncode, 0)
             self.assertIn("missing required marker", missing_direct.stderr)
+
+            reset_target()
+            (target / gate_paths[0]).write_text(
+                valid_gate(gate_paths[0]).replace(
+                    "current AI_TOOLS_APPLY_SKILL_RULE_DISCOVERY_V1\n",
+                    "",
+                )
+            )
+            missing_discovery = invoke()
+            self.assertNotEqual(missing_discovery.returncode, 0)
+            self.assertIn("missing required marker", missing_discovery.stderr)
 
             reset_target()
             verification = target / "openspec/changes/legacy/verification.md"
@@ -617,6 +636,38 @@ class VerificationContractTest(unittest.TestCase):
             for marker in forbidden:
                 with self.subTest(kind=kind, marker=marker):
                     self.assertNotIn(marker, block)
+
+    def test_apply_discovers_applicable_skills_and_rules_from_descriptions(
+        self,
+    ) -> None:
+        schema = SCHEMA.read_text()
+        apply_instruction = schema.split("apply:\n", 1)[1]
+        apply_block = re.findall(
+            r"(?ms)^<!-- AI_TOOLS_VERIFY_GATE_V2 -->\n"
+            r".*?"
+            r"^<!-- AI_TOOLS_VERIFY_GATE_V2_END -->$",
+            integration_text(),
+        )[0]
+
+        for source, text in (
+            ("schema", apply_instruction),
+            ("integration", apply_block),
+        ):
+            with self.subTest(source=source):
+                self.assertIn("description", text)
+                self.assertIn("适用范围", text)
+                self.assertIn("调用所有匹配的 skill", text)
+                self.assertIn("遵循所有匹配的 rule", text)
+
+        self.assertLess(
+            apply_instruction.index("开始实现前"),
+            apply_instruction.index("逐项完成待办任务"),
+        )
+        self.assertLess(
+            apply_block.index("开始实现前"),
+            apply_block.index("执行官方 apply 主体"),
+        )
+        self.assertIn("AI_TOOLS_APPLY_SKILL_RULE_DISCOVERY_V1", apply_block)
 
     def test_gate_checker_validates_required_markers_inside_each_block(self) -> None:
         samples = {

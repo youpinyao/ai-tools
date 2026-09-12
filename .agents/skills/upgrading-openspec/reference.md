@@ -353,7 +353,7 @@ done
 
 - [ ] **5.3 复核 `AI_TOOLS_VERIFY_GATE_V2` 追加点**
 
-阅读新版 apply、verify、sync、archive skills，确认 A/B/C 块仍有有效插入点且不与官方行为冲突。apply/verify 块必须包含 `AI_TOOLS_DIRECT_APPLY_V1` / `AI_TOOLS_DIRECT_VERIFY_V1`，并要求当前 Agent 串行执行对应阶段。旧 V1 块标为 `STALE` 并由唯一 V2 完整块替换，不得重复追加。V1-only active change 必须先执行一次 verify，再生成新的结果块。
+阅读新版 apply、verify、sync、archive skills，确认 A/B/C 块仍有有效插入点且不与官方行为冲突。apply 块必须包含 `AI_TOOLS_DIRECT_APPLY_V1` 与 `AI_TOOLS_APPLY_SKILL_RULE_DISCOVERY_V1`，verify 块必须包含 `AI_TOOLS_DIRECT_VERIFY_V1`；当前 Agent 须串行执行对应阶段，并在 apply 开始实现前按 description/适用范围发现匹配的 skill 与 rule。旧 V1 块标为 `STALE` 并由唯一 V2 完整块替换，不得重复追加。V1-only active change 必须先执行一次 verify，再生成新的结果块。
 
 ## 6. 同步当前维护文档
 
@@ -575,10 +575,13 @@ legacy = re.compile(r"(?m)^<!-- AI_TOOLS_VERIFY_GATE_V[01] -->[ \t]*$")
 start = "<!-- AI_TOOLS_VERIFY_GATE_V2 -->"
 end = "<!-- AI_TOOLS_VERIFY_GATE_V2_END -->"
 required_by_name = {
-    "openspec-apply-change": "AI_TOOLS_DIRECT_APPLY_V1",
-    "openspec-verify-change": "AI_TOOLS_DIRECT_VERIFY_V1",
-    "openspec-sync-specs": "AI_TOOLS_VERIFY_FLOW_GATE_V1",
-    "openspec-archive-change": "AI_TOOLS_VERIFY_FLOW_GATE_V1",
+    "openspec-apply-change": (
+        "AI_TOOLS_DIRECT_APPLY_V1",
+        "AI_TOOLS_APPLY_SKILL_RULE_DISCOVERY_V1",
+    ),
+    "openspec-verify-change": ("AI_TOOLS_DIRECT_VERIFY_V1",),
+    "openspec-sync-specs": ("AI_TOOLS_VERIFY_FLOW_GATE_V1",),
+    "openspec-archive-change": ("AI_TOOLS_VERIFY_FLOW_GATE_V1",),
 }
 removed_dispatch_markers = (
     "AI_TOOLS_DELEGATED_",
@@ -601,8 +604,13 @@ for name in sys.argv[1:]:
         raise SystemExit("{} still contains a legacy fingerprint gate".format(name))
     skill_name = Path(name).parent.name
     required = required_by_name.get(skill_name)
-    if required is None or required not in block:
+    if required is None:
         raise SystemExit("{} missing required marker".format(name))
+    missing = [marker for marker in required if marker not in block]
+    if missing:
+        raise SystemExit(
+            "{} missing required marker: {}".format(name, missing[0])
+        )
     present_removed = [
         marker for marker in removed_dispatch_markers if marker in block
     ]
