@@ -5,7 +5,7 @@ license: MIT
 compatibility: Requires openspec CLI.
 metadata:
   author: youpinyao
-  version: "1.3.1"
+  version: "1.3.2"
 ---
 
 # Update OpenSpec from Code
@@ -140,18 +140,34 @@ change.
 
 ### 5. Apply the confirmation policy
 
-After the target is uniquely selected (or the user has chosen it):
+After the target is uniquely selected (or the user has chosen it), stop before
+writing any file and request explicit confirmation. This applies to both simple
+and complex drift.
 
-- If all drift is simple, briefly state the intended updates and apply them.
-- If any drift is complex, stop before applying those items and ask the user to
-  approve all, a subset, or none.
-- In a mixed set, simple items that depend on a complex item must remain pending
-  with it. Apply only simple items that are demonstrably independent.
+The confirmation request must identify:
 
-On the change path, a simple item must not make change artifacts or
-`actionContext` docs inconsistent while complex items await a decision. On the
-spec path, related repository docs are not part of the edit set; their drift
-must not block applying independent spec edits.
+- the selected change or spec;
+- the implementation and documentation evidence;
+- every file proposed for modification;
+- each proposed edit, grouped by file, including whether it is simple or
+  complex; and
+- any dependent items that must be approved or rejected together.
+
+Ask the user to approve all proposed edits, an explicit subset, or none. Treat
+no response, an ambiguous response, or a response that does not clearly cover
+an item as no authorization for that item. Do not edit files while awaiting
+confirmation.
+
+After confirmation, apply only the approved items exactly as presented. If new
+drift, new evidence, an additional file, or any difference from the confirmed
+file-and-edit list is discovered, stop and request confirmation again before
+writing the affected item. An earlier confirmation authorizes only the exact
+files and edits it covered.
+
+On the change path, an approved simple item must not make change artifacts or
+`actionContext` docs inconsistent with unapproved or pending items. On the spec
+path, related repository docs are not part of the edit set; their drift must be
+reported but does not require inclusion in the proposed spec edits.
 
 ### 6. Update surgically
 
@@ -198,10 +214,12 @@ openspec validate "<name>" --type change --strict --json
 openspec validate "<id>" --type spec --strict --json
 ```
 
-Validate every selected spec id. Include `--store <id>` when applicable. Fix
-validation issues introduced by the edits and rerun until clean. If validation
-cannot run or pre-existing failures remain, report them without claiming full
-success.
+Validate every selected spec id. Include `--store <id>` when applicable. A
+validation fix may be applied only when that exact fix was included in the
+confirmed file-and-edit list. Otherwise, report the issue, request confirmation
+for the additional edit, and do not write it while awaiting confirmation. After
+approved fixes, rerun validation until clean. If validation cannot run or
+pre-existing failures remain, report them without claiming full success.
 
 Summarize:
 
@@ -226,3 +244,5 @@ Next: <change path: optionally use openspec-sync-specs or openspec-archive-chang
   asked to update them.
 - Prefer idempotent edits that produce no wording churn when rerun.
 - Keep the language and style of each existing artifact or spec.
+- Never modify a target file until the user has explicitly confirmed the exact
+  proposed file-and-edit list. Reconfirm before any difference from that list.
