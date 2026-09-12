@@ -206,6 +206,8 @@ apply:
 4. apply 前置改为 `verification`；
 5. apply 执行并如实记录验证；
 6. verification 中代码审查为必做检查，但不虚构官方 archive 能力。
+7. design 记录预期适用的 skill / rule，apply 重新发现并处理差异，
+   verification 留存实际采用证据。
 
 - [ ] **3.3 复核新版校验和归档语义**
 
@@ -230,8 +232,8 @@ apply:
 - 代码审查必须读取明确范围的完整 diff；
 - 未处理的 Critical 或 Important 不得记为通过；
 - 失败、不适用和未执行项必须记录原因与剩余风险；
-- `verification.md` 只保留“范围、检查、代码审查、风险与回滚”四个二级章节，
-  总行数不超过 30 行；复验更新原检查行，不追加完整历史。
+- `verification.md` 只保留“范围、技能与规则、检查、代码审查、风险与回滚”五个
+  二级章节，总行数不超过 36 行；复验更新原检查行，不追加完整历史。
 
 预期：不增加新版 OpenSpec 无法强制执行的声明。
 
@@ -353,7 +355,7 @@ done
 
 - [ ] **5.3 复核 `AI_TOOLS_VERIFY_GATE_V2` 追加点**
 
-阅读新版 apply、verify、sync、archive skills，确认 A/B/C 块仍有有效插入点且不与官方行为冲突。apply 块必须包含 `AI_TOOLS_DIRECT_APPLY_V1` 与 `AI_TOOLS_APPLY_SKILL_RULE_DISCOVERY_V1`，verify 块必须包含 `AI_TOOLS_DIRECT_VERIFY_V1`；当前 Agent 须串行执行对应阶段，并在 apply 开始实现前按 description/适用范围发现匹配的 skill 与 rule。旧 V1 块标为 `STALE` 并由唯一 V2 完整块替换，不得重复追加。V1-only active change 必须先执行一次 verify，再生成新的结果块。
+阅读新版 apply、verify、sync、archive skills，确认 A/B/C 块仍有有效插入点且不与官方行为冲突。apply 块必须包含 `AI_TOOLS_DIRECT_APPLY_V1`、`AI_TOOLS_APPLY_SKILL_RULE_DISCOVERY_V1` 与 `AI_TOOLS_APPLY_SKILL_RULE_RECONCILIATION_V1`；verify 块必须包含 `AI_TOOLS_DIRECT_VERIFY_V1` 与 `AI_TOOLS_SKILL_RULE_EVIDENCE_GATE_V1`；sync/archive 块必须包含 `AI_TOOLS_VERIFY_FLOW_GATE_V1` 与 `AI_TOOLS_SKILL_RULE_EVIDENCE_GATE_V1`。当前 Agent 须串行执行对应阶段，在 apply 实现或 verify 前读取 design.md 的设计预期、按 description/适用范围重新发现匹配的 skill 与 rule、处理差异并将实际采用证据写入 verification.md；即使任务已为 `all_done` 也不得跳过复核。旧 V1 块或缺少上述标记的旧 V2 块标为 `STALE`，由唯一 V2 完整块替换，不得重复追加。V1-only active change 以及缺少技能与规则证据的旧 V2 active change 必须先使旧通过结果失效，执行一次 apply 复核和 verify，再由 verify 写入含“技能与规则证据：已核验”的新结果块。
 
 ## 6. 同步当前维护文档
 
@@ -421,11 +423,17 @@ from pathlib import Path
 
 text = Path("openspec/schemas/evidence-driven/templates/verification.md").read_text()
 headings = [line for line in text.splitlines() if line.startswith("## ")]
-expected = ["## 范围", "## 检查", "## 代码审查", "## 风险与回滚"]
+expected = [
+    "## 范围",
+    "## 技能与规则",
+    "## 检查",
+    "## 代码审查",
+    "## 风险与回滚",
+]
 if headings != expected:
     raise SystemExit("verification.md headings must be exactly: {}".format(expected))
-if len(text.splitlines()) > 30:
-    raise SystemExit("verification.md must not exceed 30 lines")
+if len(text.splitlines()) > 36:
+    raise SystemExit("verification.md must not exceed 36 lines")
 PY
 if [ "$SOURCE_VERSION" != "$TARGET_VERSION" ]; then
   if rg -n -F "OpenSpec $SOURCE_VERSION" \
@@ -578,10 +586,20 @@ required_by_name = {
     "openspec-apply-change": (
         "AI_TOOLS_DIRECT_APPLY_V1",
         "AI_TOOLS_APPLY_SKILL_RULE_DISCOVERY_V1",
+        "AI_TOOLS_APPLY_SKILL_RULE_RECONCILIATION_V1",
     ),
-    "openspec-verify-change": ("AI_TOOLS_DIRECT_VERIFY_V1",),
-    "openspec-sync-specs": ("AI_TOOLS_VERIFY_FLOW_GATE_V1",),
-    "openspec-archive-change": ("AI_TOOLS_VERIFY_FLOW_GATE_V1",),
+    "openspec-verify-change": (
+        "AI_TOOLS_DIRECT_VERIFY_V1",
+        "AI_TOOLS_SKILL_RULE_EVIDENCE_GATE_V1",
+    ),
+    "openspec-sync-specs": (
+        "AI_TOOLS_VERIFY_FLOW_GATE_V1",
+        "AI_TOOLS_SKILL_RULE_EVIDENCE_GATE_V1",
+    ),
+    "openspec-archive-change": (
+        "AI_TOOLS_VERIFY_FLOW_GATE_V1",
+        "AI_TOOLS_SKILL_RULE_EVIDENCE_GATE_V1",
+    ),
 }
 removed_dispatch_markers = (
     "AI_TOOLS_DELEGATED_",

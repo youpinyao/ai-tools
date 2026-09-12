@@ -190,9 +190,12 @@ verify、archive 与 sync 的具体行为以当前 OpenSpec 官方生成物为�
 `evidence-driven` 以 OpenSpec 1.13.0 官方 `spec-driven` 为本次语义基线：
 
 - `proposal`、`specs`、`design`、`tasks` 是官方语义的简体中文派生。
-- 新增紧凑的 `verification.md` 账本，以范围、检查、代码审查、风险与回滚四节保存
-  当前权威验证状态；复验更新原检查行，不追加完整历史。
+- 新增紧凑的 `verification.md` 账本，以范围、技能与规则、检查、代码审查、风险与回滚五节
+  保存当前权威验证状态；复验更新原检查行，不追加完整历史。
 - `verification` 依赖 `tasks`，`apply` 依赖 `verification` 并跟踪 `tasks.md`。
+- `design` 记录预期适用的 skill / rule；apply 在实现前依据当前 description /
+  适用范围重新发现并处理差异，将实际采用项和证据写入 `verification.md`；任务已为
+  `all_done` 时也须在 verify 前复核，证据缺失会阻断后续流转。
 - apply 应执行 `verification.md` 中适用的检查，包括必做的代码审查，如实记录命令、
   结果、失败原因和未执行项；schema 不把这些记录扩展成额外的官方 verify 或
   archive 行为。

@@ -11,6 +11,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = ROOT / "openspec/schemas/evidence-driven/templates/verification.md"
+DESIGN_TEMPLATE = ROOT / "openspec/schemas/evidence-driven/templates/design.md"
 SCHEMA = ROOT / "openspec/schemas/evidence-driven/schema.yaml"
 INTEGRATION = ROOT / ".agents/skills/integrating-ai-tools/reference.md"
 MIGRATION = ROOT / ".agents/skills/migrating-codex-cursor/SKILL.md"
@@ -77,12 +78,18 @@ APPLY_GATE_MARKERS = (
     "AI_TOOLS_STATE_GATE_V1",
     "AI_TOOLS_DIRECT_APPLY_V1",
     "AI_TOOLS_APPLY_SKILL_RULE_DISCOVERY_V1",
+    "AI_TOOLS_APPLY_SKILL_RULE_RECONCILIATION_V1",
 )
 VERIFY_GATE_MARKERS = (
     "AI_TOOLS_STATE_GATE_V1",
     "AI_TOOLS_DIRECT_VERIFY_V1",
+    "AI_TOOLS_SKILL_RULE_EVIDENCE_GATE_V1",
 )
-FLOW_GATE_MARKERS = ("AI_TOOLS_STATE_GATE_V1", "AI_TOOLS_VERIFY_FLOW_GATE_V1")
+FLOW_GATE_MARKERS = (
+    "AI_TOOLS_STATE_GATE_V1",
+    "AI_TOOLS_VERIFY_FLOW_GATE_V1",
+    "AI_TOOLS_SKILL_RULE_EVIDENCE_GATE_V1",
+)
 
 
 class VerificationContractTest(unittest.TestCase):
@@ -388,10 +395,20 @@ class VerificationContractTest(unittest.TestCase):
             gate_paths[0]: (
                 "AI_TOOLS_DIRECT_APPLY_V1",
                 "AI_TOOLS_APPLY_SKILL_RULE_DISCOVERY_V1",
+                "AI_TOOLS_APPLY_SKILL_RULE_RECONCILIATION_V1",
             ),
-            gate_paths[1]: ("AI_TOOLS_DIRECT_VERIFY_V1",),
-            gate_paths[2]: ("AI_TOOLS_VERIFY_FLOW_GATE_V1",),
-            gate_paths[3]: ("AI_TOOLS_VERIFY_FLOW_GATE_V1",),
+            gate_paths[1]: (
+                "AI_TOOLS_DIRECT_VERIFY_V1",
+                "AI_TOOLS_SKILL_RULE_EVIDENCE_GATE_V1",
+            ),
+            gate_paths[2]: (
+                "AI_TOOLS_VERIFY_FLOW_GATE_V1",
+                "AI_TOOLS_SKILL_RULE_EVIDENCE_GATE_V1",
+            ),
+            gate_paths[3]: (
+                "AI_TOOLS_VERIFY_FLOW_GATE_V1",
+                "AI_TOOLS_SKILL_RULE_EVIDENCE_GATE_V1",
+            ),
         }
 
         def valid_gate(relative: str) -> str:
@@ -507,6 +524,20 @@ class VerificationContractTest(unittest.TestCase):
             self.assertIn("missing required marker", missing_discovery.stderr)
 
             reset_target()
+            (target / gate_paths[0]).write_text(
+                valid_gate(gate_paths[0]).replace(
+                    "current AI_TOOLS_APPLY_SKILL_RULE_RECONCILIATION_V1\n",
+                    "",
+                )
+            )
+            missing_reconciliation = invoke()
+            self.assertNotEqual(missing_reconciliation.returncode, 0)
+            self.assertIn(
+                "missing required marker",
+                missing_reconciliation.stderr,
+            )
+
+            reset_target()
             verification = target / "openspec/changes/legacy/verification.md"
             verification.parent.mkdir(parents=True)
             marker = "AI_TOOLS_VERIFICATION_RESULT_" + "V1_START"
@@ -534,15 +565,21 @@ class VerificationContractTest(unittest.TestCase):
         headings = [line for line in text.splitlines() if line.startswith("## ")]
         self.assertEqual(headings, [
             "## 范围",
+            "## 技能与规则",
             "## 检查",
             "## 代码审查",
             "## 风险与回滚",
         ])
-        self.assertLessEqual(len(text.splitlines()), 30)
+        self.assertLessEqual(len(text.splitlines()), 36)
         self.assertNotIn("AI_TOOLS_VERIFICATION_SCOPE", text)
         self.assertNotIn("AI_TOOLS_VERIFICATION_RESULT_V1", text)
         self.assertNotIn("## 自动化验证", text)
         self.assertNotIn("## 实际执行结果", text)
+        self.assertIn(
+            "设计预期：<!-- 从 design.md 的“适用技能与规则”摘录",
+            text,
+        )
+        self.assertNotIn("设计预期：待核对", text)
 
     def test_schema_describes_compact_authoritative_state(self) -> None:
         text = SCHEMA.read_text()
@@ -575,6 +612,9 @@ class VerificationContractTest(unittest.TestCase):
         for required in (
             "V1-only active change",
             "先执行一次 verify",
+            "即使任务已为 `all_done`",
+            "补齐“适用技能与规则”与“技能与规则”章节",
+            "先移除旧 V2 通过结果",
             "sync / archive 不比较验证完成后的代码或证据变化",
             "出现 V1 或缺少状态门禁标记时标为 `STALE`",
             "以当前 V2 完整块替换",
@@ -637,17 +677,29 @@ class VerificationContractTest(unittest.TestCase):
                 with self.subTest(kind=kind, marker=marker):
                     self.assertNotIn(marker, block)
 
-    def test_apply_discovers_applicable_skills_and_rules_from_descriptions(
+    def test_skills_and_rules_flow_from_design_through_apply_to_verification(
         self,
     ) -> None:
         schema = SCHEMA.read_text()
+        design_instruction = schema.split("  - id: design\n", 1)[1].split(
+            "  - id: tasks\n",
+            1,
+        )[0]
         apply_instruction = schema.split("apply:\n", 1)[1]
+        design_template = DESIGN_TEMPLATE.read_text()
+        verification_template = TEMPLATE.read_text()
         apply_block = re.findall(
             r"(?ms)^<!-- AI_TOOLS_VERIFY_GATE_V2 -->\n"
             r".*?"
             r"^<!-- AI_TOOLS_VERIFY_GATE_V2_END -->$",
             integration_text(),
         )[0]
+
+        self.assertIn("## 适用技能与规则", design_template)
+        for required in ("适用原因", "影响任务", "必需性"):
+            self.assertIn(required, design_template)
+        self.assertIn("适用技能与规则", design_instruction)
+        self.assertIn("规划时预期", design_instruction)
 
         for source, text in (
             ("schema", apply_instruction),
@@ -658,16 +710,78 @@ class VerificationContractTest(unittest.TestCase):
                 self.assertIn("适用范围", text)
                 self.assertIn("调用所有匹配的 skill", text)
                 self.assertIn("遵循所有匹配的 rule", text)
+                self.assertIn("读取 design.md", text)
+                self.assertIn("不得自动回写 design.md", text)
+                self.assertIn("verification.md", text)
 
+        self.assertIn("完成官方第 2～4 步", apply_block)
+        self.assertIn("不得保留旧“通过”结果", apply_block)
         self.assertLess(
-            apply_instruction.index("开始实现前"),
+            apply_block.index("完成官方第 2～4 步"),
+            apply_block.index("读取 design.md"),
+        )
+        self.assertLess(
+            apply_instruction.index("读取 design.md"),
             apply_instruction.index("逐项完成待办任务"),
         )
         self.assertLess(
-            apply_block.index("开始实现前"),
+            apply_block.index("读取 design.md"),
             apply_block.index("执行官方 apply 主体"),
         )
         self.assertIn("AI_TOOLS_APPLY_SKILL_RULE_DISCOVERY_V1", apply_block)
+        self.assertIn(
+            "AI_TOOLS_APPLY_SKILL_RULE_RECONCILIATION_V1",
+            apply_block,
+        )
+        for required in ("设计预期", "实际采用", "差异与处理"):
+            self.assertIn(required, verification_template)
+
+        blocks = re.findall(
+            r"(?ms)^<!-- AI_TOOLS_VERIFY_GATE_V2 -->\n"
+            r".*?"
+            r"^<!-- AI_TOOLS_VERIFY_GATE_V2_END -->$",
+            integration_text(),
+        )
+        _, verify_block, flow_block = blocks
+        for source, text in (
+            ("verify", verify_block),
+            ("flow", flow_block),
+        ):
+            with self.subTest(source=source):
+                self.assertIn("AI_TOOLS_SKILL_RULE_EVIDENCE_GATE_V1", text)
+                self.assertIn("技能与规则", text)
+                self.assertIn("待执行", text)
+                self.assertIn("不得通过", text)
+                self.assertIn("技能与规则证据：已核验", text)
+
+    def test_upgrade_static_template_check_executes_against_current_template(
+        self,
+    ) -> None:
+        text = (
+            ROOT / ".agents/skills/upgrading-openspec/reference.md"
+        ).read_text()
+        block = text.split("- [ ] **7.2 运行静态契约检查**", 1)[1]
+        match = re.search(
+            r"(?ms)python3 - <<'PY'\n(.*?)^PY$",
+            block,
+        )
+        self.assertIsNotNone(match)
+        assert match is not None
+        result = subprocess.run(
+            [sys.executable, "-c", match.group(1)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_readme_lists_the_current_verification_sections(self) -> None:
+        readme = (ROOT / "README.md").read_text()
+        self.assertIn(
+            "范围、技能与规则、检查、代码审查、风险与回滚五节",
+            readme,
+        )
 
     def test_gate_checker_validates_required_markers_inside_each_block(self) -> None:
         samples = {

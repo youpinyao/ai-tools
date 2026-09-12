@@ -34,6 +34,8 @@
 
 - 默认 schema：`evidence-driven`，并增加持久化的 `verification.md`。
 - `tasks → verification`，且 `apply` 依赖 `verification`。
+- design 记录预期适用的 skill / rule，apply 重新发现并处理差异，verification
+  留存实际采用证据。
 - 当前 Agent 完成 apply、首次完整 diff 审查和后续 verify。
 - sync/archive 入口强制复核 Verify 门禁。
 - 当前不再提供 propose 起始 worktree 选择或隔离 worktree 收尾增强；旧项目升级时必须重建对应官方 skills，确定性移除旧增强块。
@@ -199,7 +201,7 @@ openspec schema validate evidence-driven
 
 目标文件合计 **4** 个，全部位于 `.agents/skills/openspec-*`。Cursor 与 Codex 发现同一份 Skill，不存在 skill 双入口或跨目录副本。
 
-apply、verify、sync、archive 先执行官方 Store selection 与 **Steps** 第 1 步以选定 change，再在第 2 步之前放置 A/B/C 块。
+apply、verify、sync、archive 先执行官方 Store selection 与 **Steps** 第 1 步以选定 change，再在第 2 步之前放置 A/B/C 块。A 块须在此前可见以覆盖官方 `all_done` 的提前归档建议，但涉及 change 制品的读取和写入必须延后到官方 apply 第 2～4 步解析并读取具体 `contextFiles` 之后。
 
 #### A. Apply：当前 Agent 直接实施并验证
 
@@ -207,7 +209,7 @@ apply、verify、sync、archive 先执行官方 Store selection 与 **Steps** �
 
 - `.agents/skills/openspec-apply-change/SKILL.md`
 
-插入位置：官方 Store selection 和 **Steps** 第 1 步（Select the change）之后、第 2 步（Check status to understand the schema）之前。1.13.0 官方 apply 是串行任务循环；其 `context` 与 `operationGuidance` 明确只是 prompt-level behavior contracts，不能替代 CLI 状态或证明任务完成；在 `state: "all_done"` 与完成输出中仍会建议 `$openspec-archive`。以本块为准，门禁通过前不得按官方文案建议 sync 或 archive。
+插入位置：官方 Store selection 和 **Steps** 第 1 步（Select the change）之后、第 2 步（Check status to understand the schema）之前，使 Agent 在处理官方 `all_done` 分支前已知本项目门禁。块内涉及 change 制品的操作不得立即执行：先完成官方第 2～4 步，取得 `changeRoot`、`actionContext` 与具体 `contextFiles` 并读取这些文件，再进行适用项复核。1.13.0 官方 apply 是串行任务循环；其 `context` 与 `operationGuidance` 明确只是 prompt-level behavior contracts，不能替代 CLI 状态或证明任务完成；在 `state: "all_done"` 与完成输出中仍会建议 `$openspec-archive`。以本块为准，门禁通过前不得按官方文案建议 sync 或 archive。
 
 ```markdown
 <!-- AI_TOOLS_VERIFY_GATE_V2 -->
@@ -217,12 +219,13 @@ apply、verify、sync、archive 先执行官方 Store selection 与 **Steps** �
 
 当前 Agent 必须按官方逐项循环串行执行 apply（`AI_TOOLS_DIRECT_APPLY_V1`）。
 
-1. 开始实现前，当前 Agent 必须执行适用项发现（`AI_TOOLS_APPLY_SKILL_RULE_DISCOVERY_V1`）：阅读当前可用 skill 的 description 与 rule 的 description/适用范围，调用所有匹配的 skill 并遵循其工作流，同时遵循所有匹配的 rule。不得仅凭名称判断；执行期间任务性质变化时重新判断，指令冲突且无法按既定优先级消解时暂停澄清。
-2. 当前 Agent 执行官方 apply 主体、更新 `tasks.md`，并对完整实现 diff 做首次代码审查。
-3. apply 未成功或存在阻塞时不得启动 verify；change 保持 active，并向用户报告具体原因。
-4. apply 成功后，当前 Agent 继续串行执行 `openspec-verify-change` 的完整验证闭环。
-5. verify 完成后，当前 Agent 读取恰好一个 `AI_TOOLS_VERIFICATION_RESULT_V2_START` 结果块。
-6. 仅当状态为“通过”、阻塞项为“无”时，当前 Agent 才可结束 apply 并建议 sync 或 archive。状态阻塞或 verify 执行失败均阻止完成；change 保持 active，必须报告具体原因，且不得建议 sync 或 archive。
+1. 先完成官方第 2～4 步，取得权威 planning/change 路径并读取 `contextFiles`；在此之前不得读取或写入假定路径下的 change 制品。若状态为 `blocked`，按官方流程停止；若为 `all_done`，跳过实现，但仍须先完成下一步复核再进入 verify，不得直接建议归档。
+2. 无论是否存在待办任务，在实现或 verify 前都执行适用项发现（`AI_TOOLS_APPLY_SKILL_RULE_DISCOVERY_V1`）与设计复核（`AI_TOOLS_APPLY_SKILL_RULE_RECONCILIATION_V1`）。开始复核时，先把既有 V2 结果改为“阻塞 / 技能与规则复核未完成”，不得保留旧“通过”结果。读取 design.md 的“适用技能与规则”作为设计预期，再阅读当前可用 skill 的 description 与 rule 的 description/适用范围并重新判断全部匹配项。调用所有匹配的 skill 并遵循其工作流，同时遵循所有匹配的 rule，不得仅凭名称判断。将设计预期、实际采用、差异与处理及证据写入 verification.md；设计中必需项不可用，或新发现项会改变方案、规范或任务拆分时，暂停并进入 change 更新流程；只影响执行方式时采用并留证。不得自动回写 design.md，也不得把缺乏执行证据的历史 skill / rule 追记为“已采用”；证据不足时记录阻塞。执行期间任务性质变化时重新判断，指令冲突且无法按既定优先级消解时暂停澄清。
+3. 当前 Agent 执行官方 apply 主体、更新 `tasks.md`，并对完整实现 diff 做首次代码审查。
+4. apply 未成功或存在阻塞时不得启动 verify；change 保持 active，并向用户报告具体原因。
+5. apply 成功或官方状态已为 `all_done` 后，当前 Agent 继续串行执行 `openspec-verify-change` 的完整验证闭环。
+6. verify 完成后，当前 Agent 读取恰好一个 `AI_TOOLS_VERIFICATION_RESULT_V2_START` 结果块。
+7. 仅当状态为“通过”、阻塞项为“无”时，当前 Agent 才可结束 apply 并建议 sync 或 archive。状态阻塞或 verify 执行失败均阻止完成；change 保持 active，必须报告具体原因，且不得建议 sync 或 archive。
 <!-- AI_TOOLS_VERIFY_GATE_V2_END -->
 ```
 
@@ -244,6 +247,8 @@ apply、verify、sync、archive 先执行官方 Store selection 与 **Steps** �
 
 当前 Agent 必须串行执行完整验证闭环（`AI_TOOLS_DIRECT_VERIFY_V1`）。需要停止时由当前 Agent 向用户报告。
 
+verify 还必须执行技能与规则证据门禁（`AI_TOOLS_SKILL_RULE_EVIDENCE_GATE_V1`）。
+
 ### 验证闭环
 
 1. 实际执行验证并检查代码、测试及 change 制品。发现可安全修复的阻塞项时，由当前 Agent 修复，并重新运行受影响的检查和完整 verify。
@@ -251,16 +256,18 @@ apply、verify、sync、archive 先执行官方 Store selection 与 **Steps** �
 3. 遇到需要用户决策、缺少权限或凭据、外部服务故障、破坏性操作，或超出当前 change 范围的修改时，不得自行处理，停止并报告。
 4. 根据当前 change 的实现 baseline 与完整 diff 确认验证范围。无法区分当前 change 与既有无关改动时停止并询问。
 5. 将实际检查写回 `verification.md` 的统一检查表；复验时只更新统一表中的原行，不追加每轮历史。结果证据只保留退出码、摘要和报告路径。当前 Agent 每次修改代码后，必须针对修复后的完整 diff 重新执行代码审查并更新原审查行；存在未处理的 Critical/Important 时不得通过。
-6. 最终写入恰好一个结果块，并删除旧 V1 结果块、所有
+6. 写入通过结果前，确认 `verification.md` 恰有一个“技能与规则”章节，且设计预期、实际采用、差异与处理、证据均已填写，没有“待执行”或模板占位。实际采用必须有执行证据，不得从设计预期倒推；章节缺失、仍有占位或证据不足时状态必须为“阻塞”，不得通过。
+7. 最终写入恰好一个结果块，并删除旧 V1 结果块、所有
    `AI_TOOLS_VERIFICATION_SCOPE_V1/V2` 块以及旧结果块中的“范围摘要”“内容指纹”字段：
 
    <!-- AI_TOOLS_VERIFICATION_RESULT_V2_START -->
    ## Verify 门禁
    - 状态：通过
    - 阻塞项：无
+   - 技能与规则证据：已核验
    <!-- AI_TOOLS_VERIFICATION_RESULT_V2_END -->
 
-7. 未通过时将结果状态写为“阻塞”并列出具体阻塞项，不得保留旧“通过”结果。
+8. 未通过时将结果状态写为“阻塞”并列出具体阻塞项，不得保留旧“通过”结果。
 
 单独运行 `$openspec-verify` 时也执行以上步骤。
 
@@ -282,7 +289,9 @@ apply、verify、sync、archive 先执行官方 Store selection 与 **Steps** �
 
 本块使用状态门禁（`AI_TOOLS_STATE_GATE_V1`）。
 
-官方第 1 步选定 change 后、执行第 2 步及任何 sync 写入或 archive advisory 查询前，必须读取当前 change 的 `verification.md`，并要求恰好一个 V2 结果块。只有状态为“通过”、阻塞项为“无”时才可继续。
+本门禁同时检查技能与规则证据（`AI_TOOLS_SKILL_RULE_EVIDENCE_GATE_V1`）。
+
+官方第 1 步选定 change 后、执行第 2 步及任何 sync 写入或 archive advisory 查询前，必须读取当前 change 的 `verification.md`，并要求恰好一个 V2 结果块和一个“技能与规则”章节。只有状态为“通过”、阻塞项为“无”、结果块包含精确字段“技能与规则证据：已核验”，且该章节的设计预期、实际采用、差异与处理、证据均已填写、没有“待执行”或模板占位时才可继续；任一条件不满足均不得通过。
 
 本门禁发生在官方 sync / archive 主体之前。官方 archive 对未完成制品或任务仅警告并允许用户确认继续，且 `openspec instructions archive --json` 被标明为不得阻断归档的 advisory 输入；上述官方行为不得用来绕过本门禁。
 
@@ -353,12 +362,18 @@ required_by_kind = {
         "AI_TOOLS_STATE_GATE_V1",
         "AI_TOOLS_DIRECT_APPLY_V1",
         "AI_TOOLS_APPLY_SKILL_RULE_DISCOVERY_V1",
+        "AI_TOOLS_APPLY_SKILL_RULE_RECONCILIATION_V1",
     ),
     "verify": (
         "AI_TOOLS_STATE_GATE_V1",
         "AI_TOOLS_DIRECT_VERIFY_V1",
+        "AI_TOOLS_SKILL_RULE_EVIDENCE_GATE_V1",
     ),
-    "flow": ("AI_TOOLS_STATE_GATE_V1", "AI_TOOLS_VERIFY_FLOW_GATE_V1"),
+    "flow": (
+        "AI_TOOLS_STATE_GATE_V1",
+        "AI_TOOLS_VERIFY_FLOW_GATE_V1",
+        "AI_TOOLS_SKILL_RULE_EVIDENCE_GATE_V1",
+    ),
 }
 missing = [marker for marker in required_by_kind[kind] if marker not in block]
 if missing:
@@ -392,7 +407,7 @@ done
 
 每个 V2 注入必须以独立注释行 `<!-- AI_TOOLS_VERIFY_GATE_V2 -->` 开始，以独立注释行 `<!-- AI_TOOLS_VERIFY_GATE_V2_END -->` 结束；检查器只读取这两个边界之间的正文，不接受行内伪标记，也不允许文档其它位置代打 required。`MISSING` 表示既没有 V2/V1 独立起始标记，也没有孤立 V2 结束标记；`DUPLICATE` 表示 V2 起止标记重复；`STALE` 包括 V1-only、V1/V2 混写、缺少 `AI_TOOLS_STATE_GATE_V1` 的旧 V2 指纹正文、孤立 start 或 end 等边界不完整或块内 required 缺失。出现 V1 或缺少状态门禁标记时标为 `STALE`，必须以当前 V2 完整块替换，不得再次追加。
 
-apply 块内必须包含 `AI_TOOLS_DIRECT_APPLY_V1` 与 `AI_TOOLS_APPLY_SKILL_RULE_DISCOVERY_V1`，verify 块内必须包含 `AI_TOOLS_DIRECT_VERIFY_V1`；sync/archive 块内必须包含 `AI_TOOLS_VERIFY_FLOW_GATE_V1`，防止只有边界、没有流转检查正文的空块被误判为 `OK`。`NOFILE` 表示官方文件不存在，应先恢复官方生成层。
+apply 块内必须包含 `AI_TOOLS_DIRECT_APPLY_V1`、`AI_TOOLS_APPLY_SKILL_RULE_DISCOVERY_V1` 与 `AI_TOOLS_APPLY_SKILL_RULE_RECONCILIATION_V1`；verify 块内必须包含 `AI_TOOLS_DIRECT_VERIFY_V1` 与 `AI_TOOLS_SKILL_RULE_EVIDENCE_GATE_V1`；sync/archive 块内必须包含 `AI_TOOLS_VERIFY_FLOW_GATE_V1` 与 `AI_TOOLS_SKILL_RULE_EVIDENCE_GATE_V1`，防止只有边界、没有完整门禁正文的空块被误判为 `OK`。`NOFILE` 表示官方文件不存在，应先恢复官方生成层。
 
 ### 5.2 已有 active change 怎么办
 
@@ -509,7 +524,8 @@ openspec list --json
 2. 若必须带着 active change 迁移：
    - 保留 change 目录与 `.openspec.yaml`；
    - 刷新 schema 后运行 `openspec status --change "<name>" --json` 与 `openspec validate "<name>" --type change --strict`；
-   - 缺 `verification.md` 时按新模板补齐（规划阶段结果保持「待执行」，须含代码审查章节）；
+   - 按新模板补齐“适用技能与规则”与“技能与规则”章节；缺 `verification.md` 时完整创建，规划阶段实际采用、差异与证据保持「待执行」；
+   - 先移除旧 V2 通过结果，再重新执行 apply 的适用项复核和完整 verify，即使任务已为 `all_done`；不得把缺乏执行证据的历史 skill / rule 追记为“已采用”，证据不足时保持阻塞；
    - 旧 verification 中「独立验证结论 / 代码审查硬门禁」章节可保留为项目约定；官方 archive 本身不一定检查它们，但 5.1 节追加的项目级门禁会阻止带有未处理 Critical/Important 的 change 流转。
 
 ## 7. 日常升级（接入之后）
@@ -604,7 +620,7 @@ openspec schema validate evidence-driven
 
 **禁止**用本仓库完整文件覆盖目标配置；`config.yaml` 只合并 `schema: evidence-driven` 与制品规则标记块，`AGENTS.md` 只合并对话规则标记块。
 
-ai-tools 自定义层升级后必须重新运行 5.1 节检查器。旧 V1 或缺少 `AI_TOOLS_DIRECT_APPLY_V1`、`AI_TOOLS_APPLY_SKILL_RULE_DISCOVERY_V1`、`AI_TOOLS_DIRECT_VERIFY_V1` 的块均为 `STALE`，必须用当前 A/B/C 节完整块替换。
+ai-tools 自定义层升级后必须重新运行 5.1 节检查器。旧 V1 或缺少 `AI_TOOLS_DIRECT_APPLY_V1`、`AI_TOOLS_APPLY_SKILL_RULE_DISCOVERY_V1`、`AI_TOOLS_APPLY_SKILL_RULE_RECONCILIATION_V1`、`AI_TOOLS_DIRECT_VERIFY_V1`、`AI_TOOLS_SKILL_RULE_EVIDENCE_GATE_V1` 的块均为 `STALE`，必须用当前 A/B/C 节完整块替换。
 
 ### 7.3 本仓库（ai-tools）自身注意事项
 
