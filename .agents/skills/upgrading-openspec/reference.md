@@ -351,9 +351,9 @@ done
 
 预期：对话规则不依赖逐项枚举入口，制品规则覆盖新版 artifact；两层规则同时适用于官方共享 skills 与共用 `openspec-update-change-from-code` skill。
 
-- [ ] **5.3 复核 `AI_TOOLS_VERIFY_GATE_V2` 与 `AI_TOOLS_MULTI_IDE_V1` 追加点**
+- [ ] **5.3 复核 `AI_TOOLS_VERIFY_GATE_V2` 追加点**
 
-阅读新版 apply、verify、sync、archive skills，确认 A/B/C 块仍有有效插入点且不与官方行为冲突。apply/verify 块必须包含 `AI_TOOLS_STANDALONE_APPLY_V1` / `AI_TOOLS_STANDALONE_VERIFY_V1` 与 `AI_TOOLS_DISPATCH_FALLBACK_V1`：全新任务直接调用阶段时由当前 Agent 执行；已有流程仍优先派发；仅当子 Agent 尚未开始时派发失败才允许降级，已启动后的失败不得从头重做，verify 降级须记录独立性下降。旧 V1 块标为 `STALE` 并由唯一 V2 完整块替换，不得重复追加。V1-only active change 必须先执行一次 verify，再生成新的结果块。
+阅读新版 apply、verify、sync、archive skills，确认 A/B/C 块仍有有效插入点且不与官方行为冲突。apply/verify 块必须包含 `AI_TOOLS_DIRECT_APPLY_V1` / `AI_TOOLS_DIRECT_VERIFY_V1`，并要求当前 Agent 串行执行对应阶段。旧 V1 块标为 `STALE` 并由唯一 V2 完整块替换，不得重复追加。V1-only active change 必须先执行一次 verify，再生成新的结果块。
 
 ## 6. 同步当前维护文档
 
@@ -574,6 +574,20 @@ import sys
 legacy = re.compile(r"(?m)^<!-- AI_TOOLS_VERIFY_GATE_V[01] -->[ \t]*$")
 start = "<!-- AI_TOOLS_VERIFY_GATE_V2 -->"
 end = "<!-- AI_TOOLS_VERIFY_GATE_V2_END -->"
+required_by_name = {
+    "openspec-apply-change": "AI_TOOLS_DIRECT_APPLY_V1",
+    "openspec-verify-change": "AI_TOOLS_DIRECT_VERIFY_V1",
+    "openspec-sync-specs": "AI_TOOLS_VERIFY_FLOW_GATE_V1",
+    "openspec-archive-change": "AI_TOOLS_VERIFY_FLOW_GATE_V1",
+}
+removed_dispatch_markers = (
+    "AI_TOOLS_DELEGATED_",
+    "AI_TOOLS_STANDALONE_",
+    "AI_TOOLS_DISPATCH_FALLBACK_V1",
+    "AI_TOOLS_PARALLEL_",
+    "AI_TOOLS_WORKER_",
+    "AI_TOOLS_MULTI_IDE_V1",
+)
 for name in sys.argv[1:]:
     text = Path(name).read_text()
     if legacy.search(text):
@@ -585,6 +599,15 @@ for name in sys.argv[1:]:
     block = text.split(start, 1)[1].split(end, 1)[0]
     if "AI_TOOLS_STATE_GATE_V1" not in block:
         raise SystemExit("{} still contains a legacy fingerprint gate".format(name))
+    skill_name = Path(name).parent.name
+    required = required_by_name.get(skill_name)
+    if required is None or required not in block:
+        raise SystemExit("{} missing required marker".format(name))
+    present_removed = [
+        marker for marker in removed_dispatch_markers if marker in block
+    ]
+    if present_removed:
+        raise SystemExit("{} still contains removed dispatch marker".format(name))
 PY
 
 LEGACY_VERIFICATION_REPORT="$RUN_DIR/legacy-verification-changes.txt"

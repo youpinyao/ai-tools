@@ -34,7 +34,7 @@
 
 - 默认 schema：`evidence-driven`，并增加持久化的 `verification.md`。
 - `tasks → verification`，且 `apply` 依赖 `verification`。
-- apply 子 Agent 完成实施和首次完整 diff 审查后，再由独立 verify 子 Agent 验证。
+- 当前 Agent 完成 apply、首次完整 diff 审查和后续 verify。
 - sync/archive 入口强制复核 Verify 门禁。
 - 当前不再提供 propose 起始 worktree 选择或隔离 worktree 收尾增强；旧项目升级时必须重建对应官方 skills，确定性移除旧增强块。
 - `AGENTS.md` 约束对话语言，`openspec/config.yaml` 的 `context` 注入制品规则；可选 from-code skill。
@@ -201,74 +201,27 @@ openspec schema validate evidence-driven
 
 apply、verify、sync、archive 先执行官方 Store selection 与 **Steps** 第 1 步以选定 change，再在第 2 步之前放置 A/B/C 块。
 
-#### A. Apply：直接执行、派发实施与验证
+#### A. Apply：当前 Agent 直接实施并验证
 
 向以下文件追加或替换为以下内容（`STALE` 时替换旧块）：
 
 - `.agents/skills/openspec-apply-change/SKILL.md`
 
-插入位置：官方 Store selection 和 **Steps** 第 1 步（Select the change）之后、第 2 步（Check status to understand the schema）之前。1.12.0 官方 apply 是串行任务循环，不含子 Agent；其 `context` 与 `operationGuidance` 明确只是 prompt-level behavior contracts，不能替代 CLI 状态或证明任务完成；在 `state: "all_done"` 与完成输出中仍会建议 `$openspec-archive`。以本块第 4–5 条为准，门禁通过前不得按官方文案建议 sync 或 archive。
+插入位置：官方 Store selection 和 **Steps** 第 1 步（Select the change）之后、第 2 步（Check status to understand the schema）之前。1.12.0 官方 apply 是串行任务循环；其 `context` 与 `operationGuidance` 明确只是 prompt-level behavior contracts，不能替代 CLI 状态或证明任务完成；在 `state: "all_done"` 与完成输出中仍会建议 `$openspec-archive`。以本块为准，门禁通过前不得按官方文案建议 sync 或 archive。
 
 ```markdown
 <!-- AI_TOOLS_VERIFY_GATE_V2 -->
-## Apply 直接执行、子 Agent 实施与强制验证
+## Apply 直接实施与强制验证
 
 本块使用状态门禁（`AI_TOOLS_STATE_GATE_V1`）。
 
-若当前会话已按本节派发过 apply 子 Agent，本节视为已执行，不得因 command 与 skill 同处一个上下文而重复派发。入口 Agent 负责等待已启动的阶段子 Agent、必要时按下方规则降级并检查 Verify 门禁。官方 apply 在 `state: "all_done"` 或任务全部完成后会建议 `$openspec-archive`；在 Verify 门禁通过前，不得按该官方文案建议 sync 或 archive。
+当前 Agent 必须按官方逐项循环串行执行 apply（`AI_TOOLS_DIRECT_APPLY_V1`）。
 
-“全新任务”（`AI_TOOLS_STANDALONE_APPLY_V1`）必须同时满足：当前 Agent 不是由其它 Agent 创建，用户在本任务首个实质请求中直接调用 apply，且此前未在本任务中为该 change 执行 propose、update、apply 或 verify。不得用上下文长短、模型猜测或是否刚读取 skill 代替这三个条件。满足时由当前 Agent 直接执行官方 apply 主体；不满足且没有委派/工作者标记时，才作为已有流程的入口编排者。
-
-任何子 Agent 派发失败时按 `AI_TOOLS_DISPATCH_FALLBACK_V1` 处理：仅当派发工具明确返回失败、不可用或并发上限，且没有返回可用的任务标识、子 Agent 尚未开始工作时，当前 Agent 降级执行对应阶段或独立域。只要子 Agent 已经开始或可能已经修改文件，后续超时、崩溃、阻塞或失联都属于执行失败；当前 Agent 必须先检查其状态与已有改动，无法确认安全接续时停止，不得从头重做。每次降级必须向用户报告原因。
-
-在官方第 1 步选定 change 后、执行第 2 步及任何实施动作前，只检查父 Agent 或用户下发给本次任务的提示文本；本规则正文中出现的标记字符串不计入判定。按下列顺序判定，命中即停：
-
-1. 若提示文本显式包含 `AI_TOOLS_WORKER_APPLY_V1`，当前 Agent 是 apply 实施者，不是入口也不是 apply 阶段子 Agent：
-   - 只实施任务给出的独立 task 域和拟改路径；
-   - 不得派发 apply / verify 阶段子 Agent，不得再派实施者或调查者；
-   - 不得勾选 `tasks.md`，不得写 `verification.md` 或门禁块；
-   - 不得执行 git add、commit、stash 或其它索引 / HEAD 写入；
-   - 即使提示中还出现 `AI_TOOLS_DELEGATED_APPLY_V1` 或 `AI_TOOLS_DELEGATED_VERIFY_V1`，仍按实施者执行；
-   - 完成后把结果或阻塞返回 apply 子 Agent，不得向用户提问。
-2. 若提示文本显式包含 `AI_TOOLS_DELEGATED_APPLY_V1`，当前 Agent 是 apply 子 Agent，不得再次派发 apply 或 verify 阶段子 Agent。apply 与 verify 两个阶段必须串行，不得对开。执行官方 apply 主体前，按下列顺序判定阶段内并行（AI_TOOLS_PARALLEL_DISPATCH_V1）：
-   - 只解析父 Agent 任务中边界之间的字段，不读取其它 `Path:` 或用户正文。提示必须含恰好一个 `AI_TOOLS_PARALLEL_HANDOFF_V1_START`、恰好一个 `AI_TOOLS_PARALLEL_HANDOFF_V1_END`，且 start 在 end 前；块内必须各有且仅有一行 `status:`、`name: dispatching-parallel-agents` 与 `path:`。
-   - `status:` 必须恰为 `AI_TOOLS_PARALLEL_SKILL_AVAILABLE_V1` 或 `AI_TOOLS_PARALLEL_SKILL_UNAVAILABLE_V1`。两种状态同时出现、重复、缺失或含其它值均为交接无效。AVAILABLE 的 `path:` 必须是非空绝对路径且不得为 `none`；UNAVAILABLE 必须恰为 `path: none`。
-   - 交接无效时不得执行官方 apply 主体、不得自行查找 skill、不得降级串行；立即返回 `阶段内并行：交接无效（<具体原因>）` 并阻塞本阶段。
-   - AVAILABLE 时必须读取该绝对路径，并确认所读 skill 的 metadata name 恰为 `dispatching-parallel-agents`。Path 落在插件缓存不得作为拒绝理由；这是入口交接，不是自行扫描磁盘。Path 不可读、读取工具失败、内容缺失或 name 不匹配时，按 `AI_TOOLS_PARALLEL_SKILL_READ_FAILED_V1` 处理：不得执行官方 apply 主体、不得降级串行，立即返回 `阶段内并行：skill 读取失败（<具体原因>）` 并阻塞本阶段。
-   - UNAVAILABLE 时按官方逐项循环由 apply 子 Agent 自己实施，不得为并行派发实施者。不得 glob 磁盘或插件缓存、不得猜测 SKILL.md 路径、不得把规则正文里的 skill 名当成已可用、不得联网安装。
-   - skill 已读取：仅对无共享状态、不会改同一相对路径或同一制品、互不依赖的独立 task 域，在同一轮派发实施者。每个实施者任务必须包含 `AI_TOOLS_WORKER_APPLY_V1`，且不得包含 `AI_TOOLS_DELEGATED_APPLY_V1`、`AI_TOOLS_DELEGATED_VERIFY_V1`、`AI_TOOLS_PARALLEL_SKILL_AVAILABLE_V1` 或 `AI_TOOLS_PARALLEL_SKILL_UNAVAILABLE_V1`。实施者返回后，以本阶段开始时的路径集合为基线，若两名及以上实施者改动了同一相对路径，则视为重叠，由 apply 子 Agent 串行重做冲突项。无法还原该基线或无法分离已混写内容时，停止并把阻塞返回入口 Agent，不得勾选冲突项。只有 apply 子 Agent 勾选 `tasks.md`。全部 task 结束后仍由 apply 子 Agent 对完整实现 diff 做首次代码审查。
-   - 阶段内并行派发工具不可用：仅当本轮所有实施者均尚未开始时，由 apply 子 Agent 退回本阶段官方串行；已有实施者启动或可能修改文件时按上方派发失败规则检查和接续，不得直接重做。不得改由入口执行官方 apply 主体。
-   - 共享状态、会改同一路径或同一制品、修 A 可能带上 B、或拿不准时：不并行。
-   - 实施者缺少必要上下文：由 apply 子 Agent 补齐后重派或改串行，不得让实施者猜测 change。
-   完成后把结果或阻塞返回入口 Agent，且必须包含恰好一行：`阶段内并行：已派发（<N> 个独立域）`，或 `阶段内并行：已读取 skill，未派发（无独立域|共享状态或路径重叠|派发工具不可用）`，或 `阶段内并行：未读取 skill（不在会话目录）`。不得静默省略该行。
-3. 若满足“全新任务”定义，当前 Agent 直接执行官方 apply 主体并完成首次完整 diff 代码审查，不派发 apply 子 Agent。apply 成功后仍优先派发独立 verify 子 Agent；若该派发在子 Agent 尚未开始时失败，则当前 Agent 降级执行 verify，并在 `verification.md` 的代码审查结论后记录 `验证独立性：已降级（<派发失败原因>）`。
-4. 其余无委派/工作者标记的情况，当前 Agent 是已有流程的入口编排者（AI_TOOLS_PARALLEL_HANDOFF_V1）：
-   - 派发 apply 子 Agent 前，只在入口自己的会话 skills 目录中查找 name 恰好为 `dispatching-parallel-agents` 的条目。该目录指当前助手注入到本次 Agent 提示中的可用 skills 清单（常见为 `available_skills` / `agent_skills` 及其 Path；AI_TOOLS_MULTI_IDE_V1），不是磁盘或插件缓存扫描。
-   - 派发一个子 Agent，在任务中加入 `AI_TOOLS_DELEGATED_APPLY_V1`，要求其使用 `openspec-apply-change` skill 实施当前 change，且不得派发 apply 或 verify 阶段子 Agent。
-   - 任务中必须加入恰好一个以下交接块。找到的目录条目只有在 Path 为非空绝对路径时才算可用；`<目录中的绝对 Path>` 必须原样写入，不得改写或另猜路径：
-
-     ```text
-     AI_TOOLS_PARALLEL_HANDOFF_V1_START
-     status: AI_TOOLS_PARALLEL_SKILL_AVAILABLE_V1
-     name: dispatching-parallel-agents
-     path: <目录中的绝对 Path>
-     AI_TOOLS_PARALLEL_HANDOFF_V1_END
-     ```
-
-     未找到同名条目或 Path 不是非空绝对路径时使用：
-
-     ```text
-     AI_TOOLS_PARALLEL_HANDOFF_V1_START
-     status: AI_TOOLS_PARALLEL_SKILL_UNAVAILABLE_V1
-     name: dispatching-parallel-agents
-     path: none
-     AI_TOOLS_PARALLEL_HANDOFF_V1_END
-     ```
-   - apply 派发在子 Agent 尚未开始时失败，则当前 Agent 降级执行官方 apply 主体和首次完整 diff 代码审查；若子 Agent 已经开始或可能已修改文件，则按上方安全规则检查并接续，无法确认时停止。apply 子 Agent 返回失败或阻塞时不得启动 verify。其成功返回中的「阶段内并行：」行必须转述给用户，不得省略。
-   - apply 成功后派发另一个独立 verify 子 Agent，在任务中加入 `AI_TOOLS_DELEGATED_VERIFY_V1`，要求其使用 `openspec-verify-change` skill 执行 verify。并行交接按同一规则再做一次（查找会话 skills 目录 → 写入 AVAILABLE+Path 或 UNAVAILABLE）。verify 派发在子 Agent 尚未开始时失败，则当前 Agent 降级执行 verify，并在 `verification.md` 的代码审查结论后记录 `验证独立性：已降级（<派发失败原因>）`。
-   - 等待 verify 子 Agent 返回，转述其「阶段内并行：」行，再检查唯一结果块。
-5. apply 执行者仍须对完整实现 diff 做首次代码审查。verify 完成后，当前入口读取恰好一个 `AI_TOOLS_VERIFICATION_RESULT_V2_START` 结果块。
-6. 仅当状态为“通过”、阻塞项为“无”时，当前入口才可结束 apply 并建议 sync 或 archive。状态阻塞或 verify 执行失败均阻止完成；change 保持 active，必须报告具体原因，且不得建议 sync 或 archive。
+1. 当前 Agent 执行官方 apply 主体、更新 `tasks.md`，并对完整实现 diff 做首次代码审查。
+2. apply 未成功或存在阻塞时不得启动 verify；change 保持 active，并向用户报告具体原因。
+3. apply 成功后，当前 Agent 继续串行执行 `openspec-verify-change` 的完整验证闭环。
+4. verify 完成后，当前 Agent 读取恰好一个 `AI_TOOLS_VERIFICATION_RESULT_V2_START` 结果块。
+5. 仅当状态为“通过”、阻塞项为“无”时，当前 Agent 才可结束 apply 并建议 sync 或 archive。状态阻塞或 verify 执行失败均阻止完成；change 保持 active，必须报告具体原因，且不得建议 sync 或 archive。
 <!-- AI_TOOLS_VERIFY_GATE_V2_END -->
 ```
 
@@ -282,47 +235,21 @@ apply、verify、sync、archive 先执行官方 Store selection 与 **Steps** �
 
 ```markdown
 <!-- AI_TOOLS_VERIFY_GATE_V2 -->
-## Verify 入口编排与验证阻塞修复闭环
+## Verify 直接执行与验证阻塞修复闭环
 
 本块使用状态门禁（`AI_TOOLS_STATE_GATE_V1`）。
 
-若当前会话已派发过 verify 子 Agent（无论由本节还是 Apply 节触发），本节视为已执行，不得因 command 与 skill 同处一个上下文而重复派发。入口 Agent 只等待该子 Agent并读取、汇报最终门禁，不得执行官方 verify 主体。官方 verify 的会话记分卡（CRITICAL / WARNING / SUGGESTION）和「Ready for archive」文案不是本项目硬门禁，不得替代下方闭环；必须写入 `verification.md`。
+官方 verify 的会话记分卡（CRITICAL / WARNING / SUGGESTION）和「Ready for archive」文案不是本项目硬门禁，不得替代下方闭环；必须写入 `verification.md`。
 
-“全新任务”（`AI_TOOLS_STANDALONE_VERIFY_V1`）必须同时满足：当前 Agent 不是由其它 Agent 创建，用户在本任务首个实质请求中直接调用 verify，且此前未在本任务中为该 change 执行 propose、update、apply 或 verify。不得用上下文长短、模型猜测或是否刚读取 skill 代替这三个条件。满足时由当前 Agent 直接执行完整验证闭环；不满足且没有委派/工作者标记时，才作为已有流程的入口编排者。
-
-任何 verify 阶段子 Agent 或调查者派发失败时按 `AI_TOOLS_DISPATCH_FALLBACK_V1` 处理：仅当派发工具明确返回失败、不可用或并发上限，且没有返回可用的任务标识、子 Agent 尚未开始工作时，当前 Agent 降级执行对应验证阶段或独立域；阶段级 verify 降级还须在 `verification.md` 的代码审查结论后记录 `验证独立性：已降级（<派发失败原因>）`。只要子 Agent 已经开始或可能已经修改文件，后续超时、崩溃、阻塞或失联都属于执行失败；当前 Agent 必须先检查其状态与已有改动，无法确认安全接续时停止，不得从头重做。每次降级必须向用户报告原因。
-
-在官方第 1 步选定 change 后、执行第 2 步及任何验证动作前，只检查父 Agent 或用户下发给本次任务的提示文本；本规则正文中出现的标记字符串不计入判定。按下列顺序判定，命中即停：
-
-1. 若提示文本显式包含 `AI_TOOLS_WORKER_VERIFY_V1`，当前 Agent 是 verify 调查者，不是入口也不是 verify 阶段子 Agent：
-   - 只做任务给出的独立失败域或只读检查域；
-   - 不得派发 apply / verify 阶段子 Agent，不得再派实施者或调查者；
-   - 不得写 `verification.md` 或门禁块；
-   - 不得执行 git add、commit、stash 或其它索引 / HEAD 写入；
-   - 即使提示中还出现 `AI_TOOLS_DELEGATED_APPLY_V1` 或 `AI_TOOLS_DELEGATED_VERIFY_V1`，仍按调查者执行；
-   - 完成后把结果或阻塞返回 verify 子 Agent，不得向用户提问。
-2. 若满足“全新任务”定义，当前 Agent 直接执行完整验证闭环，不派发 verify 子 Agent。直接执行本身不是派发降级，不记录“验证独立性：已降级”。
-3. 若提示文本未显式包含 `AI_TOOLS_DELEGATED_VERIFY_V1`，当前 Agent 是已有流程的入口编排者（AI_TOOLS_PARALLEL_HANDOFF_V1）：派发前只在入口自己的会话 skills 目录中查找 name 恰好为 `dispatching-parallel-agents` 的条目（当前助手注入的 `available_skills` / `agent_skills` 及其 Path；AI_TOOLS_MULTI_IDE_V1，不是磁盘扫描）。派发一个子 Agent，在任务中加入 `AI_TOOLS_DELEGATED_VERIFY_V1`，要求其使用 `openspec-verify-change` skill 执行当前 change 的完整 verify。任务必须含恰好一个与 Apply 第 4 步格式完全相同的交接块：同名条目且 Path 为非空绝对路径时，块内写 `status: AI_TOOLS_PARALLEL_SKILL_AVAILABLE_V1`、`name: dispatching-parallel-agents` 与原样绝对 `path:`；否则写 `status: AI_TOOLS_PARALLEL_SKILL_UNAVAILABLE_V1`、`name: dispatching-parallel-agents` 与 `path: none`。块必须由恰好一个 `AI_TOOLS_PARALLEL_HANDOFF_V1_START` 和恰好一个 `AI_TOOLS_PARALLEL_HANDOFF_V1_END` 包围。派发在子 Agent 尚未开始时失败，则当前 Agent 降级执行完整验证闭环并记录独立性降级；已启动后的失败按上方安全规则处理。等待成功后转述子 Agent 返回的「阶段内并行：」行，再读取并汇报最终门禁。
-4. 若提示文本显式包含 `AI_TOOLS_DELEGATED_VERIFY_V1`，当前 Agent 是 verify 子 Agent，不得再次派发 verify 阶段子 Agent。apply 与 verify 两个阶段必须串行，不得对开。执行官方 verify 主体前，按下列顺序判定阶段内并行（命中即停）；规则正文中的标记不计入提示判定。阶段内并行（AI_TOOLS_PARALLEL_DISPATCH_V1）：
-   - 只解析父 Agent 任务中边界之间的字段，不读取其它 `Path:` 或用户正文。提示必须含恰好一个 `AI_TOOLS_PARALLEL_HANDOFF_V1_START`、恰好一个 `AI_TOOLS_PARALLEL_HANDOFF_V1_END`，且 start 在 end 前；块内必须各有且仅有一行 `status:`、`name: dispatching-parallel-agents` 与 `path:`。
-   - `status:` 必须恰为 `AI_TOOLS_PARALLEL_SKILL_AVAILABLE_V1` 或 `AI_TOOLS_PARALLEL_SKILL_UNAVAILABLE_V1`。两种状态同时出现、重复、缺失或含其它值均为交接无效。AVAILABLE 的 `path:` 必须是非空绝对路径且不得为 `none`；UNAVAILABLE 必须恰为 `path: none`。
-   - 交接无效时不得执行官方 verify 主体、不得自行查找 skill、不得降级串行；立即返回 `阶段内并行：交接无效（<具体原因>）` 并阻塞本阶段。
-   - AVAILABLE 时必须读取该绝对路径，并确认所读 skill 的 metadata name 恰为 `dispatching-parallel-agents`。Path 落在插件缓存不得作为拒绝理由；这是入口交接，不是自行扫描磁盘。Path 不可读、读取工具失败、内容缺失或 name 不匹配时，按 `AI_TOOLS_PARALLEL_SKILL_READ_FAILED_V1` 处理：不得执行官方 verify 主体、不得降级串行，立即返回 `阶段内并行：skill 读取失败（<具体原因>）` 并阻塞本阶段。
-   - UNAVAILABLE 时由 verify 子 Agent 独自完成下方验证闭环，不得为并行派发调查者。不得 glob 磁盘或插件缓存、不得猜测 SKILL.md 路径、不得把规则正文里的 skill 名当成已可用、不得联网安装。
-   - skill 已读取：仅对只读、互不干扰的检查或独立失败域，在同一轮派发调查者。每个调查者任务必须包含 `AI_TOOLS_WORKER_VERIFY_V1`，且不得包含 `AI_TOOLS_DELEGATED_APPLY_V1`、`AI_TOOLS_DELEGATED_VERIFY_V1`、`AI_TOOLS_PARALLEL_SKILL_AVAILABLE_V1` 或 `AI_TOOLS_PARALLEL_SKILL_UNAVAILABLE_V1`。调查者返回后，verify 子 Agent 汇合结论；以本阶段开始时的路径集合为基线，若两名及以上调查者改动了同一相对路径，则视为重叠，由 verify 子 Agent 串行重做冲突项。无法还原该基线或无法分离已混写内容时，停止并把阻塞返回入口 Agent，不得写通过门禁。需要安全修复时，仅当修复域独立且无共享状态才可按该 skill 并行修改互不重叠的路径；否则由 verify 子 Agent 串行修复。每一轮修复后的完整复验、完整 diff 审查与门禁仍由 verify 子 Agent 串行收口。同一轮内对独立域的并行修复只计 1 轮；必须等该轮全部修复返回并由 verify 子 Agent 做完整复验后，才可进入下一轮。
-   - 阶段内并行派发工具不可用：仅当本轮所有调查者均尚未开始时，由 verify 子 Agent 退回本阶段官方串行；已有调查者启动或可能修改文件时按上方派发失败规则检查和接续，不得直接重做。不得改由入口执行官方 verify 主体。
-   - 共享状态、会改同一路径或同一制品、修 A 可能带上 B、或拿不准时：不并行。
-   - 调查者缺少必要上下文：由 verify 子 Agent 补齐后重派或改串行，不得让调查者猜测 change。
-   向入口返回时必须包含恰好一行：`阶段内并行：已派发（<N> 个独立域）`，或 `阶段内并行：已读取 skill，未派发（无独立域|共享状态或路径重叠|派发工具不可用）`，或 `阶段内并行：未读取 skill（不在会话目录）`。不得静默省略该行。
-5. verify 执行者按下方验证闭环中的正式阻塞条件处理；需要停止时，阶段子 Agent把阻塞返回入口 Agent，直接执行的当前 Agent则向用户报告。
+当前 Agent 必须串行执行完整验证闭环（`AI_TOOLS_DIRECT_VERIFY_V1`）。需要停止时由当前 Agent 向用户报告。
 
 ### 验证闭环
 
-1. 实际执行验证并检查代码、测试及 change 制品。发现可安全修复的阻塞项时，按第 3 步已判定的方式修复（verify 子 Agent 串行修复，或对独立修复域派带 `AI_TOOLS_WORKER_VERIFY_V1` 的调查者），并重新运行受影响的检查和完整 verify。
-2. 最多执行 3 轮“验证—修复—重新验证”。同一轮内并行修复只计 1 轮。同一阻塞连续两轮无进展时提前停止。
+1. 实际执行验证并检查代码、测试及 change 制品。发现可安全修复的阻塞项时，由当前 Agent 修复，并重新运行受影响的检查和完整 verify。
+2. 最多执行 3 轮“验证—修复—重新验证”。同一阻塞连续两轮无进展时提前停止。
 3. 遇到需要用户决策、缺少权限或凭据、外部服务故障、破坏性操作，或超出当前 change 范围的修改时，不得自行处理，停止并报告。
 4. 根据当前 change 的实现 baseline 与完整 diff 确认验证范围。无法区分当前 change 与既有无关改动时停止并询问。
-5. 将实际检查写回 `verification.md` 的统一检查表；复验时只更新统一表中的原行，不追加每轮历史。结果证据只保留退出码、摘要和报告路径。verify 子 Agent 每次修改代码后，必须针对修复后的完整 diff 重新执行代码审查并更新原审查行；存在未处理的 Critical/Important 时不得通过。
+5. 将实际检查写回 `verification.md` 的统一检查表；复验时只更新统一表中的原行，不追加每轮历史。结果证据只保留退出码、摘要和报告路径。当前 Agent 每次修改代码后，必须针对修复后的完整 diff 重新执行代码审查并更新原审查行；存在未处理的 Critical/Important 时不得通过。
 6. 最终写入恰好一个结果块，并删除旧 V1 结果块、所有
    `AI_TOOLS_VERIFICATION_SCOPE_V1/V2` 块以及旧结果块中的“范围摘要”“内容指纹”字段：
 
@@ -423,37 +350,34 @@ block = text[starts[0].end():ends[0].start()]
 required_by_kind = {
     "apply": (
         "AI_TOOLS_STATE_GATE_V1",
-        "AI_TOOLS_DELEGATED_APPLY_V1",
-        "AI_TOOLS_STANDALONE_APPLY_V1",
-        "AI_TOOLS_DISPATCH_FALLBACK_V1",
-        "AI_TOOLS_PARALLEL_DISPATCH_V1",
-        "AI_TOOLS_PARALLEL_HANDOFF_V1_START",
-        "AI_TOOLS_PARALLEL_HANDOFF_V1_END",
-        "AI_TOOLS_PARALLEL_SKILL_AVAILABLE_V1",
-        "AI_TOOLS_PARALLEL_SKILL_UNAVAILABLE_V1",
-        "AI_TOOLS_PARALLEL_SKILL_READ_FAILED_V1",
-        "AI_TOOLS_WORKER_APPLY_V1",
-        "AI_TOOLS_MULTI_IDE_V1",
+        "AI_TOOLS_DIRECT_APPLY_V1",
     ),
     "verify": (
         "AI_TOOLS_STATE_GATE_V1",
-        "AI_TOOLS_DELEGATED_VERIFY_V1",
-        "AI_TOOLS_STANDALONE_VERIFY_V1",
-        "AI_TOOLS_DISPATCH_FALLBACK_V1",
-        "AI_TOOLS_PARALLEL_DISPATCH_V1",
-        "AI_TOOLS_PARALLEL_HANDOFF_V1_START",
-        "AI_TOOLS_PARALLEL_HANDOFF_V1_END",
-        "AI_TOOLS_PARALLEL_SKILL_AVAILABLE_V1",
-        "AI_TOOLS_PARALLEL_SKILL_UNAVAILABLE_V1",
-        "AI_TOOLS_PARALLEL_SKILL_READ_FAILED_V1",
-        "AI_TOOLS_WORKER_VERIFY_V1",
-        "AI_TOOLS_MULTI_IDE_V1",
+        "AI_TOOLS_DIRECT_VERIFY_V1",
     ),
     "flow": ("AI_TOOLS_STATE_GATE_V1", "AI_TOOLS_VERIFY_FLOW_GATE_V1"),
 }
 missing = [marker for marker in required_by_kind[kind] if marker not in block]
 if missing:
     print("STALE (missing in V2 block: {})".format(missing[0]))
+    raise SystemExit(0)
+
+removed_dispatch_markers = (
+    "AI_TOOLS_DELEGATED_",
+    "AI_TOOLS_STANDALONE_",
+    "AI_TOOLS_DISPATCH_FALLBACK_V1",
+    "AI_TOOLS_PARALLEL_",
+    "AI_TOOLS_WORKER_",
+    "AI_TOOLS_MULTI_IDE_V1",
+)
+present_removed = [
+    marker for marker in removed_dispatch_markers if marker in block
+]
+if present_removed:
+    print("STALE (removed dispatch marker in V2 block: {})".format(
+        present_removed[0]
+    ))
     raise SystemExit(0)
 
 print("OK")
@@ -466,7 +390,7 @@ done
 
 每个 V2 注入必须以独立注释行 `<!-- AI_TOOLS_VERIFY_GATE_V2 -->` 开始，以独立注释行 `<!-- AI_TOOLS_VERIFY_GATE_V2_END -->` 结束；检查器只读取这两个边界之间的正文，不接受行内伪标记，也不允许文档其它位置代打 required。`MISSING` 表示既没有 V2/V1 独立起始标记，也没有孤立 V2 结束标记；`DUPLICATE` 表示 V2 起止标记重复；`STALE` 包括 V1-only、V1/V2 混写、缺少 `AI_TOOLS_STATE_GATE_V1` 的旧 V2 指纹正文、孤立 start 或 end 等边界不完整或块内 required 缺失。出现 V1 或缺少状态门禁标记时标为 `STALE`，必须以当前 V2 完整块替换，不得再次追加。
 
-apply 块内必须同时包含当前 APPLY delegated、standalone、dispatch fallback、parallel、handoff 起止边界、AVAILABLE/UNAVAILABLE/READ_FAILED、worker 与 `AI_TOOLS_MULTI_IDE_V1` 标记；verify 块内必须包含对应的 VERIFY 标记；sync/archive 块内必须包含 `AI_TOOLS_VERIFY_FLOW_GATE_V1`，防止只有边界、没有流转检查正文的空块被误判为 `OK`。缺少 Superpowers 或缺少 `dispatching-parallel-agents` 不得标为 `STALE`。`NOFILE` 表示官方文件不存在，应先恢复官方生成层。
+apply 块内必须包含 `AI_TOOLS_DIRECT_APPLY_V1`，verify 块内必须包含 `AI_TOOLS_DIRECT_VERIFY_V1`；sync/archive 块内必须包含 `AI_TOOLS_VERIFY_FLOW_GATE_V1`，防止只有边界、没有流转检查正文的空块被误判为 `OK`。`NOFILE` 表示官方文件不存在，应先恢复官方生成层。
 
 ### 5.2 已有 active change 怎么办
 
@@ -485,9 +409,7 @@ spec-driven:   proposal → specs/design → tasks → apply
 evidence-driven: proposal → specs/design → tasks → verification → apply
 ```
 
-官方 skills 以 CLI 生成物为基线，并按 5.1 节追加验证闭环与流转门禁。`verification` 的制品依赖通过 schema 的 `apply.requires` 与模板指导进入工作流；该依赖只保证制品存在。全新任务直接调用 apply/verify 时由当前 Agent 执行；已有流程进入 apply 时入口优先派发 apply 子 Agent，成功后再优先派发独立 verify 子 Agent。阶段派发在子 Agent 尚未开始时失败可由当前 Agent 降级执行，已启动后的失败必须先检查状态与改动，不得从头重做。最终由 verification 中持久化的 Verify 门禁决定能否继续 sync 或 archive。
-
-阶段内并行由入口通过唯一有边界的交接块传递：入口在自己的会话 skills 目录中查找 `dispatching-parallel-agents`，找到则交接 AVAILABLE 与绝对 Path；找不到则交接 UNAVAILABLE 并串行。交接无效或读取失败会阻塞，不得静默降级。阶段子 Agent 必须回报「阶段内并行：」行，入口须转述。自行扫描磁盘或插件缓存仍不算可用。
+官方 skills 以 CLI 生成物为基线，并按 5.1 节追加验证闭环与流转门禁。`verification` 的制品依赖通过 schema 的 `apply.requires` 与模板指导进入工作流；该依赖只保证制品存在。apply 与 verify 始终由当前 Agent 串行执行。最终由 verification 中持久化的 Verify 门禁决定能否继续 sync 或 archive。
 
 ## 6. 路径 C：从旧版 ai-tools 迁移
 
@@ -680,7 +602,7 @@ openspec schema validate evidence-driven
 
 **禁止**用本仓库完整文件覆盖目标配置；`config.yaml` 只合并 `schema: evidence-driven` 与制品规则标记块，`AGENTS.md` 只合并对话规则标记块。
 
-ai-tools 自定义层升级后必须重新运行 5.1 节检查器。旧 V1 或缺少当前委派、并行交接、工作者和 `AI_TOOLS_MULTI_IDE_V1` 标记的块均为 `STALE`，必须用当前 A/B/C 节完整块替换。
+ai-tools 自定义层升级后必须重新运行 5.1 节检查器。旧 V1 或缺少 `AI_TOOLS_DIRECT_APPLY_V1`、`AI_TOOLS_DIRECT_VERIFY_V1` 的块均为 `STALE`，必须用当前 A/B/C 节完整块替换。
 
 ### 7.3 本仓库（ai-tools）自身注意事项
 
@@ -725,7 +647,7 @@ Cursor 与 Codex 共用的 `$openspec-propose` skill 由 `.agents/skills/` 中�
 - [ ] `evidence-driven` schema 存在、启用且校验通过。
 - [ ] `.agents/skills/` 是唯一官方 Skill 源。
 - [ ] apply/verify/sync/archive 各有且只有一个完整的 `AI_TOOLS_VERIFY_GATE_V2` 块。
-- [ ] apply/verify 的委派、并行交接、工作者和 `AI_TOOLS_MULTI_IDE_V1` 标记完整。
+- [ ] apply/verify 的直接串行执行标记完整。
 - [ ] sync/archive 会复核通过状态与无阻塞。
 - [ ] 中文规则和 from-code skill 按约定安装。
 
@@ -751,11 +673,11 @@ openspec validate "smoke-ai-tools-integration" --type change --strict --json
 
 ### 接入后官方 verify 变「弱」了？
 
-verify 主体仍跟随官方生成物。OpenSpec 1.12.0 官方 verify 只在会话中输出 Completeness / Correctness / Coherence 记分卡，不写 `verification.md`。增强规则要求全新任务直接调用 `$openspec-verify` 时由当前 Agent 执行；已有流程衔接 verify 时优先派发独立 verify 子 Agent。派发仅在子 Agent 尚未开始时失败才降级到当前 Agent，并把验证独立性下降写入 `verification.md`。verify 执行者仅对可安全、在当前 change 范围内且不需要用户决策的阻塞直接修复并重新验证（最多 3 轮）；其余情况停止并报告。结构化结论写回 verification，sync/archive 会在各自入口强制检查该结论（状态为通过、阻塞项为无）。当前 verification 已要求完整 diff 代码审查，并以未处理的 Critical/Important 阻断流转。若还需要独立审批人、第二次审查或 archive 阶段的额外审批门禁，应另加项目规则或独立 skill。
+verify 主体仍跟随官方生成物。OpenSpec 1.12.0 官方 verify 只在会话中输出 Completeness / Correctness / Coherence 记分卡，不写 `verification.md`。增强规则要求当前 Agent 串行执行完整 verify。verify 执行者仅对可安全、在当前 change 范围内且不需要用户决策的阻塞直接修复并重新验证（最多 3 轮）；其余情况停止并报告。结构化结论写回 verification，sync/archive 会在各自入口强制检查该结论（状态为通过、阻塞项为无）。当前 verification 已要求完整 diff 代码审查，并以未处理的 Critical/Important 阻断流转。若还需要独立审批人、第二次审查或 archive 阶段的额外审批门禁，应另加项目规则或独立 skill。
 
 ### 安装增强规则后还要再装 Superpowers 吗？注入要不要再替换？
 
-不必。`AI_TOOLS_PARALLEL_DISPATCH_V1` 只表示注入已包含阶段内并行规则，不表示 Superpowers 已安装。`AI_TOOLS_PARALLEL_HANDOFF_V1` 表示入口必须用唯一 START/END 交接块把判定结果写入子 Agent 任务：自己的会话 skills 目录里有 `dispatching-parallel-agents` 且 Path 为绝对路径时，块内写 AVAILABLE、固定 name 与原样 Path；否则写 UNAVAILABLE 与 `path: none`。阶段子 Agent 只解析该块；交接畸形或读取失败（READ_FAILED）会阻塞阶段，不得降级串行。阶段子 Agent 必须回报「阶段内并行：」行（已派发 / 已读取未派发 / 未读取 / 交接无效 / 读取失败），入口须转述给用户，不得静默。之后自行安装 Superpowers 且目录出现该条目，无需再次替换注入。卸掉后目录不再包含该条目即回到串行；自行扫描插件缓存里残留的 `SKILL.md` 不算可用。只有注入文本过期（5.1 节脚本报 `STALE`，例如缺 START/END 或 AVAILABLE/UNAVAILABLE/READ_FAILED）才需要用当前 A/B 节替换。并行工作者必须带 `AI_TOOLS_WORKER_APPLY_V1` / `AI_TOOLS_WORKER_VERIFY_V1`，否则会把自己当成入口再派阶段子 Agent。
+不必。当前增强规则不依赖 Superpowers。只有注入文本过期（5.1 节脚本报 `STALE`，例如缺少直接执行标记）时，才需要用当前 A/B 节替换。
 
 ### `openspec update` 会不会删掉 `evidence-driven`？
 

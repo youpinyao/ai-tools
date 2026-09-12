@@ -86,8 +86,8 @@ flowchart TD
     Specs --> Tasks[tasks]
     Design --> Tasks
     Tasks --> VerificationPlan[verification 计划]
-    VerificationPlan --> ApplyLoop[apply 执行者<br/>全新任务当前执行，否则优先子 Agent]
-    ApplyLoop --> VerifyLoop[verify 执行者<br/>已有流程优先独立子 Agent]
+    VerificationPlan --> ApplyLoop[当前 Agent<br/>串行执行 apply]
+    ApplyLoop --> VerifyLoop[当前 Agent<br/>串行执行 verify]
     FromCodeChange --> VerifyLoop
     FromCodeSpec --> SpecDone([main spec 已按代码回写])
     VerifyLoop --> Repairable{阻塞可安全修复且<br/>仍可继续尝试?}
@@ -134,23 +134,16 @@ flowchart TD
   之间的制品依赖，要求 `apply` 在 `verification.md` 已存在后实施，并跟踪
   `tasks.md`；紧凑的 `verification.md` 负责保存范围、需求与检查的对应关系、代码
   审查和剩余风险。每轮复验更新原检查行，只保留当前权威证据，不追加完整历史。
-- 安装 `AI_TOOLS_VERIFY_GATE_V2` 后，全新任务直接调用 apply 或 verify 时由当前 Agent
-  执行；已有流程进入 apply 时入口优先派发 apply 子 Agent，成功后才优先派发独立
-  verify 子 Agent。阶段派发只有在子 Agent 尚未开始时失败才由当前 Agent 降级执行；
-  已启动后的失败须先检查状态和已有改动，不得从头重做。verify 派发降级时在
-  `verification.md` 记录独立性下降。verify 先确认可解析的 baseline 与 change
+- 安装 `AI_TOOLS_VERIFY_GATE_V2` 后，apply 与 verify 均由当前 Agent 串行执行。
+  verify 先确认可解析的 baseline 与 change
   范围，再执行检查。图中的“仍可继续尝试”表示未达到三轮上限、未连续两轮无进展，
   且不涉及用户决策、权限或凭据、外部服务故障、破坏性操作或范围外修改。满足条件的
   阻塞由 verify 执行者直接修复并完整复验；每次修改代码后都针对修复后的完整
   diff 重新执行代码审查并更新 verification。不能继续修复的问题再按类型回到
-  `apply`、`update` 或补充检查。阶段内并行由入口按会话 skills 目录交接
-  `dispatching-parallel-agents`：使用唯一有边界的块传递 AVAILABLE 与绝对 Path，
-  或传递 UNAVAILABLE 并串行；交接畸形或读取失败会阻塞，不得静默降级。子 Agent
-  回报「阶段内并行：」行。后续安装无需再替换注入。自行扫描磁盘上的 `SKILL.md`
-  不足以为可用。
+  `apply`、`update` 或补充检查。
 - `sync` 或 `archive` 入口只检查 `verification.md` 的结构化结论：验证状态为通过、
   阻塞项为无。它们不比较验证完成后的代码或证据变化，也不重复实现验证。
-- 未安装增强规则时，以上子 Agent 派发与门禁均不成立；`verify`、`sync`、`archive`
+- 未安装增强规则时，以上直接执行约束与门禁均不成立；`verify`、`sync`、`archive`
   的具体条件与行为仍以目标项目当前 OpenSpec 官方生成物为准。OpenSpec 1.12.0 官方
   `$openspec-verify` 只输出会话记分卡（Completeness / Correctness / Coherence），不写
   `verification.md`；官方 `$openspec-archive` 对未完成制品或任务仅警告并允许用户确认
@@ -197,8 +190,8 @@ OpenSpec 1.12.0 的官方 `explore` 会在提出事实性问题前只读检查�
 
 在 `verify` 阶段发现问题时，应先判断问题类型，再选择处理路径：
 
-- 实现不满足需求：若修复安全、在当前 change 范围内且无需用户决策，由 verify 子
-  Agent 直接修复并复验；否则返回 `apply` 修复实现，再重新验证。
+- 实现不满足需求：若修复安全、在当前 change 范围内且无需用户决策，由当前 Agent
+  直接修复并复验；否则返回 `apply` 修复实现，再重新验证。
 - 规划错误或制品之间存在矛盾：使用 `update` 修正规划，再通过 `apply` 完成必要
   修改并重新验证。
 - 验证证据不足：补充并执行缺失的检查，再重新验证；不要仅为补证据而修改规划。
@@ -267,8 +260,7 @@ change 再调用 `openspec-update-change-from-code`：该 skill 只更新已有 
   spec 回写使用 `openspec list --specs --json` 或 `openspec context --json` 的
   `root.path`。路径为 `<root>/openspec/specs/<capability-path>/spec.md`，不要假设仓库相对路径。
 - 实现完成后建议核验。安装 `AI_TOOLS_VERIFY_GATE_V2` 后，apply 与单独
-  `$openspec-verify` 均由入口 Agent 派发子 Agent 执行，阶段内并行由入口按会话 skills
-  目录以唯一有边界的块交接 `dispatching-parallel-agents`，并通过 Verify 门禁与
+  `$openspec-verify` 均由当前 Agent 串行执行，并通过 Verify 门禁与
   结构化验证结论约束 sync/archive。未安装增强规则时，
   `verify`、`sync`、`archive` 的具体条件与行为
   遵循目标项目当前 OpenSpec 官方生成物（1.12.0 官方 verify 仅为会话记分卡，官方

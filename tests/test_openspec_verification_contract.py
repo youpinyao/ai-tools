@@ -73,33 +73,13 @@ def fenced_bash(text: str, start: str, end: str) -> str:
     return match.group(1)
 
 
-APPLY_PARALLEL_MARKERS = (
+APPLY_GATE_MARKERS = (
     "AI_TOOLS_STATE_GATE_V1",
-    "AI_TOOLS_DELEGATED_APPLY_V1",
-    "AI_TOOLS_STANDALONE_APPLY_V1",
-    "AI_TOOLS_DISPATCH_FALLBACK_V1",
-    "AI_TOOLS_PARALLEL_DISPATCH_V1",
-    "AI_TOOLS_PARALLEL_HANDOFF_V1_START",
-    "AI_TOOLS_PARALLEL_HANDOFF_V1_END",
-    "AI_TOOLS_PARALLEL_SKILL_AVAILABLE_V1",
-    "AI_TOOLS_PARALLEL_SKILL_UNAVAILABLE_V1",
-    "AI_TOOLS_PARALLEL_SKILL_READ_FAILED_V1",
-    "AI_TOOLS_WORKER_APPLY_V1",
-    "AI_TOOLS_MULTI_IDE_V1",
+    "AI_TOOLS_DIRECT_APPLY_V1",
 )
-VERIFY_PARALLEL_MARKERS = (
+VERIFY_GATE_MARKERS = (
     "AI_TOOLS_STATE_GATE_V1",
-    "AI_TOOLS_DELEGATED_VERIFY_V1",
-    "AI_TOOLS_STANDALONE_VERIFY_V1",
-    "AI_TOOLS_DISPATCH_FALLBACK_V1",
-    "AI_TOOLS_PARALLEL_DISPATCH_V1",
-    "AI_TOOLS_PARALLEL_HANDOFF_V1_START",
-    "AI_TOOLS_PARALLEL_HANDOFF_V1_END",
-    "AI_TOOLS_PARALLEL_SKILL_AVAILABLE_V1",
-    "AI_TOOLS_PARALLEL_SKILL_UNAVAILABLE_V1",
-    "AI_TOOLS_PARALLEL_SKILL_READ_FAILED_V1",
-    "AI_TOOLS_WORKER_VERIFY_V1",
-    "AI_TOOLS_MULTI_IDE_V1",
+    "AI_TOOLS_DIRECT_VERIFY_V1",
 )
 FLOW_GATE_MARKERS = ("AI_TOOLS_STATE_GATE_V1", "AI_TOOLS_VERIFY_FLOW_GATE_V1")
 
@@ -237,20 +217,24 @@ class VerificationContractTest(unittest.TestCase):
             with self.subTest(path=path.relative_to(ROOT).as_posix()):
                 self.assertIn("AI_TOOLS_VERIFY_GATE_V2", text)
 
-    def test_current_docs_define_standalone_and_dispatch_fallback_semantics(
+    def test_current_docs_define_direct_serial_execution_semantics(
         self,
     ) -> None:
         for path in CURRENT_DOCS:
             text = path.read_text()
             relative_path = path.relative_to(ROOT).as_posix()
             for phrase in (
-                "全新任务",
                 "当前 Agent",
-                "尚未开始",
-                "不得从头重做",
+                "串行",
             ):
                 with self.subTest(path=relative_path, phrase=phrase):
                     self.assertIn(phrase, text)
+
+        current = "\n".join(path.read_text() for path in CURRENT_DOCS)
+        self.assertNotIn("子 Agent", current)
+        self.assertNotIn("dispatching-parallel-agents", current)
+        self.assertIn("$openspec-apply-change", current)
+        self.assertNotRegex(current, r"\$openspec-apply(?!-change)")
 
     def test_current_docs_reject_legacy_workspace_semantics(self) -> None:
         for path in CURRENT_DOCS:
@@ -388,11 +372,20 @@ class VerificationContractTest(unittest.TestCase):
             ".agents/skills/openspec-sync-specs/SKILL.md",
             ".agents/skills/openspec-archive-change/SKILL.md",
         )
-        valid_gate = (
-            "<!-- AI_TOOLS_VERIFY_GATE_V2 -->\n"
-            "current AI_TOOLS_STATE_GATE_V1\n"
-            "<!-- AI_TOOLS_VERIFY_GATE_V2_END -->\n"
-        )
+        markers_by_path = {
+            gate_paths[0]: "AI_TOOLS_DIRECT_APPLY_V1",
+            gate_paths[1]: "AI_TOOLS_DIRECT_VERIFY_V1",
+            gate_paths[2]: "AI_TOOLS_VERIFY_FLOW_GATE_V1",
+            gate_paths[3]: "AI_TOOLS_VERIFY_FLOW_GATE_V1",
+        }
+
+        def valid_gate(relative: str) -> str:
+            return (
+                "<!-- AI_TOOLS_VERIFY_GATE_V2 -->\n"
+                "current AI_TOOLS_STATE_GATE_V1\n"
+                f"current {markers_by_path[relative]}\n"
+                "<!-- AI_TOOLS_VERIFY_GATE_V2_END -->\n"
+            )
 
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -406,7 +399,7 @@ class VerificationContractTest(unittest.TestCase):
                 for relative in gate_paths:
                     path = target / relative
                     path.parent.mkdir(parents=True, exist_ok=True)
-                    path.write_text(valid_gate)
+                    path.write_text(valid_gate(relative))
 
             def invoke(*, optimize: bool = False) -> subprocess.CompletedProcess:
                 environment = os.environ.copy()
@@ -443,12 +436,14 @@ class VerificationContractTest(unittest.TestCase):
 
             reset_target()
             legacy = "<!-- AI_TOOLS_VERIFY_GATE_" + "V1 -->\n"
-            (target / gate_paths[0]).write_text(valid_gate + legacy)
+            (target / gate_paths[0]).write_text(valid_gate(gate_paths[0]) + legacy)
             self.assertNotEqual(invoke().returncode, 0)
             self.assertNotEqual(invoke(optimize=True).returncode, 0)
 
             reset_target()
-            (target / gate_paths[0]).write_text(valid_gate + valid_gate)
+            (target / gate_paths[0]).write_text(
+                valid_gate(gate_paths[0]) + valid_gate(gate_paths[0])
+            )
             self.assertNotEqual(invoke().returncode, 0)
 
             reset_target()
@@ -461,7 +456,7 @@ class VerificationContractTest(unittest.TestCase):
 
             reset_target()
             (target / gate_paths[0]).write_text(
-                valid_gate.replace(
+                valid_gate(gate_paths[0]).replace(
                     "current AI_TOOLS_STATE_GATE_V1",
                     "python3 scripts/openspec-verification-fingerprint.py",
                 )
@@ -469,6 +464,17 @@ class VerificationContractTest(unittest.TestCase):
             legacy_gate = invoke()
             self.assertNotEqual(legacy_gate.returncode, 0)
             self.assertIn("legacy fingerprint gate", legacy_gate.stderr)
+
+            reset_target()
+            (target / gate_paths[0]).write_text(
+                valid_gate(gate_paths[0]).replace(
+                    "current AI_TOOLS_DIRECT_APPLY_V1\n",
+                    "",
+                )
+            )
+            missing_direct = invoke()
+            self.assertNotEqual(missing_direct.returncode, 0)
+            self.assertIn("missing required marker", missing_direct.stderr)
 
             reset_target()
             verification = target / "openspec/changes/legacy/verification.md"
@@ -571,67 +577,7 @@ class VerificationContractTest(unittest.TestCase):
         self.assertEqual(classify_gate("verify", blocks[1]), "OK")
         self.assertEqual(classify_gate("flow", blocks[2]), "OK")
 
-    def test_apply_and_verify_blocks_require_parallel_skill_handoff(self) -> None:
-        text = integration_text()
-        blocks = re.findall(
-            r"(?ms)^<!-- AI_TOOLS_VERIFY_GATE_V2 -->\n"
-            r".*?"
-            r"^<!-- AI_TOOLS_VERIFY_GATE_V2_END -->$",
-            text,
-        )
-        self.assertEqual(len(blocks), 3)
-        apply_block, verify_block, flow_block = blocks
-        for required in (
-            "AI_TOOLS_PARALLEL_HANDOFF_V1",
-            "AI_TOOLS_PARALLEL_SKILL_AVAILABLE_V1",
-            "AI_TOOLS_PARALLEL_SKILL_UNAVAILABLE_V1",
-            "会话 skills 目录",
-            "原样",
-            "阶段内并行：",
-            "不得静默省略",
-        ):
-            with self.subTest(block="apply", required=required):
-                self.assertIn(required, apply_block)
-            with self.subTest(block="verify", required=required):
-                self.assertIn(required, verify_block)
-        self.assertNotIn("静默串行", apply_block)
-        self.assertNotIn("静默串行", verify_block)
-        self.assertNotIn("AI_TOOLS_PARALLEL_HANDOFF_V1", flow_block)
-        self.assertIn("转述", apply_block)
-        self.assertIn("转述", verify_block)
-
-    def test_parallel_handoff_contract_is_bounded_exclusive_and_fail_closed(
-        self,
-    ) -> None:
-        text = integration_text()
-        blocks = re.findall(
-            r"(?ms)^<!-- AI_TOOLS_VERIFY_GATE_V2 -->\n"
-            r".*?"
-            r"^<!-- AI_TOOLS_VERIFY_GATE_V2_END -->$",
-            text,
-        )
-        self.assertEqual(len(blocks), 3)
-        for kind, block in (("apply", blocks[0]), ("verify", blocks[1])):
-            for required in (
-                "恰好一个 `AI_TOOLS_PARALLEL_HANDOFF_V1_START`",
-                "恰好一个 `AI_TOOLS_PARALLEL_HANDOFF_V1_END`",
-                "status:",
-                "name: dispatching-parallel-agents",
-                "path: none",
-                "非空绝对路径",
-                "同时出现",
-                "交接无效",
-                "AI_TOOLS_PARALLEL_SKILL_READ_FAILED_V1",
-                "skill 读取失败",
-                "不得降级串行",
-            ):
-                with self.subTest(kind=kind, required=required):
-                    self.assertIn(required, block)
-            self.assertNotIn("且含 `Path:`", block)
-
-    def test_stage_dispatch_supports_standalone_execution_and_safe_fallback(
-        self,
-    ) -> None:
+    def test_apply_and_verify_blocks_require_direct_serial_execution(self) -> None:
         text = integration_text()
         blocks = re.findall(
             r"(?ms)^<!-- AI_TOOLS_VERIFY_GATE_V2 -->\n"
@@ -641,35 +587,30 @@ class VerificationContractTest(unittest.TestCase):
         )
         self.assertEqual(len(blocks), 3)
         apply_block, verify_block, _ = blocks
+        self.assertIn("AI_TOOLS_DIRECT_APPLY_V1", apply_block)
+        self.assertIn("当前 Agent", apply_block)
+        self.assertIn("串行", apply_block)
+        self.assertIn("AI_TOOLS_DIRECT_VERIFY_V1", verify_block)
+        self.assertIn("当前 Agent", verify_block)
+        self.assertIn("串行", verify_block)
 
-        for marker, block in (
-            ("AI_TOOLS_STANDALONE_APPLY_V1", apply_block),
-            ("AI_TOOLS_STANDALONE_VERIFY_V1", verify_block),
-        ):
-            with self.subTest(marker=marker):
-                self.assertIn(marker, block)
-                self.assertIn("全新任务", block)
-                self.assertIn("当前 Agent 直接执行", block)
-
+        forbidden = (
+            "子 Agent",
+            "dispatching-parallel-agents",
+            "AI_TOOLS_DELEGATED_",
+            "AI_TOOLS_WORKER_",
+            "AI_TOOLS_PARALLEL_",
+            "AI_TOOLS_DISPATCH_FALLBACK_V1",
+        )
         for kind, block in (("apply", apply_block), ("verify", verify_block)):
-            with self.subTest(kind=kind):
-                self.assertIn("AI_TOOLS_DISPATCH_FALLBACK_V1", block)
-                self.assertIn("尚未开始", block)
-                self.assertIn("当前 Agent 降级执行", block)
-                self.assertIn("已经开始", block)
-                self.assertIn("不得从头重做", block)
-
-        self.assertIn("验证独立性：已降级", apply_block)
-        self.assertIn("验证独立性：已降级", verify_block)
-        self.assertIn("所有实施者均尚未开始", apply_block)
-        self.assertIn("已有实施者启动", apply_block)
-        self.assertIn("所有调查者均尚未开始", verify_block)
-        self.assertIn("已有调查者启动", verify_block)
+            for marker in forbidden:
+                with self.subTest(kind=kind, marker=marker):
+                    self.assertNotIn(marker, block)
 
     def test_gate_checker_validates_required_markers_inside_each_block(self) -> None:
         samples = {
-            "apply": APPLY_PARALLEL_MARKERS,
-            "verify": VERIFY_PARALLEL_MARKERS,
+            "apply": APPLY_GATE_MARKERS,
+            "verify": VERIFY_GATE_MARKERS,
             "flow": FLOW_GATE_MARKERS,
         }
         for kind, markers in samples.items():
@@ -683,6 +624,25 @@ class VerificationContractTest(unittest.TestCase):
                         classify_gate(kind, incomplete).startswith("STALE"),
                     )
 
+    def test_gate_checker_rejects_removed_dispatch_markers(self) -> None:
+        removed_markers = (
+            "AI_TOOLS_DELEGATED_APPLY_V1",
+            "AI_TOOLS_WORKER_VERIFY_V1",
+            "AI_TOOLS_PARALLEL_HANDOFF_V1_START",
+            "AI_TOOLS_DISPATCH_FALLBACK_V1",
+        )
+        for kind, markers in (
+            ("apply", APPLY_GATE_MARKERS),
+            ("verify", VERIFY_GATE_MARKERS),
+        ):
+            for removed in removed_markers:
+                with self.subTest(kind=kind, removed=removed):
+                    status = classify_gate(
+                        kind,
+                        gate_block(*markers, body=removed),
+                    )
+                    self.assertTrue(status.startswith("STALE"), status)
+
     def test_gate_checker_rejects_legacy_fingerprint_v2_blocks(self) -> None:
         legacy_body = (
             "python3 scripts/openspec-verification-fingerprint.py\n"
@@ -690,8 +650,8 @@ class VerificationContractTest(unittest.TestCase):
             "scope_digest content_digest 范围摘要： 内容指纹：\n"
         )
         samples = {
-            "apply": APPLY_PARALLEL_MARKERS,
-            "verify": VERIFY_PARALLEL_MARKERS,
+            "apply": APPLY_GATE_MARKERS,
+            "verify": VERIFY_GATE_MARKERS,
             "flow": FLOW_GATE_MARKERS,
         }
         for kind, markers in samples.items():
@@ -707,7 +667,7 @@ class VerificationContractTest(unittest.TestCase):
                 self.assertTrue(status.startswith("STALE"), status)
 
     def test_gate_checker_classifies_invalid_gate_shapes(self) -> None:
-        required = APPLY_PARALLEL_MARKERS
+        required = APPLY_GATE_MARKERS
         valid = gate_block(*required)
         old_gate = "<!-- AI_TOOLS_VERIFY_GATE_" + "V1 -->\n"
         cases = {

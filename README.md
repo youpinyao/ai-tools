@@ -131,19 +131,9 @@ TARGET_PROJECT="/absolute/path/to/target-project"
 5. 要完成当前 ai-tools 接入，必须继续执行
    [接入文档 5.1 节](.agents/skills/integrating-ai-tools/reference.md#51-补充-verify-修复闭环与流转门禁)：
    向 apply、verify、sync、archive 的官方 skills 幂等追加
-   `AI_TOOLS_VERIFY_GATE_V2` 规则。增强规则同时提供
-   apply 子 Agent 派发、独立 verify 子 Agent 派发、防递归标记（
-   `AI_TOOLS_DELEGATED_APPLY_V1`、`AI_TOOLS_DELEGATED_VERIFY_V1`）与阶段内并行开关
-   （`AI_TOOLS_PARALLEL_DISPATCH_V1`、`AI_TOOLS_PARALLEL_HANDOFF_V1`）。全新任务直接
-   调用 apply 或 verify 时由当前 Agent 执行；已有流程进入 apply 时入口优先派发 apply
-   子 Agent，成功后再优先派发独立 verify 子 Agent。阶段派发在子 Agent 尚未开始时
-   失败，可由当前 Agent 降级执行；已启动后的失败须先检查状态和改动，不得从头重做。
-   入口在自己的会话 skills
-   目录中查找 `dispatching-parallel-agents`，通过唯一有边界的交接块传递 AVAILABLE
-   与绝对 Path，找不到则传递 UNAVAILABLE 并串行；交接或读取失败会阻塞，不得静默
-   降级。子 Agent 必须回报「阶段内并行：」行，入口须转述。不得靠扫描磁盘启用并行。
-   后续安装该 skill 无需再次替换注入。未安装增强规则时，这些
-   派发行为不成立。仅复制 schema 不会自动获得这些流转门禁与子 Agent 编排。
+   `AI_TOOLS_VERIFY_GATE_V2` 规则。增强规则要求当前 Agent 串行完成 apply 和 verify，
+   并提供 sync/archive 的 Verify 门禁。apply 使用 `AI_TOOLS_DIRECT_APPLY_V1`，verify
+   使用 `AI_TOOLS_DIRECT_VERIFY_V1`；仅复制 schema 不会自动获得这些流转门禁。
 
 官方 `$openspec-*` skills 归 OpenSpec 管理；Cursor 与 Codex 共同从 `.agents/skills/` 发现它们。升级后的具体行为应以目标项目
 中当前 OpenSpec 官方生成物为准，不要从本仓库寻找或复制官方模板。当前 CLI 1.12.0
@@ -173,20 +163,14 @@ TARGET_PROJECT="/absolute/path/to/target-project"
 官方 explore（可选）
   → 官方 propose
   → evidence-driven 制品（含 verification 计划）
-  → apply 执行者（全新任务为当前 Agent，否则优先子 Agent）
-  → verify 执行者（已有流程优先独立子 Agent）
+  → 当前 Agent 执行 apply
+  → 当前 Agent 执行 verify
   → 官方 archive
 ```
 
-apply 与 verify 两个阶段始终串行。阶段内并行不是接入时开关：入口按本会话 skills
-目录用唯一有边界的块交接 `dispatching-parallel-agents` 的绝对 Path，阶段子 Agent
-读取后才对独立域派发带身份标记的工作者；目录中没有则显式串行，交接或读取失败则
-阻塞，并回报「阶段内并行：」行。
-
-全新任务中单独运行 `$openspec-verify` 时由当前 Agent 直接执行验证闭环；已有流程触发
-verify 时仍优先派发独立 verify 子 Agent。派发在子 Agent 尚未开始时失败才允许降级，
-且 verify 降级须在 `verification.md` 记录独立性下降。未安装增强规则时，apply/verify
-子 Agent 派发及 sync/archive 门禁均不成立；
+apply 与 verify 两个阶段始终由当前 Agent 串行执行。单独运行 `$openspec-apply-change` 或
+`$openspec-verify` 时同样由当前 Agent 执行对应阶段。未安装增强规则时，相关直接执行
+约束及 sync/archive 门禁均不成立；
 具体行为仍以目标项目当前 OpenSpec 官方生成物为准。
 
 常见旁路：
