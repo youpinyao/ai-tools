@@ -14,3 +14,4 @@
 /.agents/skills/.openspec-target
 
 /spec
+__pycache__
