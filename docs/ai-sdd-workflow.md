@@ -144,7 +144,7 @@ flowchart TD
 - `sync` 或 `archive` 入口只检查 `verification.md` 的结构化结论：验证状态为通过、
   阻塞项为无。它们不比较验证完成后的代码或证据变化，也不重复实现验证。
 - 未安装增强规则时，以上直接执行约束与门禁均不成立；`verify`、`sync`、`archive`
-  的具体条件与行为仍以目标项目当前 OpenSpec 官方生成物为准。OpenSpec 1.12.0 官方
+  的具体条件与行为仍以目标项目当前 OpenSpec 官方生成物为准。OpenSpec 1.13.0 官方
   `$openspec-verify` 只输出会话记分卡（Completeness / Correctness / Coherence），不写
   `verification.md`；官方 `$openspec-archive` 对未完成制品或任务仅警告并允许用户确认
   继续。项目级 Verify 门禁不是官方行为。
@@ -156,12 +156,14 @@ flowchart TD
 ### 场景 1：新需求，需要先探索
 
 当需求目标、范围或实现方向尚不明确时，先通过 `explore` 梳理问题、约束和可选方案。
-OpenSpec 1.12.0 的官方 `explore` 会在提出事实性问题前只读检查相关 OpenSpec 制品、
-源码、测试、文档与配置，并按决策依赖一次聚焦一个问题；开放式讨论不强制变成访谈或产物。
+OpenSpec 1.13.0 的官方 `explore` 会在提出事实性问题前只读检查相关 OpenSpec 制品、
+源码、测试、文档与配置，并通过 `openspec list --specs` 盘点持久能力、先读筛选概览再
+完整读取相关规范及场景；它按决策依赖一次聚焦一个问题，开放式讨论不强制变成访谈或产物。
 结论明确后使用 `propose` 建立 change，再依次完成实现与验证。
-官方 `propose` 在起草制品时会先读取项目 `context` / `rules`，并按需只读检查实现、测试、
-配置与文档，以实际发现确定 scope、approach 和 tasks；若规划根与代码项目分离或源码不可用，
-应明确目标或说明限制，而不是留下泛化的“探索代码库”实施任务。
+官方 `propose` 会先以 `openspec context --json` 解析权威根；若没有 OpenSpec 根则停止并
+等待用户明确请求初始化。解析成功后，它在探索与规划前读取配置中的项目 `context`，并按需
+只读检查实现、测试、配置与文档，以实际发现确定 scope、approach 和 tasks；若规划根与代码
+项目分离或源码不可用，应明确目标或说明限制，而不是留下泛化的“探索代码库”实施任务。
 推荐路径：`explore → propose → apply → verify → archive`。
 
 该场景步骤最多，但能在实施前消除关键歧义，适合影响范围较大、存在多种实现方案，
@@ -263,5 +265,5 @@ change 再调用 `openspec-update-change-from-code`：该 skill 只更新已有 
   `$openspec-verify` 均由当前 Agent 串行执行，并通过 Verify 门禁与
   结构化验证结论约束 sync/archive。未安装增强规则时，
   `verify`、`sync`、`archive` 的具体条件与行为
-  遵循目标项目当前 OpenSpec 官方生成物（1.12.0 官方 verify 仅为会话记分卡，官方
+  遵循目标项目当前 OpenSpec 官方生成物（1.13.0 官方 verify 仅为会话记分卡，官方
   archive 允许确认绕过）。

@@ -17,8 +17,16 @@ artifacts:
         - **修改能力**：列出需求（REQUIREMENTS）发生变化的现有能力。仅在规范层行为发生变化时列出（而非只改实现细节）。每项能力都需要一个增量规范文件。使用 `openspec/specs/` 下准确的现有路径。若需求没有变化则留空。
       - **影响**：受影响的代码、API、依赖或系统。
 
-      重要：能力章节至关重要。它建立提案与规范阶段之间的契约。
-      填写前先调研现有规范。此处列出的每项能力都需要对应的规范文件。
+      重要：能力章节至关重要。它建立提案与规范阶段之间的契约。填写前先调研现有规范：
+      先运行 `openspec list --specs` 查看项目能力清单，再对可能相关的能力运行
+      `openspec show "<spec-id>" --type spec --json --no-scenarios`，以便在不把完整
+      规范载入上下文的情况下查看能力用途和需求文本。只有使用已注册的独立 store 时，
+      才在这两条命令后追加 `--store "<id>"`，并保留 `--type spec`；否则同名 change
+      和 spec 会触发条目歧义错误。单独运行 `openspec list` 只列出进行中的 change，
+      不会显示项目已有能力。应复用现有能力的准确路径，不要创建近似重复名称。
+      过滤后的读取只是概览；在判断现有覆盖范围或决定变更内容之前，必须再通过
+      `openspec show "<spec-id>" --type spec`（遵循同一 store 规则）读取每份相关规范的完整内容，
+      包括全部场景。此处列出的每项能力都需要对应的规范文件。
 
       每项变更必须声明至少一项能力（新增或修改），或明确选择跳过规范：
       若变更的 `.openspec.yaml` 未设置 `skip_specs: true`，`openspec validate`
@@ -59,7 +67,7 @@ artifacts:
       `<capability-path>` 是相对于 `specs/` 的规范目录（例如
       `user-auth` 或 `identity/user-auth`）。保留完整路径：
       - 新增能力：使用提案中的准确路径 `specs/<capability-path>/spec.md`。提案中新引入的任何路径段都必须使用 kebab-case。遵循项目既有组织方式；若项目使用扁平布局，不要新增领域层级。
-      - 修改能力：在 `specs/<capability-path>/spec.md` 创建增量规范时，使用 `openspec/specs/<capability-path>/` 下准确的现有路径。不要移动或重命名该能力。
+      - 修改能力：在 `specs/<capability-path>/spec.md` 创建增量规范时，使用 `openspec/specs/<capability-path>/` 下准确的现有路径。写入增量前运行 `openspec list --specs` 确认该路径；只有使用已注册的独立 store 时才追加 `--store "<id>"`。输入错误或臆造的路径会指向一个不存在的能力，而不是原本要修改的能力。不要移动或重命名该能力。
 
       除非变更的 `.openspec.yaml` 设置了 `skip_specs: true`（没有规范层行为变化），
       否则必须至少有一个规范文件——`openspec validate` 会拒绝没有该标记的

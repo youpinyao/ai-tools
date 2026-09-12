@@ -2,7 +2,7 @@
 
 本文面向**其它业务仓库**：说明如何从「仅有官方 OpenSpec」或「旧版 ai-tools（含 Cursor commands/重复 skills）」升级并接入当前 `ai-tools`。
 
-当前语义基线为 OpenSpec **1.12.0** 官方 `spec-driven`（以 `openspec --version` 与 `npm view @fission-ai/openspec version` 为准）。后续升级须重新查询最新稳定版，不得永久假定该版本细节。
+当前语义基线为 OpenSpec **1.13.0** 官方 `spec-driven`（以 `openspec --version` 与 `npm view @fission-ai/openspec version` 为准）。后续升级须重新查询最新稳定版，不得永久假定该版本细节。
 
 场景化日常用法见 [ai-sdd-workflow.md](../../../docs/ai-sdd-workflow.md)。Graphify 可选增强见 [integrating-graphify reference](../integrating-graphify/reference.md)。
 
@@ -207,7 +207,7 @@ apply、verify、sync、archive 先执行官方 Store selection 与 **Steps** �
 
 - `.agents/skills/openspec-apply-change/SKILL.md`
 
-插入位置：官方 Store selection 和 **Steps** 第 1 步（Select the change）之后、第 2 步（Check status to understand the schema）之前。1.12.0 官方 apply 是串行任务循环；其 `context` 与 `operationGuidance` 明确只是 prompt-level behavior contracts，不能替代 CLI 状态或证明任务完成；在 `state: "all_done"` 与完成输出中仍会建议 `$openspec-archive`。以本块为准，门禁通过前不得按官方文案建议 sync 或 archive。
+插入位置：官方 Store selection 和 **Steps** 第 1 步（Select the change）之后、第 2 步（Check status to understand the schema）之前。1.13.0 官方 apply 是串行任务循环；其 `context` 与 `operationGuidance` 明确只是 prompt-level behavior contracts，不能替代 CLI 状态或证明任务完成；在 `state: "all_done"` 与完成输出中仍会建议 `$openspec-archive`。以本块为准，门禁通过前不得按官方文案建议 sync 或 archive。
 
 ```markdown
 <!-- AI_TOOLS_VERIFY_GATE_V2 -->
@@ -231,7 +231,7 @@ apply、verify、sync、archive 先执行官方 Store selection 与 **Steps** �
 
 - `.agents/skills/openspec-verify-change/SKILL.md`
 
-插入位置：官方 Store selection 和 **Steps** 第 1 步（Select the change）之后、第 2 步（Check status to understand the schema）之前。1.12.0 官方 verify 只在会话中输出 Completeness / Correctness / Coherence 记分卡，不写 `verification.md`、不修复；官方「Ready for archive」不是本项目持久化门禁，不得替代下方闭环。
+插入位置：官方 Store selection 和 **Steps** 第 1 步（Select the change）之后、第 2 步（Check status to understand the schema）之前。1.13.0 官方 verify 只在会话中输出 Completeness / Correctness / Coherence 记分卡，不写 `verification.md`、不修复；官方「Ready for archive」不是本项目持久化门禁，不得替代下方闭环。
 
 ```markdown
 <!-- AI_TOOLS_VERIFY_GATE_V2 -->
@@ -273,7 +273,7 @@ apply、verify、sync、archive 先执行官方 Store selection 与 **Steps** �
 - `.agents/skills/openspec-sync-specs/SKILL.md`
 - `.agents/skills/openspec-archive-change/SKILL.md`
 
-插入位置：官方 Store selection 和 **Steps** 第 1 步选定 change 之后、第 2 步之前。sync 在第 2 步 Resolve change context 前检查；archive 则在第 1 步选定 change 后、读取 advisory `openspec instructions archive --json` 前检查。1.12.0 官方 sync 已使用 `artifactPaths.specs.existingOutputPaths`、specs rules 快照和 `openspec validate --specs` 约束 main spec 合并，archive 也会在内联 sync 后复核 delta，但两者均不检查 `verification.md` 的结构化结论，因此 C 块不与这些官方行为重复。官方 archive 对未完成制品或任务仍仅警告并允许用户确认继续，且 archive instructions 仍是不得阻断归档的 advisory 输入；这些官方行为不能替代本项目 Verify 门禁规则。
+插入位置：官方 Store selection 和 **Steps** 第 1 步选定 change 之后、第 2 步之前。sync 在第 2 步 Resolve change context 前检查；archive 则在第 1 步选定 change 后、读取 advisory `openspec instructions archive --json` 前检查。1.13.0 官方 sync 已使用 `artifactPaths.specs.existingOutputPaths`、specs rules 快照和 `openspec validate --specs` 约束 main spec 合并，archive 也会在内联 sync 后复核 delta，但两者均不检查 `verification.md` 的结构化结论，因此 C 块不与这些官方行为重复。官方 archive 对未完成制品或任务仍仅警告并允许用户确认继续，且 archive instructions 仍是不得阻断归档的 advisory 输入；这些官方行为不能替代本项目 Verify 门禁规则。
 
 ```markdown
 <!-- AI_TOOLS_VERIFY_GATE_V2 -->
@@ -609,11 +609,11 @@ ai-tools 自定义层升级后必须重新运行 5.1 节检查器。旧 V1 或�
 - 不要在 `ai-tools` 仓库根目录对官方路径跑 `openspec init` / `openspec update` 并提交生成物。
 - 官方模板对照应在临时目录完成，再手工同步到 `evidence-driven`。
 
-### 7.4 工作流命令、JSON 与目录（OpenSpec 1.12.0）
+### 7.4 工作流命令、JSON 与目录（OpenSpec 1.13.0）
 
-以下命令与字段均来自 1.12.0 的 `openspec --help`、子命令 help、官方 schema 和临时 `openspec init --tools codex` 生成物，不要猜测未列出的参数。
+以下命令与字段均来自 1.13.0 的 `openspec --help`、子命令 help、官方 schema 和临时 `openspec init --tools codex` 生成物，不要猜测未列出的参数。
 
-| 用途 | 命令 | 1.12.0 说明 |
+| 用途 | 命令 | 1.13.0 说明 |
 |------|------|-------------|
 | 新项目官方生成层 | `openspec init --tools codex` | `--tools` 用于非交互指定工具。Cursor 生成 7 组 skill + 7 个 command；Codex 生成 7 组 skill（skills-only，入口为 `$openspec-*`）。官方 apply 在制品缺失时可能提示未随 init 生成的 `$openspec-continue`，不要纳入本仓库忽略清单或 5.1 幂等清单。 |
 | 已初始化刷新 | `openspec update` | 更新 instruction 文件；`--force` 可在工具已是最新时仍刷新。 |
@@ -627,7 +627,7 @@ ai-tools 自定义层升级后必须重新运行 5.1 节检查器。旧 V1 或�
 | apply 指令 | `openspec instructions apply --change "<name>" --json` | 顶层含 `state`、`missingArtifacts`、`contextFiles`。`evidence-driven` 在缺少 `verification` 时 `state` 可为 `blocked`。 |
 | archive 指令 | `openspec instructions archive --change "<name>" --json` | 官方 skill 标明该查询为 advisory，不得当作硬门禁；成功 JSON 可省略 `context` / `operationGuidance`。 |
 
-以 `schemaName` / `--schema` 为准，不要用 `planningHome.defaultSchema`（该字段在 1.12.0 仍可能报 `spec-driven`）。
+以 `schemaName` / `--schema` 为准，不要用 `planningHome.defaultSchema`（该字段在 1.13.0 仍可能报 `spec-driven`）。
 
 目录（用 JSON 里的 store-aware 路径，不要写死仓库相对路径）：
 
@@ -637,7 +637,7 @@ ai-tools 自定义层升级后必须重新运行 5.1 节检查器。旧 V1 或�
 - active change：`openspec/changes/<name>/`
 - 归档：`<planningHome.changesDir>/archive/`（仓库内通常是 `openspec/changes/archive/`）
 
-Cursor 与 Codex 共用的 `$openspec-propose` skill 由 `.agents/skills/` 中的官方生成物提供。1.12.0 的生成 workflow 除更新 `generatedBy` 外有两项上游语义变化：`explore` 在提出事实性问题前只读检查相关 OpenSpec 制品、源码、测试、文档与配置，按决策依赖逐项澄清；`propose` 在起草制品时先读取 `context` / `rules`，再按需只读检查相关实现、测试、配置与文档，用实际发现落实 scope、approach 与 tasks。其余 apply、update、verify、sync、archive 正文相对 1.11.0 无语义变化。1.12.0 官方 verify 只输出 Completeness / Correctness / Coherence 会话记分卡，不写 `verification.md`。官方 sync 以 `artifactPaths.specs.existingOutputPaths` 为 delta 路径来源，合并后运行 `openspec validate --specs`；archive 在内联 sync 后复核 delta，对未完成制品或任务仅警告并允许确认继续。项目级 `AI_TOOLS_VERIFY_GATE_V2` 检查结构化验证结论，不是官方行为。
+Cursor 与 Codex 共用的 `$openspec-propose` skill 由 `.agents/skills/` 中的官方生成物提供。1.13.0 的生成 workflow 除更新 `generatedBy` 外，`explore` 新增持久能力盘点：用 `openspec list --specs` 区分能力与在途 change，以 `openspec show "<spec-id>" --type spec --json --no-scenarios` 筛选后再完整读取相关规范及场景。`propose` 新增强制 context 根解析：先运行 `openspec context --json`，无 OpenSpec 根时停止并等待用户请求初始化；解析成功后，在探索与规划前读取配置中的项目 `context`。官方 schema 的 proposal/specs instruction 也要求先核对既有能力及准确路径。apply、update、verify、sync、archive 正文除 `generatedBy` 外没有语义变化。1.13.0 官方 verify 只输出 Completeness / Correctness / Coherence 会话记分卡，不写 `verification.md`。官方 sync 以 `artifactPaths.specs.existingOutputPaths` 为 delta 路径来源，合并后运行 `openspec validate --specs`；archive 在内联 sync 后复核 delta，对未完成制品或任务仅警告并允许确认继续。项目级 `AI_TOOLS_VERIFY_GATE_V2` 检查结构化验证结论，不是官方行为。
 
 ## 8. 验收清单
 
@@ -658,7 +658,7 @@ cd "$TARGET_PROJECT"
 openspec schema validate evidence-driven
 openspec new change "smoke-ai-tools-integration" --schema evidence-driven
 openspec status --change "smoke-ai-tools-integration" --json
-# 1.12.0 顶层应含 changeRoot、artifactPaths、actionContext、schemaName、planningHome
+# 1.13.0 顶层应含 changeRoot、artifactPaths、actionContext、schemaName、planningHome
 openspec instructions apply --change "smoke-ai-tools-integration" --json
 # 未填 verification 时 evidence-driven 的 apply 可为 blocked
 openspec validate "smoke-ai-tools-integration" --type change --strict --json
@@ -673,7 +673,7 @@ openspec validate "smoke-ai-tools-integration" --type change --strict --json
 
 ### 接入后官方 verify 变「弱」了？
 
-verify 主体仍跟随官方生成物。OpenSpec 1.12.0 官方 verify 只在会话中输出 Completeness / Correctness / Coherence 记分卡，不写 `verification.md`。增强规则要求当前 Agent 串行执行完整 verify。verify 执行者仅对可安全、在当前 change 范围内且不需要用户决策的阻塞直接修复并重新验证（最多 3 轮）；其余情况停止并报告。结构化结论写回 verification，sync/archive 会在各自入口强制检查该结论（状态为通过、阻塞项为无）。当前 verification 已要求完整 diff 代码审查，并以未处理的 Critical/Important 阻断流转。若还需要独立审批人、第二次审查或 archive 阶段的额外审批门禁，应另加项目规则或独立 skill。
+verify 主体仍跟随官方生成物。OpenSpec 1.13.0 官方 verify 只在会话中输出 Completeness / Correctness / Coherence 记分卡，不写 `verification.md`。增强规则要求当前 Agent 串行执行完整 verify。verify 执行者仅对可安全、在当前 change 范围内且不需要用户决策的阻塞直接修复并重新验证（最多 3 轮）；其余情况停止并报告。结构化结论写回 verification，sync/archive 会在各自入口强制检查该结论（状态为通过、阻塞项为无）。当前 verification 已要求完整 diff 代码审查，并以未处理的 Critical/Important 阻断流转。若还需要独立审批人、第二次审查或 archive 阶段的额外审批门禁，应另加项目规则或独立 skill。
 
 ### 安装增强规则后还要再装 Superpowers 吗？注入要不要再替换？
 

@@ -85,6 +85,17 @@ FLOW_GATE_MARKERS = ("AI_TOOLS_STATE_GATE_V1", "AI_TOOLS_VERIFY_FLOW_GATE_V1")
 
 
 class VerificationContractTest(unittest.TestCase):
+    def test_current_schema_and_docs_track_openspec_1_13_capability_discovery(self) -> None:
+        schema = SCHEMA.read_text()
+        current = "\n".join(path.read_text() for path in CURRENT_DOCS[:-1])
+
+        self.assertIn("OpenSpec 1.13.0", current)
+        self.assertNotIn("OpenSpec 1.12.0", current)
+        self.assertIn("openspec list --specs", schema)
+        self.assertIn("--type spec --json --no-scenarios", schema)
+        self.assertIn("读取每份相关规范的完整内容", schema)
+        self.assertIn("输入错误或臆造的路径", schema)
+
     def test_cursor_migration_forbids_commands_and_keeps_one_skill_source(self) -> None:
         text = MIGRATION.read_text()
         self.assertIn("Cursor 不保留 command", text)
