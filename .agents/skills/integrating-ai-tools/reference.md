@@ -34,7 +34,7 @@
 
 - 默认 schema：`evidence-driven`，并增加持久化的 `verification.md`。
 - `tasks → verification`，且 `apply` 依赖 `verification`。
-- design 记录预期适用的 skill / rule，apply 重新发现并处理差异，verification
+- design 记录预期适用的 skill / rule，apply 轻量筛选候选项并增量处理差异，verification
   留存实际采用证据。
 - 当前 Agent 完成 apply、首次完整 diff 审查和后续 verify。
 - sync/archive 入口强制复核 Verify 门禁。
@@ -220,7 +220,7 @@ apply、verify、sync、archive 先执行官方 Store selection 与 **Steps** �
 当前 Agent 必须按官方逐项循环串行执行 apply（`AI_TOOLS_DIRECT_APPLY_V1`）。
 
 1. 先完成官方第 2～4 步，取得权威 planning/change 路径并读取 `contextFiles`；在此之前不得读取或写入假定路径下的 change 制品。若状态为 `blocked`，按官方流程停止；若为 `all_done`，跳过实现，但仍须先完成下一步复核再进入 verify，不得直接建议归档。
-2. 无论是否存在待办任务，在实现或 verify 前都执行适用项发现（`AI_TOOLS_APPLY_SKILL_RULE_DISCOVERY_V1`）与设计复核（`AI_TOOLS_APPLY_SKILL_RULE_RECONCILIATION_V1`）。开始复核时，先把既有 V2 结果改为“阻塞 / 技能与规则复核未完成”，不得保留旧“通过”结果。读取 design.md 的“适用技能与规则”作为设计预期，再阅读当前可用 skill 的 description 与 rule 的 description/适用范围并重新判断全部匹配项。调用所有匹配的 skill 并遵循其工作流，同时遵循所有匹配的 rule，不得仅凭名称判断。将设计预期、实际采用、差异与处理及证据写入 verification.md；设计中必需项不可用，或新发现项会改变方案、规范或任务拆分时，暂停并进入 change 更新流程；只影响执行方式时采用并留证。不得自动回写 design.md，也不得把缺乏执行证据的历史 skill / rule 追记为“已采用”；证据不足时记录阻塞。执行期间任务性质变化时重新判断，指令冲突且无法按既定优先级消解时暂停澄清。
+2. 无论是否存在待办任务，在实现或 verify 前都执行适用项发现（`AI_TOOLS_APPLY_SKILL_RULE_DISCOVERY_V1`）与设计复核（`AI_TOOLS_APPLY_SKILL_RULE_RECONCILIATION_V1`）。开始复核时，先把既有 V2 结果改为“阻塞 / 技能与规则复核未完成”，不得保留旧“通过”结果。读取 design.md 的“适用技能与规则”作为设计预期，先依据当前任务、可用 skill 的 description 与 rule 的 description/适用范围筛选候选项；仅对设计预期项和新命中的候选项读取完整指令，不得为了复核而遍历所有指令正文。调用所有确认匹配的 skill 并遵循其工作流，同时遵循所有确认匹配的 rule，不得仅凭名称判断。将设计预期、实际采用、差异与处理及证据写入 verification.md；无变化可简记“无差异”，无适用项写“无（已检查）”。设计中必需项不可用，或新发现项会改变方案、规范或任务拆分时，暂停并进入 change 更新流程；只影响执行方式时采用并留证。不得自动回写 design.md，也不得把缺乏执行证据的历史 skill / rule 追记为“已采用”；证据不足时记录阻塞。仅当执行期间任务性质或范围发生变化时重新复核，指令冲突且无法按既定优先级消解时暂停澄清。
 3. 当前 Agent 执行官方 apply 主体、更新 `tasks.md`，并对完整实现 diff 做首次代码审查。
 4. apply 未成功或存在阻塞时不得启动 verify；change 保持 active，并向用户报告具体原因。
 5. apply 成功或官方状态已为 `all_done` 后，当前 Agent 继续串行执行 `openspec-verify-change` 的完整验证闭环。

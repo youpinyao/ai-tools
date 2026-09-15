@@ -193,8 +193,10 @@ verify、archive 与 sync 的具体行为以当前 OpenSpec 官方生成物为�
 - 新增紧凑的 `verification.md` 账本，以范围、技能与规则、检查、代码审查、风险与回滚五节
   保存当前权威验证状态；复验更新原检查行，不追加完整历史。
 - `verification` 依赖 `tasks`，`apply` 依赖 `verification` 并跟踪 `tasks.md`。
-- `design` 记录预期适用的 skill / rule；apply 在实现前依据当前 description /
-  适用范围重新发现并处理差异，将实际采用项和证据写入 `verification.md`；任务已为
+- `design` 记录预期适用的 skill / rule；apply 在实现前做轻量增量复核，依据当前
+  description / 适用范围筛选候选项，只深入读取设计预期项和新命中项，
+  不遍历所有指令正文，并将实际采用项和差异证据写入 `verification.md`；无变化简记“无差异”，
+  无适用项写“无（已检查）”，仅在任务性质或范围变化时重新复核。任务已为
   `all_done` 时也须在 verify 前复核，证据缺失会阻断后续流转。
 - apply 应执行 `verification.md` 中适用的检查，包括必做的代码审查，如实记录命令、
   结果、失败原因和未执行项；schema 不把这些记录扩展成额外的官方 verify 或

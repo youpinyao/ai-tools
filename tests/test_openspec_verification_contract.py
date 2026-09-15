@@ -708,8 +708,18 @@ class VerificationContractTest(unittest.TestCase):
             with self.subTest(source=source):
                 self.assertIn("description", text)
                 self.assertIn("适用范围", text)
-                self.assertIn("调用所有匹配的 skill", text)
-                self.assertIn("遵循所有匹配的 rule", text)
+                self.assertIn("筛选候选项", text)
+                self.assertIn("新命中", text)
+                self.assertIn("完整指令", text)
+                self.assertIn("不得为了复核而遍历所有指令正文", text)
+                self.assertIn("无差异", text)
+                self.assertIn("无（已检查）", text)
+                self.assertIn(
+                    "仅当执行期间任务性质或范围发生变化时重新复核",
+                    text,
+                )
+                self.assertIn("调用所有确认匹配的 skill", text)
+                self.assertIn("遵循所有确认匹配的 rule", text)
                 self.assertIn("读取 design.md", text)
                 self.assertIn("不得自动回写 design.md", text)
                 self.assertIn("verification.md", text)
@@ -735,6 +745,22 @@ class VerificationContractTest(unittest.TestCase):
         )
         for required in ("设计预期", "实际采用", "差异与处理"):
             self.assertIn(required, verification_template)
+        for required in ("无差异", "无（已检查）", "筛选依据", "不复制完整指令"):
+            self.assertIn(required, verification_template)
+
+        maintenance_summaries = (
+            (ROOT / "README.md").read_text(),
+            (ROOT / "docs/ai-sdd-workflow.md").read_text(),
+            (ROOT / ".agents/skills/upgrading-openspec/reference.md").read_text(),
+        )
+        for text in maintenance_summaries:
+            for required in (
+                "不遍历所有指令正文",
+                "无差异",
+                "无（已检查）",
+                "任务性质或范围变化时重新复核",
+            ):
+                self.assertIn(required, text)
 
         blocks = re.findall(
             r"(?ms)^<!-- AI_TOOLS_VERIFY_GATE_V2 -->\n"

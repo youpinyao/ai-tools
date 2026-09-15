@@ -134,10 +134,12 @@ flowchart TD
   之间的制品依赖，要求 `apply` 在 `verification.md` 已存在后实施，并跟踪
   `tasks.md`；紧凑的 `verification.md` 负责保存范围、需求与检查的对应关系、代码
   审查和剩余风险。每轮复验更新原检查行，只保留当前权威证据，不追加完整历史。
-- `design.md` 记录规划时预期适用且可复现的 skill / rule。apply 在实现前依据
-  description / 适用范围重新发现并与设计预期比对：影响方案、规范或任务拆分的差异
+- `design.md` 记录规划时预期适用且可复现的 skill / rule。apply 在实现前做轻量增量复核：
+  先依据 description / 适用范围筛选候选项，只对设计预期项和新命中项读取完整指令，
+  不遍历所有指令正文。复核结果与设计预期比对：影响方案、规范或任务拆分的差异
   返回 `update`，只影响执行方式的差异直接采用；实际采用项和处理证据写入
-  `verification.md`，不得在 apply 中静默回写设计。即使任务已为 `all_done`，verify
+  `verification.md`，无变化可简记“无差异”，无适用项写“无（已检查）”；
+  仅在任务性质或范围变化时重新复核，不得在 apply 中静默回写设计。即使任务已为 `all_done`，verify
   前仍须完成复核；技能与规则证据缺失或仍有待执行项会阻断 verify、sync 和 archive。
 - 安装 `AI_TOOLS_VERIFY_GATE_V2` 后，apply 与 verify 均由当前 Agent 串行执行。
   verify 先确认可解析的 baseline 与 change

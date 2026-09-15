@@ -206,7 +206,7 @@ apply:
 4. apply 前置改为 `verification`；
 5. apply 执行并如实记录验证；
 6. verification 中代码审查为必做检查，但不虚构官方 archive 能力。
-7. design 记录预期适用的 skill / rule，apply 重新发现并处理差异，
+7. design 记录预期适用的 skill / rule，apply 轻量筛选候选项并增量处理差异，
    verification 留存实际采用证据。
 
 - [ ] **3.3 复核新版校验和归档语义**
@@ -355,7 +355,7 @@ done
 
 - [ ] **5.3 复核 `AI_TOOLS_VERIFY_GATE_V2` 追加点**
 
-阅读新版 apply、verify、sync、archive skills，确认 A/B/C 块仍有有效插入点且不与官方行为冲突。apply 块必须包含 `AI_TOOLS_DIRECT_APPLY_V1`、`AI_TOOLS_APPLY_SKILL_RULE_DISCOVERY_V1` 与 `AI_TOOLS_APPLY_SKILL_RULE_RECONCILIATION_V1`；verify 块必须包含 `AI_TOOLS_DIRECT_VERIFY_V1` 与 `AI_TOOLS_SKILL_RULE_EVIDENCE_GATE_V1`；sync/archive 块必须包含 `AI_TOOLS_VERIFY_FLOW_GATE_V1` 与 `AI_TOOLS_SKILL_RULE_EVIDENCE_GATE_V1`。当前 Agent 须串行执行对应阶段，在 apply 实现或 verify 前读取 design.md 的设计预期、按 description/适用范围重新发现匹配的 skill 与 rule、处理差异并将实际采用证据写入 verification.md；即使任务已为 `all_done` 也不得跳过复核。旧 V1 块或缺少上述标记的旧 V2 块标为 `STALE`，由唯一 V2 完整块替换，不得重复追加。V1-only active change 以及缺少技能与规则证据的旧 V2 active change 必须先使旧通过结果失效，执行一次 apply 复核和 verify，再由 verify 写入含“技能与规则证据：已核验”的新结果块。
+阅读新版 apply、verify、sync、archive skills，确认 A/B/C 块仍有有效插入点且不与官方行为冲突。apply 块必须包含 `AI_TOOLS_DIRECT_APPLY_V1`、`AI_TOOLS_APPLY_SKILL_RULE_DISCOVERY_V1` 与 `AI_TOOLS_APPLY_SKILL_RULE_RECONCILIATION_V1`；verify 块必须包含 `AI_TOOLS_DIRECT_VERIFY_V1` 与 `AI_TOOLS_SKILL_RULE_EVIDENCE_GATE_V1`；sync/archive 块必须包含 `AI_TOOLS_VERIFY_FLOW_GATE_V1` 与 `AI_TOOLS_SKILL_RULE_EVIDENCE_GATE_V1`。当前 Agent 须串行执行对应阶段，在 apply 实现或 verify 前读取 design.md 的设计预期，按 description/适用范围轻量筛选候选项，只对设计预期项和新命中项读取完整指令，不遍历所有指令正文，处理差异并将实际采用证据写入 verification.md；无变化简记“无差异”，无适用项写“无（已检查）”，仅在任务性质或范围变化时重新复核。即使任务已为 `all_done` 也不得跳过复核。旧 V1 块或缺少上述标记的旧 V2 块标为 `STALE`，由唯一 V2 完整块替换，不得重复追加。V1-only active change 以及缺少技能与规则证据的旧 V2 active change 必须先使旧通过结果失效，执行一次 apply 复核和 verify，再由 verify 写入含“技能与规则证据：已核验”的新结果块。
 
 ## 6. 同步当前维护文档
 
@@ -450,8 +450,8 @@ else
 fi
 ```
 
-预期：schema 与契约测试全部通过；紧凑模板严格为四个章节且不超过
-30 行；当前维护文档无旧版 Verify 门禁标记或已删除的变化复核表述。若 `SOURCE_VERSION` 与
+预期：schema 与契约测试全部通过；紧凑模板严格为五个章节且不超过
+36 行；当前维护文档无旧版 Verify 门禁标记或已删除的变化复核表述。若 `SOURCE_VERSION` 与
 `TARGET_VERSION` 不同，最后一组在当前维护文档中无命中；若版本相同，则人工核对
 命中上下文是否准确。
 
