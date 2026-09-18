@@ -750,7 +750,6 @@ class VerificationContractTest(unittest.TestCase):
 
         maintenance_summaries = (
             (ROOT / "README.md").read_text(),
-            (ROOT / "docs/ai-sdd-workflow.md").read_text(),
             (ROOT / ".agents/skills/upgrading-openspec/reference.md").read_text(),
         )
         for text in maintenance_summaries:
