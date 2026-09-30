@@ -97,12 +97,13 @@ class VerificationContractTest(unittest.TestCase):
         schema = SCHEMA.read_text()
         current = "\n".join(path.read_text() for path in CURRENT_DOCS[:-1])
 
-        self.assertIn("OpenSpec 1.13.0", current)
+        self.assertIn("OpenSpec 1.13.2", current)
         self.assertNotIn("OpenSpec 1.12.0", current)
         self.assertIn("openspec list --specs", schema)
         self.assertIn("--type spec --json --no-scenarios", schema)
         self.assertIn("读取每份相关规范的完整内容", schema)
         self.assertIn("输入错误或臆造的路径", schema)
+        self.assertIn("每个任务组必须落地本组工作所要求的测试和文档", schema)
 
     def test_cursor_migration_forbids_commands_and_keeps_one_skill_source(self) -> None:
         text = MIGRATION.read_text()
