@@ -65,7 +65,7 @@ flowchart TD
 ### 场景 1：新需求，需要先探索
 
 当需求目标、范围或实现方向尚不明确时，先通过 `explore` 梳理问题、约束和可选方案。
-OpenSpec 1.13.2 的官方 `explore` 会在提出事实性问题前只读检查相关 OpenSpec 制品、
+OpenSpec 1.14.1 的官方 `explore` 会在提出事实性问题前只读检查相关 OpenSpec 制品、
 源码、测试、文档与配置，并通过 `openspec list --specs` 盘点持久能力、先读筛选概览再
 完整读取相关规范及场景；它按决策依赖一次聚焦一个问题，开放式讨论不强制变成访谈或产物。
 结论明确后使用 `propose` 建立 change，再依次完成实现与验证。
@@ -165,9 +165,14 @@ change 再调用 `openspec-update-change-from-code`：该 skill 只更新已有 
   change 时只改该 change；没有 change 且只有一份对应 main spec 时只改该 spec。
   归档 change、change 与 spec 冲突、或多份 spec 都能对上时，先请用户选择，不要
   自动执行。不能建立 change、不能创建缺失 spec，也不能替代缺陷修复。
+- 编写 delta spec 时，新增能力按持久系统行为命名，一次只写一个文件。新需求说明
+  （`### Requirement:` 到第一个场景之间）不超过 500 个字符，否则 `--strict` 失败；
+  MODIFIED 不得仅为满足长度改写既有块。
 - 编写 `tasks.md` 时，每项任务必须在 `- [ ]` 说明中写明如何验证完成。
+  复选框只含 `x`（大小写与空格不限）算完成；`- [~]`、`- [-]`、空 `- []` 和无复选框的行不算完成。
   每个任务组必须落地本组工作所要求的测试和文档，不要把它们集中到最后一组；
-  最后一组只做集成检查。
+  最后一组只做集成检查。归档及必须以已归档为前提的步骤写成 `## Workflow follow-up`
+  普通项目符号，不进入被跟踪任务。
 - 定位或修改主规范时：有 change 则使用 `openspec instructions apply --change "<name>" --json`
   或 `openspec status --change "<name>" --json` 中的 `planningHome.root`；无 change 的
   spec 回写使用 `openspec list --specs --json` 或 `openspec context --json` 的
@@ -176,5 +181,5 @@ change 再调用 `openspec-update-change-from-code`：该 skill 只更新已有 
   `$openspec-verify` 均由当前 Agent 串行执行，并通过 Verify 门禁与
   结构化验证结论约束 sync/archive。未安装增强规则时，
   `verify`、`sync`、`archive` 的具体条件与行为
-  遵循目标项目当前 OpenSpec 官方生成物（1.13.2 官方 verify 仅为会话记分卡，官方
+  遵循目标项目当前 OpenSpec 官方生成物（1.14.1 官方 verify 仅为会话记分卡，官方
   archive 允许确认绕过）。
