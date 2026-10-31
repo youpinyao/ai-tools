@@ -33,7 +33,7 @@ schema 与可选旁路的基础安装；完整的 verify 修复闭环及 sync/ar
 
 前置条件：
 
-- Node.js ≥ 20.19.0，并可使用 npm 安装 OpenSpec CLI。
+- Node.js 满足当前 OpenSpec 包声明（1.16.0 为 `>=22.12.0`），并可使用 npm 安装 OpenSpec CLI。
 - 支持 [Agent Skills](https://agentskills.io) 的 AI 编程助手（默认 Cursor、Codex）。
 
 以下命令中的 `AI_TOOLS_DIR` 是本仓库的绝对路径，`TARGET_PROJECT` 是目标项目的
@@ -136,7 +136,7 @@ TARGET_PROJECT="/absolute/path/to/target-project"
    使用 `AI_TOOLS_DIRECT_VERIFY_V1`；仅复制 schema 不会自动获得这些流转门禁。
 
 官方 `$openspec-*` skills 归 OpenSpec 管理；Cursor 与 Codex 共同从 `.agents/skills/` 发现它们。升级后的具体行为应以目标项目
-中当前 OpenSpec 官方生成物为准，不要从本仓库寻找或复制官方模板。当前 CLI 1.14.1
+中当前 OpenSpec 官方生成物为准，不要从本仓库寻找或复制官方模板。当前 CLI 1.16.0
 已确认的命令（以 `openspec --help` 为准，不要猜测未列出的参数）：
 
 - 新项目：`openspec init --tools codex`
@@ -187,7 +187,7 @@ verify、archive 与 sync 的具体行为以当前 OpenSpec 官方生成物为�
 
 ## Schema：`evidence-driven`
 
-`evidence-driven` 以 OpenSpec 1.14.1 官方 `spec-driven` 为本次语义基线：
+`evidence-driven` 以 OpenSpec 1.16.0 官方 `spec-driven` 为本次语义基线：
 
 - `proposal`、`specs`、`design`、`tasks` 是官方语义的简体中文派生。
 - 新增紧凑的 `verification.md` 账本，以范围、技能与规则、检查、代码审查、风险与回滚五节
@@ -202,7 +202,7 @@ verify、archive 与 sync 的具体行为以当前 OpenSpec 官方生成物为�
   结果、失败原因和未执行项；schema 不把这些记录扩展成额外的官方 verify 或
   archive 行为。
 
-兼容的官方 1.14.1 语义包括：
+兼容的官方 1.16.0 语义包括：
 
 - `explore` 在提出事实性问题前先只读检查相关 OpenSpec 制品、源码、测试、文档与配置，
   同时用 `openspec list --specs` 与带 `--type spec` 的 `openspec show` 区分在途 change
@@ -214,6 +214,7 @@ verify、archive 与 sync 的具体行为以当前 OpenSpec 官方生成物为�
   避免把近似名称或错误路径当成新能力。
 - 用 `planningHome.root` 定位主规范，不要写死仓库相对路径。
 - 新增能力按持久系统行为命名，而不是按本次工作条目命名；一次只写一个 delta spec。
+- 每个场景必须有 WHEN/GIVEN 触发步骤和 THEN 结果步骤；只有 AND 或普通正文时普通校验仍通过，但 `--strict` 失败。
 - 新需求说明（`### Requirement:` 到第一个场景之间）不超过 500 个字符，否则 `--strict` 失败；MODIFIED 不得仅为满足长度改写既有块。
 - 复选框只含 `x`（大小写与空格不限）算完成；`- [~]`、`- [-]`、空 `- []` 和无复选框的行不算完成。
 - 归档及必须以已归档为前提的步骤写成 `## Workflow follow-up` 普通项目符号，不进入被跟踪任务。
@@ -234,7 +235,7 @@ verify、archive 与 sync 的具体行为以当前 OpenSpec 官方生成物为�
   阻塞项必须为“无”。
 
 后续升级 OpenSpec 时，应从当前官方 `spec-driven` 基线重新核对这些语义，而不是
-永久假定 1.14.1 的实现细节。
+永久假定 1.16.0 的实现细节。
 
 ## 许可证
 

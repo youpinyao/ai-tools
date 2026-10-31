@@ -97,7 +97,7 @@ class VerificationContractTest(unittest.TestCase):
         schema = SCHEMA.read_text()
         current = "\n".join(path.read_text() for path in CURRENT_DOCS[:-1])
 
-        self.assertIn("OpenSpec 1.14.1", current)
+        self.assertIn("OpenSpec 1.16.0", current)
         self.assertNotIn("OpenSpec 1.13.2", current)
         self.assertNotIn("OpenSpec 1.12.0", current)
         self.assertIn("openspec list --specs", schema)
@@ -106,6 +106,7 @@ class VerificationContractTest(unittest.TestCase):
         self.assertIn("输入错误或臆造的路径", schema)
         self.assertIn("每个任务组必须落地本组工作所要求的测试和文档", schema)
         self.assertIn("不得超过 500 个字符", schema)
+        self.assertIn("WHEN/GIVEN", schema)
         self.assertIn("## Workflow follow-up", schema)
         self.assertIn("一次只写一个规范文件", schema)
         self.assertIn("这些 schema 增量相对 1.13.2", current)

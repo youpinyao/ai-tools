@@ -65,7 +65,7 @@ flowchart TD
 ### 场景 1：新需求，需要先探索
 
 当需求目标、范围或实现方向尚不明确时，先通过 `explore` 梳理问题、约束和可选方案。
-OpenSpec 1.14.1 的官方 `explore` 会在提出事实性问题前只读检查相关 OpenSpec 制品、
+OpenSpec 1.16.0 的官方 `explore` 会在提出事实性问题前只读检查相关 OpenSpec 制品、
 源码、测试、文档与配置，并通过 `openspec list --specs` 盘点持久能力、先读筛选概览再
 完整读取相关规范及场景；它按决策依赖一次聚焦一个问题，开放式讨论不强制变成访谈或产物。
 结论明确后使用 `propose` 建立 change，再依次完成实现与验证。
@@ -181,5 +181,5 @@ change 再调用 `openspec-update-change-from-code`：该 skill 只更新已有 
   `$openspec-verify` 均由当前 Agent 串行执行，并通过 Verify 门禁与
   结构化验证结论约束 sync/archive。未安装增强规则时，
   `verify`、`sync`、`archive` 的具体条件与行为
-  遵循目标项目当前 OpenSpec 官方生成物（1.14.1 官方 verify 仅为会话记分卡，官方
+  遵循目标项目当前 OpenSpec 官方生成物（1.16.0 官方 verify 仅为会话记分卡，官方
   archive 允许确认绕过）。
