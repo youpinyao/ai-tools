@@ -2,9 +2,11 @@
 
 本文面向**其它业务仓库**：说明如何从「仅有官方 OpenSpec」或「旧版 ai-tools（含 Cursor commands/重复 skills）」升级并接入当前 `ai-tools`。
 
-当前语义基线为 OpenSpec **1.16.0** 官方 `spec-driven`（以 `openspec --version` 与 `npm view @fission-ai/openspec version` 为准）。后续升级须重新查询最新稳定版，不得永久假定该版本细节。
+当前语义基线为 OpenSpec **2.0.0** 官方 `spec-driven`（以 `openspec --version` 与 `npm view @fission-ai/openspec version` 为准）。后续升级须重新查询最新稳定版，不得永久假定该版本细节。
 
-下文对 apply、verify、sync、archive 官方行为的描述，已对照 1.16.0 生成物复核。相对 1.14.1，官方 schema instruction 新增场景必须同时包含 WHEN/GIVEN 与 THEN，否则普通校验仅警告、`--strict` 失败；skill 步骤结构未变。这些 schema 增量相对 1.13.2：能力按持久系统行为命名、delta spec 一次写一个、需求说明不超过 500 字符、复选框完成判定放宽为只含 `x`，以及 `## Workflow follow-up` 普通项目符号不计入被跟踪任务。`planningHome.defaultSchema` 在 1.13.0 已核对时仍可能报 `spec-driven`，本次 1.16.0 冒烟再确认。
+下文对 apply、verify、sync、archive 官方行为的描述，已对照 2.0.0 生成物复核。相对 1.14.1，官方 schema instruction 新增场景必须同时包含 WHEN/GIVEN 与 THEN，否则普通校验仅警告、`--strict` 失败；2.0.0 的 `schema.yaml` 与四个官方模板相对 1.14.1 只有这一处差异。这些 schema 增量相对 1.13.2：能力按持久系统行为命名、delta spec 一次写一个、需求说明不超过 500 字符、复选框完成判定放宽为只含 `x`，以及 `## Workflow follow-up` 普通项目符号不计入被跟踪任务。`planningHome.defaultSchema` 在 1.13.0 已核对时仍可能报 `spec-driven`；2.0.0 冒烟在 change 已使用 `evidence-driven` 时仍返回 `spec-driven`。
+
+2.0.0 只安装 skills。`delivery` 已废弃，`openspec init --tools cursor` 不再生成 `.cursor/commands/opsx-*`，Cursor 与 Codex 都写 `.agents/skills/`。core profile 不含 verify，只生成 propose、explore、apply、update、sync、archive。ai-tools 的 Verify 门禁依赖 `openspec-verify-change`，接入或升级前必须让本机 workflows 包含 `verify`。new、continue、ff、bulk-archive、onboard 仍不是 5.1 检查目标。
 
 场景化日常用法见 [ai-sdd-workflow.md](../../../docs/ai-sdd-workflow.md)。Graphify 可选增强见 [integrating-graphify reference](../integrating-graphify/reference.md)。
 
@@ -27,7 +29,7 @@
 
 | 层级 | 谁维护 | 内容 |
 |------|--------|------|
-| 官方生成层 | OpenSpec CLI | explore / propose / update / apply / verify / archive / sync |
+| 官方生成层 | OpenSpec CLI | core：explore / propose / update / apply / archive / sync；ai-tools 另要求 profile 包含 verify |
 | 自定义层 | ai-tools | `evidence-driven`、验证闭环与流转门禁、中文规则、from-code |
 
 **不要**初始化或保留 `.cursor/commands/opsx-*` 与 `.cursor/skills/openspec-*`。应由 `openspec init --tools codex` / `openspec update` 在 `.agents/skills/` 生成唯一官方层，再按本文向 apply、verify、sync、archive skills 追加项目规则。
@@ -54,7 +56,7 @@
 
 ## 2. 前置条件
 
-- Node.js 满足当前 OpenSpec 包声明（1.16.0 的 `engines.node` 为 `>=22.12.0`）。
+- Node.js 满足当前 OpenSpec 包声明（2.0.0 的 `engines.node` 为 `>=22.12.0`）。
 - 支持从 `.agents/skills/` 发现 [Agent Skills](https://agentskills.io) 的 Cursor 或 Codex。统一运行 `openspec init --tools codex`，两种助手共享生成的 skills，不创建 Cursor command。
 - 能在目标项目根目录执行 shell。
 
@@ -79,6 +81,36 @@ openspec --version
 TARGET_VERSION="$(npm view @fission-ai/openspec version)"
 npm install --global "@fission-ai/openspec@$TARGET_VERSION"
 test "$(openspec --version)" = "$TARGET_VERSION"
+```
+
+OpenSpec 2.0 的 core profile 不含 verify。下面的命令只在当前 workflows 缺少 `verify` 时写入**本机全局配置**，并保留已经选中的其它 workflow。已包含 `verify` 时不做修改。随后的 `openspec init` / `openspec update` 才会生成 `openspec-verify-change`。
+
+```bash
+python3 - <<'PY'
+import json
+import subprocess
+
+cfg = json.loads(
+    subprocess.check_output(["openspec", "config", "list", "--json"], text=True)
+)
+profile = cfg.get("profile") or "core"
+workflows = list(cfg.get("workflows") or [])
+if profile == "core" and not workflows:
+    workflows = ["propose", "explore", "apply", "update", "sync", "archive"]
+if "verify" in workflows:
+    raise SystemExit(0)
+workflows.append("verify")
+subprocess.check_call(["openspec", "config", "set", "profile", "custom"])
+subprocess.check_call(
+    [
+        "openspec",
+        "config",
+        "set",
+        "workflows",
+        json.dumps(workflows, separators=(",", ":")),
+    ]
+)
+PY
 ```
 
 ## 3. 先判断你属于哪条路径
@@ -124,8 +156,10 @@ rg -n "独立验证结论|代码审查（归档硬门禁）|Superpowers 对接" 
 ```bash
 cd "$TARGET_PROJECT"
 
-# 1) 在唯一共享目录生成官方 skills，不生成 Cursor command
+# 1) 先完成第 2 节，使本机 workflows 包含 verify。core profile 不含 verify。
+#    然后在唯一共享目录生成官方 skills；2.0.0 不生成 Cursor command。
 openspec init --tools codex
+test -f .agents/skills/openspec-verify-change/SKILL.md
 
 # 2) 清理既有 OpenSpec Cursor command 与重复 skill；不影响其它 Cursor 文件
 rm -rf "$TARGET_PROJECT/.cursor/commands/opsx-"*
@@ -211,7 +245,7 @@ apply、verify、sync、archive 先执行官方 Store selection 与 **Steps** �
 
 - `.agents/skills/openspec-apply-change/SKILL.md`
 
-插入位置：官方 Store selection 和 **Steps** 第 1 步（Select the change）之后、第 2 步（Check status to understand the schema）之前，使 Agent 在处理官方 `all_done` 分支前已知本项目门禁。块内涉及 change 制品的操作不得立即执行：先完成官方第 2～4 步，取得 `changeRoot`、`actionContext` 与具体 `contextFiles` 并读取这些文件，再进行适用项复核。1.16.0 官方 apply 是串行任务循环；其 `context` 与 `operationGuidance` 明确只是 prompt-level behavior contracts，不能替代 CLI 状态或证明任务完成；在 `state: "all_done"` 与完成输出中仍会建议 `$openspec-archive`。以本块为准，门禁通过前不得按官方文案建议 sync 或 archive。
+插入位置：官方 Store selection 和 **Steps** 第 1 步（Select the change）之后、第 2 步（Check status to understand the schema）之前，使 Agent 在处理官方 `all_done` 分支前已知本项目门禁。块内涉及 change 制品的操作不得立即执行：先完成官方第 2～4 步，取得 `changeRoot`、`actionContext` 与具体 `contextFiles` 并读取这些文件，再进行适用项复核。2.0.0 官方 apply 是串行任务循环；其 `context` 与 `operationGuidance` 明确只是 prompt-level behavior contracts，不能替代 CLI 状态或证明任务完成；在 `state: "all_done"` 与完成输出中仍会建议 `$openspec-archive`。以本块为准，门禁通过前不得按官方文案建议 sync 或 archive。
 
 ```markdown
 <!-- AI_TOOLS_VERIFY_GATE_V2 -->
@@ -237,7 +271,7 @@ apply、verify、sync、archive 先执行官方 Store selection 与 **Steps** �
 
 - `.agents/skills/openspec-verify-change/SKILL.md`
 
-插入位置：官方 Store selection 和 **Steps** 第 1 步（Select the change）之后、第 2 步（Check status to understand the schema）之前。1.16.0 官方 verify 只在会话中输出 Completeness / Correctness / Coherence 记分卡，不写 `verification.md`、不修复；官方「Ready for archive」不是本项目持久化门禁，不得替代下方闭环。
+插入位置：官方 Store selection 和 **Steps** 第 1 步（Select the change）之后、第 2 步（Check status to understand the schema）之前。2.0.0 官方 verify 只在会话中输出 Completeness / Correctness / Coherence 记分卡，不写 `verification.md`、不修复；官方「Ready for archive」不是本项目持久化门禁，不得替代下方闭环。
 
 ```markdown
 <!-- AI_TOOLS_VERIFY_GATE_V2 -->
@@ -283,7 +317,7 @@ verify 还必须执行技能与规则证据门禁（`AI_TOOLS_SKILL_RULE_EVIDENC
 - `.agents/skills/openspec-sync-specs/SKILL.md`
 - `.agents/skills/openspec-archive-change/SKILL.md`
 
-插入位置：官方 Store selection 和 **Steps** 第 1 步选定 change 之后、第 2 步之前。sync 在第 2 步 Resolve change context 前检查；archive 则在第 1 步选定 change 后、读取 advisory `openspec instructions archive --json` 前检查。1.16.0 官方 sync 已使用 `artifactPaths.specs.existingOutputPaths`、specs rules 快照和 `openspec validate --specs` 约束 main spec 合并，archive 也会在内联 sync 后复核 delta，但两者均不检查 `verification.md` 的结构化结论，因此 C 块不与这些官方行为重复。官方 archive 对未完成制品或任务仍仅警告并允许用户确认继续，且 archive instructions 仍是不得阻断归档的 advisory 输入；这些官方行为不能替代本项目 Verify 门禁规则。
+插入位置：官方 Store selection 和 **Steps** 第 1 步选定 change 之后、第 2 步之前。sync 在第 2 步 Resolve change context 前检查；archive 则在第 1 步选定 change 后、读取 advisory `openspec instructions archive --json` 前检查。2.0.0 官方 sync 已使用 `artifactPaths.specs.existingOutputPaths`、specs rules 快照和 `openspec validate --specs` 约束 main spec 合并，archive 也会在内联 sync 后复核 delta，但两者均不检查 `verification.md` 的结构化结论，因此 C 块不与这些官方行为重复。官方 archive 对未完成制品或任务仍仅警告并允许用户确认继续，且 archive instructions 仍是不得阻断归档的 advisory 输入；这些官方行为不能替代本项目 Verify 门禁规则。
 
 ```markdown
 <!-- AI_TOOLS_VERIFY_GATE_V2 -->
@@ -409,7 +443,7 @@ done
 
 每个 V2 注入必须以独立注释行 `<!-- AI_TOOLS_VERIFY_GATE_V2 -->` 开始，以独立注释行 `<!-- AI_TOOLS_VERIFY_GATE_V2_END -->` 结束；检查器只读取这两个边界之间的正文，不接受行内伪标记，也不允许文档其它位置代打 required。`MISSING` 表示既没有 V2/V1 独立起始标记，也没有孤立 V2 结束标记；`DUPLICATE` 表示 V2 起止标记重复；`STALE` 包括 V1-only、V1/V2 混写、缺少 `AI_TOOLS_STATE_GATE_V1` 的旧 V2 指纹正文、孤立 start 或 end 等边界不完整或块内 required 缺失。出现 V1 或缺少状态门禁标记时标为 `STALE`，必须以当前 V2 完整块替换，不得再次追加。
 
-apply 块内必须包含 `AI_TOOLS_DIRECT_APPLY_V1`、`AI_TOOLS_APPLY_SKILL_RULE_DISCOVERY_V1` 与 `AI_TOOLS_APPLY_SKILL_RULE_RECONCILIATION_V1`；verify 块内必须包含 `AI_TOOLS_DIRECT_VERIFY_V1` 与 `AI_TOOLS_SKILL_RULE_EVIDENCE_GATE_V1`；sync/archive 块内必须包含 `AI_TOOLS_VERIFY_FLOW_GATE_V1` 与 `AI_TOOLS_SKILL_RULE_EVIDENCE_GATE_V1`，防止只有边界、没有完整门禁正文的空块被误判为 `OK`。`NOFILE` 表示官方文件不存在，应先恢复官方生成层。
+apply 块内必须包含 `AI_TOOLS_DIRECT_APPLY_V1`、`AI_TOOLS_APPLY_SKILL_RULE_DISCOVERY_V1` 与 `AI_TOOLS_APPLY_SKILL_RULE_RECONCILIATION_V1`；verify 块内必须包含 `AI_TOOLS_DIRECT_VERIFY_V1` 与 `AI_TOOLS_SKILL_RULE_EVIDENCE_GATE_V1`；sync/archive 块内必须包含 `AI_TOOLS_VERIFY_FLOW_GATE_V1` 与 `AI_TOOLS_SKILL_RULE_EVIDENCE_GATE_V1`，防止只有边界、没有完整门禁正文的空块被误判为 `OK`。`NOFILE` 表示官方文件不存在，应先恢复官方生成层。verify 为 `NOFILE` 时，先按第 2 节把 `verify` 加入 workflows，再重建该 skill。
 
 ### 5.2 已有 active change 怎么办
 
@@ -465,7 +499,7 @@ rm -f -- \
   "$TARGET_PROJECT/scripts/openspec-verification-fingerprint.py" \
   "$TARGET_PROJECT/.cursor/scripts/openspec-verification-fingerprint.py"
 
-# 2) 升级 CLI 并重新生成官方层
+# 2) 升级 CLI 并重新生成官方层。先完成第 2 节，使 workflows 包含 verify。
 npm install --global @fission-ai/openspec@latest
 openspec --version
 # 团队升级请改用精确版本，见 7.1 节
@@ -483,6 +517,7 @@ do
 done
 # 用 codex 生成 `.agents/skills/` 唯一官方层
 openspec init --tools codex
+test -f .agents/skills/openspec-verify-change/SKILL.md
 # 若项目尚不完整，也用上面的 init
 
 # 3) 刷新自定义 schema
@@ -540,6 +575,7 @@ openspec list --json
 cd "$TARGET_PROJECT"
 npm install --global @fission-ai/openspec@latest
 openspec --version
+# 先完成第 2 节。core profile 不含 verify；先删掉该 skill 再 init 时它不会回来。
 openspec update
 # 重建 `.agents/skills/` 唯一官方层：
 for skill_name in \
@@ -552,12 +588,13 @@ do
   rm -rf -- "$TARGET_PROJECT/.agents/skills/$skill_name"
 done
 openspec init --tools codex
+test -f .agents/skills/openspec-verify-change/SKILL.md
 rm -rf "$TARGET_PROJECT/.cursor/commands/opsx-"*
 rm -rf "$TARGET_PROJECT/.cursor/skills/openspec-"*
 openspec schema validate evidence-driven
 ```
 
-`openspec update` 可能刷新官方生成物。升级后重新运行 5.1 节检查器；对 `MISSING` 追加当前块，对 `STALE` 原位替换，对 `DUPLICATE` 先清理重复块。最终四个门禁文件均应为 `OK`。
+`openspec update` 可能刷新官方生成物。升级后重新运行 5.1 节检查器；对 `MISSING` 追加当前块，对 `STALE` 原位替换，对 `DUPLICATE` 先清理重复块。最终四个门禁文件均应为 `OK`。verify 文件不存在时检查器报 `NOFILE`，先回到第 2 节补上 `verify` 再重建，不要把缺失写成通过。
 
 团队执行升级时应记录并固定 `npm view` 解析出的精确版本，不要只依赖 `@latest` 的瞬时解析：
 
@@ -566,6 +603,7 @@ cd "$TARGET_PROJECT"
 TARGET_VERSION="$(npm view @fission-ai/openspec version)"
 npm install --global "@fission-ai/openspec@$TARGET_VERSION"
 test "$(openspec --version)" = "$TARGET_VERSION"
+# 先完成第 2 节，确认 workflows 含 verify，再删除并重建。
 openspec update
 # 精确版本升级也重建这五个官方 skills；清单不含自定义
 # openspec-update-change-from-code，后者必须保留。
@@ -579,6 +617,7 @@ do
   rm -rf -- "$TARGET_PROJECT/.agents/skills/$skill_name"
 done
 openspec init --tools codex
+test -f .agents/skills/openspec-verify-change/SKILL.md
 LEGACY_WORKTREE_PATTERN='AI_TOOLS_(PROPOSE_WORKTREE|WORKTREE_FINISH|VERIFY_GATE_NO_FINISH_ASK)'
 for file in \
   .agents/skills/openspec-{propose,apply-change,verify-change,sync-specs,archive-change}/SKILL.md
@@ -629,14 +668,14 @@ ai-tools 自定义层升级后必须重新运行 5.1 节检查器。旧 V1 或�
 - 不要在 `ai-tools` 仓库根目录对官方路径跑 `openspec init` / `openspec update` 并提交生成物。
 - 官方模板对照应在临时目录完成，再手工同步到 `evidence-driven`。
 
-### 7.4 工作流命令、JSON 与目录（OpenSpec 1.16.0）
+### 7.4 工作流命令、JSON 与目录（OpenSpec 2.0.0）
 
-以下命令与字段均来自 1.16.0 的 `openspec --help`、子命令 help、官方 schema 和临时 `openspec init --tools codex` 生成物，不要猜测未列出的参数。
+以下命令与字段均来自 2.0.0 的 `openspec --help`、子命令 help、官方 schema 和临时 `openspec init --tools codex` 生成物，不要猜测未列出的参数。
 
-| 用途 | 命令 | 1.16.0 说明 |
+| 用途 | 命令 | 2.0.0 说明 |
 |------|------|-------------|
-| 新项目官方生成层 | `openspec init --tools codex` | `--tools` 用于非交互指定工具。Cursor 生成 7 组 skill + 7 个 command；Codex 生成 7 组 skill（skills-only，入口为 `$openspec-*`）。官方 apply 在制品缺失时可能提示未随 init 生成的 `$openspec-continue`，不要纳入本仓库忽略清单或 5.1 幂等清单。 |
-| 已初始化刷新 | `openspec update` | 更新 instruction 文件；`--force` 可在工具已是最新时仍刷新。 |
+| 新项目官方生成层 | `openspec init --tools codex` | `--tools` 非交互指定工具，`--profile core` 可临时覆盖本机 profile。2.0.0 只安装 skills：core 生成 6 个 skill，不含 verify，也不生成 command。先按第 2 节加入 `verify` 再 init，才会有 `openspec-verify-change`。new、continue、ff、bulk-archive、onboard 不进入 5.1。 |
+| 已初始化刷新 | `openspec update` | 更新 instruction 文件。`--force` 在工具已是最新时仍刷新；`--dry-run` 只报告变化，`--dry-run --json` 输出计划。 |
 | schema 校验 | `openspec schema validate evidence-driven` | schema 子命令仍标为 experimental；`--json` 返回 `name` / `path` / `valid` / `issues`。 |
 | 新建 change | `openspec new change "<name>" --schema evidence-driven` | `--schema` 覆盖默认 schema。 |
 | 列出 change | `openspec list --json` | 顶层含 `changes`、`root`。`openspec change list` 的 `--help` 标明 DEPRECATED。 |
@@ -647,7 +686,7 @@ ai-tools 自定义层升级后必须重新运行 5.1 节检查器。旧 V1 或�
 | apply 指令 | `openspec instructions apply --change "<name>" --json` | 顶层含 `state`、`missingArtifacts`、`contextFiles`。`evidence-driven` 在缺少 `verification` 时 `state` 可为 `blocked`。 |
 | archive 指令 | `openspec instructions archive --change "<name>" --json` | 官方 skill 标明该查询为 advisory，不得当作硬门禁；成功 JSON 可省略 `context` / `operationGuidance`。 |
 
-以 `schemaName` / `--schema` 为准，不要用 `planningHome.defaultSchema`（该字段在 1.13.0 已核对时仍可能报 `spec-driven`；1.16.0 冒烟再确认）。
+以 `schemaName` / `--schema` 为准，不要用 `planningHome.defaultSchema`（该字段在 1.13.0 已核对时仍可能报 `spec-driven`；2.0.0 冒烟在 `evidence-driven` change 上仍返回 `spec-driven`）。`status --json` 同时包含 `isComplete` 与 `isPlanningComplete`。
 
 目录（用 JSON 里的 store-aware 路径，不要写死仓库相对路径）：
 
@@ -657,7 +696,7 @@ ai-tools 自定义层升级后必须重新运行 5.1 节检查器。旧 V1 或�
 - active change：`openspec/changes/<name>/`
 - 归档：`<planningHome.changesDir>/archive/`（仓库内通常是 `openspec/changes/archive/`）
 
-Cursor 与 Codex 共用的 `$openspec-propose` skill 由 `.agents/skills/` 中的官方生成物提供。1.16.0 仍保留既有能力盘点：用 `openspec list --specs` 区分能力与在途 change，以 `openspec show "<spec-id>" --type spec --json --no-scenarios` 筛选后再完整读取相关规范及场景。`propose` 仍先运行 `openspec context --json`，无 OpenSpec 根时停止并等待用户请求初始化；解析成功后，在探索与规划前读取配置中的项目 `context`。官方 schema 的 proposal/specs instruction 也要求先核对既有能力及准确路径。相对 1.13.2，1.14.1 官方 schema 新增能力命名、逐份写 spec、需求说明 500 字符上限、复选框完成判定和 `## Workflow follow-up`。相对 1.14.1，1.16.0 要求每个场景同时包含 WHEN/GIVEN 与 THEN，否则 `--strict` 失败。1.16.0 官方 verify 只输出 Completeness / Correctness / Coherence 会话记分卡，不写 `verification.md`。官方 sync 以 `artifactPaths.specs.existingOutputPaths` 为 delta 路径来源，合并后运行 `openspec validate --specs`；archive 在内联 sync 后复核 delta，对未完成制品或任务仅警告并允许确认继续。项目级 `AI_TOOLS_VERIFY_GATE_V2` 检查结构化验证结论，不是官方行为。
+Cursor 与 Codex 共用的 `$openspec-propose` skill 由 `.agents/skills/` 中的官方生成物提供。2.0.0 仍保留既有能力盘点：用 `openspec list --specs` 区分能力与在途 change，以 `openspec show "<spec-id>" --type spec --json --no-scenarios` 筛选后再完整读取相关规范及场景。`propose` 仍先运行 `openspec context --json`，无 OpenSpec 根时停止并等待用户请求初始化；解析成功后，在探索与规划前读取配置中的项目 `context`。官方 schema 的 proposal/specs instruction 也要求先核对既有能力及准确路径。相对 1.13.2，1.14.1 官方 schema 新增能力命名、逐份写 spec、需求说明 500 字符上限、复选框完成判定和 `## Workflow follow-up`。相对 1.14.1，2.0.0 要求每个场景同时包含 WHEN/GIVEN 与 THEN，否则 `--strict` 失败。2.0.0 官方 verify 只输出 Completeness / Correctness / Coherence 会话记分卡，不写 `verification.md`。官方 sync 以 `artifactPaths.specs.existingOutputPaths` 为 delta 路径来源，合并后运行 `openspec validate --specs`；archive 在内联 sync 后复核 delta，对未完成制品或任务仅警告并允许确认继续。项目级 `AI_TOOLS_VERIFY_GATE_V2` 检查结构化验证结论，不是官方行为。
 
 ## 8. 验收清单
 
@@ -678,7 +717,7 @@ cd "$TARGET_PROJECT"
 openspec schema validate evidence-driven
 openspec new change "smoke-ai-tools-integration" --schema evidence-driven
 openspec status --change "smoke-ai-tools-integration" --json
-# 1.16.0 顶层应含 changeRoot、artifactPaths、actionContext、schemaName、planningHome
+# 2.0.0 顶层应含 changeRoot、artifactPaths、actionContext、schemaName、planningHome
 openspec instructions apply --change "smoke-ai-tools-integration" --json
 # 未填 verification 时 evidence-driven 的 apply 可为 blocked
 openspec validate "smoke-ai-tools-integration" --type change --strict --json
@@ -693,7 +732,7 @@ openspec validate "smoke-ai-tools-integration" --type change --strict --json
 
 ### 接入后官方 verify 变「弱」了？
 
-verify 主体仍跟随官方生成物。OpenSpec 1.16.0 官方 verify 只在会话中输出 Completeness / Correctness / Coherence 记分卡，不写 `verification.md`。增强规则要求当前 Agent 串行执行完整 verify。verify 执行者仅对可安全、在当前 change 范围内且不需要用户决策的阻塞直接修复并重新验证（最多 3 轮）；其余情况停止并报告。结构化结论写回 verification，sync/archive 会在各自入口强制检查该结论（状态为通过、阻塞项为无）。当前 verification 已要求完整 diff 代码审查，并以未处理的 Critical/Important 阻断流转。若还需要独立审批人、第二次审查或 archive 阶段的额外审批门禁，应另加项目规则或独立 skill。
+verify 主体仍跟随官方生成物。OpenSpec 2.0.0 官方 verify 只在会话中输出 Completeness / Correctness / Coherence 记分卡，不写 `verification.md`。增强规则要求当前 Agent 串行执行完整 verify。verify 执行者仅对可安全、在当前 change 范围内且不需要用户决策的阻塞直接修复并重新验证（最多 3 轮）；其余情况停止并报告。结构化结论写回 verification，sync/archive 会在各自入口强制检查该结论（状态为通过、阻塞项为无）。当前 verification 已要求完整 diff 代码审查，并以未处理的 Critical/Important 阻断流转。若还需要独立审批人、第二次审查或 archive 阶段的额外审批门禁，应另加项目规则或独立 skill。
 
 ### 安装增强规则后还要再装 Superpowers 吗？注入要不要再替换？
 

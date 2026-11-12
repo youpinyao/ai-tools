@@ -3,7 +3,9 @@
 # SDD 临时进度区（不纳入版本控制）
 /.superpowers/
 
-# OpenSpec 官方 Skill：由目标项目运行 openspec init/update 管理
+# OpenSpec 官方 Skill：由目标项目运行 openspec init/update 管理。
+# core profile 生成前 6 个；verify 由 ai-tools 要求的自定义 profile 生成。
+# 后 5 个只在 profile 选中对应 workflow 时出现，不进入 5.1 检查器。
 /.agents/skills/openspec-explore/
 /.agents/skills/openspec-propose/
 /.agents/skills/openspec-update-change/
@@ -11,6 +13,11 @@
 /.agents/skills/openspec-verify-change/
 /.agents/skills/openspec-archive-change/
 /.agents/skills/openspec-sync-specs/
+/.agents/skills/openspec-new-change/
+/.agents/skills/openspec-continue-change/
+/.agents/skills/openspec-ff-change/
+/.agents/skills/openspec-bulk-archive-change/
+/.agents/skills/openspec-onboard/
 /.agents/skills/.openspec-target
 
 /spec

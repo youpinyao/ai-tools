@@ -97,7 +97,9 @@ class VerificationContractTest(unittest.TestCase):
         schema = SCHEMA.read_text()
         current = "\n".join(path.read_text() for path in CURRENT_DOCS[:-1])
 
-        self.assertIn("OpenSpec 1.16.0", current)
+        self.assertIn("OpenSpec 2.0.0", current)
+        self.assertIn("core profile 不含 verify", current)
+        self.assertIn("只安装 skills", current)
         self.assertNotIn("OpenSpec 1.13.2", current)
         self.assertNotIn("OpenSpec 1.12.0", current)
         self.assertIn("openspec list --specs", schema)

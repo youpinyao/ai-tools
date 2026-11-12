@@ -33,7 +33,7 @@ schema 与可选旁路的基础安装；完整的 verify 修复闭环及 sync/ar
 
 前置条件：
 
-- Node.js 满足当前 OpenSpec 包声明（1.16.0 为 `>=22.12.0`），并可使用 npm 安装 OpenSpec CLI。
+- Node.js 满足当前 OpenSpec 包声明（2.0.0 为 `>=22.12.0`），并可使用 npm 安装 OpenSpec CLI。
 - 支持 [Agent Skills](https://agentskills.io) 的 AI 编程助手（默认 Cursor、Codex）。
 
 以下命令中的 `AI_TOOLS_DIR` 是本仓库的绝对路径，`TARGET_PROJECT` 是目标项目的
@@ -62,7 +62,39 @@ TARGET_PROJECT="/absolute/path/to/target-project"
    test "$(openspec --version)" = "$TARGET_VERSION"
    ```
 
-2. 在目标项目根目录生成或升级 OpenSpec 官方共享 skills。新项目
+2. 确保本机 workflows 包含 `verify`。2.0.0 只安装 skills，且 core profile 不含 verify；
+   缺少它时，下一步 `init` 不会生成 `openspec-verify-change`。下面的命令只在缺少
+   `verify` 时写入本机全局配置，并保留已选中的其它 workflow：
+
+   ```bash
+   python3 - <<'PY'
+   import json
+   import subprocess
+
+   cfg = json.loads(
+       subprocess.check_output(["openspec", "config", "list", "--json"], text=True)
+   )
+   profile = cfg.get("profile") or "core"
+   workflows = list(cfg.get("workflows") or [])
+   if profile == "core" and not workflows:
+       workflows = ["propose", "explore", "apply", "update", "sync", "archive"]
+   if "verify" in workflows:
+       raise SystemExit(0)
+   workflows.append("verify")
+   subprocess.check_call(["openspec", "config", "set", "profile", "custom"])
+   subprocess.check_call(
+       [
+           "openspec",
+           "config",
+           "set",
+           "workflows",
+           json.dumps(workflows, separators=(",", ":")),
+       ]
+   )
+   PY
+   ```
+
+3. 在目标项目根目录生成或升级 OpenSpec 官方共享 skills。新项目
    使用 `init`：
 
    ```bash
@@ -80,7 +112,7 @@ TARGET_PROJECT="/absolute/path/to/target-project"
    rm -rf "$TARGET_PROJECT/.cursor/skills/openspec-"*
    ```
 
-3. 将本仓库的 schema 复制到目标项目，并在目标配置中启用：
+4. 将本仓库的 schema 复制到目标项目，并在目标配置中启用：
 
    ```bash
    mkdir -p "$TARGET_PROJECT/openspec/schemas"
@@ -121,14 +153,14 @@ TARGET_PROJECT="/absolute/path/to/target-project"
      "$TARGET_PROJECT/.agents/skills/"
    ```
 
-4. 在目标项目校验自定义 schema：
+5. 在目标项目校验自定义 schema：
 
    ```bash
    cd "$TARGET_PROJECT"
    openspec schema validate evidence-driven
    ```
 
-5. 要完成当前 ai-tools 接入，必须继续执行
+6. 要完成当前 ai-tools 接入，必须继续执行
    [接入文档 5.1 节](.agents/skills/integrating-ai-tools/reference.md#51-补充-verify-修复闭环与流转门禁)：
    向 apply、verify、sync、archive 的官方 skills 幂等追加
    `AI_TOOLS_VERIFY_GATE_V2` 规则。增强规则要求当前 Agent 串行完成 apply 和 verify，
@@ -136,7 +168,7 @@ TARGET_PROJECT="/absolute/path/to/target-project"
    使用 `AI_TOOLS_DIRECT_VERIFY_V1`；仅复制 schema 不会自动获得这些流转门禁。
 
 官方 `$openspec-*` skills 归 OpenSpec 管理；Cursor 与 Codex 共同从 `.agents/skills/` 发现它们。升级后的具体行为应以目标项目
-中当前 OpenSpec 官方生成物为准，不要从本仓库寻找或复制官方模板。当前 CLI 1.16.0
+中当前 OpenSpec 官方生成物为准，不要从本仓库寻找或复制官方模板。当前 CLI 2.0.0
 已确认的命令（以 `openspec --help` 为准，不要猜测未列出的参数）：
 
 - 新项目：`openspec init --tools codex`
@@ -187,7 +219,7 @@ verify、archive 与 sync 的具体行为以当前 OpenSpec 官方生成物为�
 
 ## Schema：`evidence-driven`
 
-`evidence-driven` 以 OpenSpec 1.16.0 官方 `spec-driven` 为本次语义基线：
+`evidence-driven` 以 OpenSpec 2.0.0 官方 `spec-driven` 为本次语义基线：
 
 - `proposal`、`specs`、`design`、`tasks` 是官方语义的简体中文派生。
 - 新增紧凑的 `verification.md` 账本，以范围、技能与规则、检查、代码审查、风险与回滚五节
@@ -202,7 +234,7 @@ verify、archive 与 sync 的具体行为以当前 OpenSpec 官方生成物为�
   结果、失败原因和未执行项；schema 不把这些记录扩展成额外的官方 verify 或
   archive 行为。
 
-兼容的官方 1.16.0 语义包括：
+兼容的官方 2.0.0 语义包括：
 
 - `explore` 在提出事实性问题前先只读检查相关 OpenSpec 制品、源码、测试、文档与配置，
   同时用 `openspec list --specs` 与带 `--type spec` 的 `openspec show` 区分在途 change
@@ -235,7 +267,7 @@ verify、archive 与 sync 的具体行为以当前 OpenSpec 官方生成物为�
   阻塞项必须为“无”。
 
 后续升级 OpenSpec 时，应从当前官方 `spec-driven` 基线重新核对这些语义，而不是
-永久假定 1.16.0 的实现细节。
+永久假定 2.0.0 的实现细节。
 
 ## 许可证
 
